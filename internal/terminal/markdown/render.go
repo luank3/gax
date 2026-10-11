@@ -202,19 +202,6 @@ func findItalicCloser(input string) int {
 	return -1
 }
 
-func trimClosingHashes(text string) string {
-	trimmed := strings.TrimRight(text, " \t")
-	end := len(trimmed)
-	hashEnd := end
-	for end > 0 && text[end-1] == '#' {
-		end--
-	}
-	if end < hashEnd && (end == 0 || text[end-1] == ' ' || text[end-1] == '\t') {
-		return strings.TrimRight(text[:end], " \t")
-	}
-	return text
-}
-
 func isFenceCloser(line string, fenceLength int) bool {
 	index := 0
 	for index < len(line) && index < 3 && line[index] == ' ' {

@@ -246,7 +246,13 @@ func (p *parser) stepBlock(final bool) bool {
 		p.openFence(info)
 	case LineHeading:
 		p.pending = rest
-		p.startHeading(line, info, complete)
+		if headingMarkerPresent(line, info) {
+			p.startHeading(line, info, complete)
+		} else {
+			// The scanner reports a heading for hashes followed by a newline, but upstream's
+			// dispatcher requires a space, so such a line stays prose.
+			p.startProse(line, 0, complete)
+		}
 	case LineThematic:
 		p.pending = rest
 		p.startThematic(line, info, complete)
@@ -273,11 +279,17 @@ func (p *parser) stepBlock(final bool) bool {
 	return true
 }
 
+// headingMarkerPresent reports whether the byte after a heading's hashes is a space, which the
+// upstream dispatcher requires even though its scanner also accepts a newline.
+func headingMarkerPresent(line string, info LineInfo) bool {
+	index := info.IndentLength + info.MarkerLength
+	return index < len(line) && line[index] == ' '
+}
+
 // stepFinalLine resolves the end-of-input cases where a line's own bytes decide its kind: a fence
 // candidate with no content, an indented incomplete prefix, a whitespace-only continuation, and a
-// terminal bullet that stayed ambiguous with a thematic break.
-// stepFinalLine resolves the end-of-input cases a block-start line decides on its own. The prose
-// cases live in stepFinalProseLine, which runs while a paragraph is still open.
+// terminal bullet that stayed ambiguous with a thematic break. The prose cases live in
+// stepFinalProseLine, which runs while a paragraph is still open.
 func (p *parser) stepFinalLine(line string, info LineInfo) bool {
 	streaming := ScanLine(line, false)
 	candidate := line[streaming.IndentLength:]
@@ -498,36 +510,24 @@ func (p *parser) feedProseLine() {
 // following line continues: the line itself as the join trims it, the boundary sentinel, and the
 // separator that replaces the newline.
 func paragraphBoundary(line, next string) (body, separator, nextTrimmed string) {
-	previous := strings.TrimSuffix(line, "\r")
-	trailingSpaces := len(previous) - len(strings.TrimRight(previous, " "))
-	codeAtNewline := inlineCodeOpenAtEnd(previous)
-	body = line
-	switch {
-	case codeAtNewline:
-		// The upstream inline-code handler emits the trailing bytes as written.
-	case trailingSpaces >= 2:
-		body = strings.TrimRight(line, " \r")
-	default:
-		body = strings.TrimRight(line, " \t\r")
-	}
+	// Upstream never rewrites a line: it emits the bytes as they arrive and decides only what
+	// replaces the newline. A carriage return is therefore a text byte that also ends the trailing
+	// space run, and a hard break is a newline on its own rather than a re-emission of the spaces.
+	// A carriage return does not end the run: upstream keeps counting the spaces before it.
+	withoutCR := strings.TrimSuffix(line, "\r")
+	trailingSpaces := len(withoutCR) - len(strings.TrimRight(withoutCR, " "))
 	var out strings.Builder
 	out.WriteByte(inlineLineBoundary)
-	if trailingSpaces >= 2 && !codeAtNewline {
-		out.WriteString(strings.Repeat(" ", trailingSpaces))
-		if strings.HasSuffix(line, "\r") {
-			out.WriteByte('\r')
-		}
+	if trailingSpaces >= 2 && !inlineCodeOpenAtEnd(line) {
 		out.WriteByte('\n')
-		return body, out.String(), next
+		return line, out.String(), next
 	}
-	trailingWhitespace := previous[len(strings.TrimRight(previous, " \t")):]
-	switch {
-	case trailingWhitespace == "":
+	// A soft join adds a space unless the line already ended in one, and skips the whitespace the
+	// next line starts with.
+	if line == "" || line[len(line)-1] != ' ' && line[len(line)-1] != '\t' {
 		out.WriteByte(' ')
-	case !codeAtNewline:
-		out.WriteString(trailingWhitespace)
 	}
-	return body, out.String(), strings.TrimLeft(next, " \t")
+	return line, out.String(), strings.TrimLeft(next, " \t")
 }
 
 // startProse begins a paragraph, or a list item whose prefix is already written. The line is the
@@ -601,10 +601,10 @@ func (p *parser) closeProseRawTail(last string) {
 	// The raw-tail join writes its separator, then the tail as literal bytes: upstream's newline
 	// handler emits them while the run they sit inside is still open, and md_flush closes that run
 	// afterwards.
-	previous := strings.TrimSuffix(p.line, "\r")
-	trailingSpaces := len(previous) - len(strings.TrimRight(previous, " "))
+	withoutCR := strings.TrimSuffix(p.line, "\r")
+	trailingSpaces := len(withoutCR) - len(strings.TrimRight(withoutCR, " "))
 	switch {
-	case trailingSpaces >= 2 && !inlineCodeOpenAtEnd(previous):
+	case trailingSpaces >= 2 && !inlineCodeOpenAtEnd(p.line):
 		p.feedInline("\n", false)
 	case len(p.line) > 0 && p.line[len(p.line)-1] != ' ' && p.line[len(p.line)-1] != '\t':
 		p.feedInline(" ", false)
@@ -845,9 +845,13 @@ func (p *parser) startBlockquote(line string, info LineInfo, complete bool) {
 // document's last line.
 func (p *parser) startHeading(line string, info LineInfo, complete bool) {
 	p.startBlock()
-	heading := strings.TrimLeft(line[info.IndentLength+info.MarkerLength:], " \t")
+	// Upstream consumes the hashes and the single space that follows them, keeps any further
+	// indentation, expands tabs, and does not strip a closing hash run.
+	heading := line[info.IndentLength+info.MarkerLength:]
+	if heading != "" && heading[0] == ' ' {
+		heading = heading[1:]
+	}
 	heading = strings.ReplaceAll(heading, "\t", "    ")
-	heading = trimClosingHashes(heading)
 	text, italicOpen := renderInlineWithDeferredItalicClose(heading, p.styled)
 	if p.styled {
 		headingOpen := terminaltheme.Open(terminaltheme.Heading)

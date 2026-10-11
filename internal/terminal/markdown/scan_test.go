@@ -279,8 +279,10 @@ func TestRenderSoftJoinsProseAndPreservesHardBreaks(t *testing.T) {
 	if got := Render("foo  \n  bar", 0, false); got != "foo  \n  bar" {
 		t.Fatalf("hard break continuation indent = %q, want preserved indentation", got)
 	}
-	if got := Render("foo\r\nbar", 0, false); got != "foo bar" {
-		t.Fatalf("CRLF soft break = %q, want %q", got, "foo bar")
+	// Upstream keeps the carriage return as a text byte and replaces only the newline, so a CRLF
+	// soft break reads "foo\r bar"; the wrapper drops the CR when wrapping is on.
+	if got := Render("foo\r\nbar", 0, false); got != "foo\r bar" {
+		t.Fatalf("CRLF soft break = %q, want %q", got, "foo\r bar")
 	}
 	if got := Render("foo  \r\nbar", 0, false); got != "foo  \r\nbar" {
 		t.Fatalf("CRLF hard break = %q, want the original hard line break", got)
