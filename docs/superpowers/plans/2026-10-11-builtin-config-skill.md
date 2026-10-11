@@ -65,7 +65,7 @@ baseline.
 
 ## Record
 
-- The rendered document is 15 929 bytes / 196 lines, of which the generated settings table is 64
+- The rendered document is 15 918 bytes / 196 lines, of which the generated settings table is 64
   rows. `read` returns it numbered like a file (`     1→---`), and the tool cap is deliberately not
   applied: the document is fixed-size and the tail is the reference table.
 - The listing line is `- customize-gax: Change gax's own settings, providers, models, or presets
