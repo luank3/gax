@@ -22,6 +22,7 @@ import (
 	"github.com/luank3/gax/internal/provider"
 	systemshell "github.com/luank3/gax/internal/system/shell"
 	"github.com/luank3/gax/internal/system/tempfiles"
+	"github.com/luank3/gax/internal/web"
 )
 
 const defaultOutputCap = 50 * 1024
@@ -29,6 +30,7 @@ const defaultOutputCap = 50 * 1024
 type Options struct {
 	OutputCap        int
 	NoTasks          bool
+	NoWeb            bool
 	BashTimeout      time.Duration
 	BashTimeoutMax   time.Duration
 	BashTimeoutGrace time.Duration
@@ -38,6 +40,9 @@ type Options struct {
 	Shell            string
 	WorkDir          string
 	UseExactValues   bool
+	WebTimeout       time.Duration
+	WebMaxBytes      int64
+	WebClient        *web.Client
 }
 
 type Result struct {
@@ -146,7 +151,7 @@ func New(options Options) *Registry {
 		options.TaskMaxRunning = 32
 	}
 	registry := &Registry{outputCap: capBytes, options: options, active: make(map[int]*commandTask)}
-	registry.definitions = builtInDefinitions(options.NoTasks)
+	registry.definitions = builtInDefinitions(options.NoTasks, options.NoWeb)
 	registry.tasks = newTaskManager(options.TaskMaxRunning)
 	return registry
 }
@@ -220,11 +225,12 @@ func NewFromConfig(store *config.Store) *Registry {
 		store = config.New(config.DefaultSettings())
 	}
 	registry := New(Options{
-		OutputCap: int(store.Size("tool_output_cap")), NoTasks: store.Bool("no_tasks"),
+		OutputCap: int(store.Size("tool_output_cap")), NoTasks: store.Bool("no_tasks"), NoWeb: store.Bool("no_web"),
 		BashTimeout: store.Duration("bash.timeout"), BashTimeoutMax: store.Duration("bash.timeout_max"),
 		BashTimeoutGrace: store.Duration("bash.timeout_grace"), BackgroundYield: store.Duration("bash.background_yield"),
 		TaskWaitTimeout: store.Duration("task.wait_timeout"), TaskMaxRunning: store.Int("task.max_running"),
 		Shell: configString(store, "bash.shell"), UseExactValues: true,
+		WebTimeout: store.Duration("web.timeout"), WebMaxBytes: store.Size("web.max_bytes"),
 	})
 	registry.store = store
 	return registry
@@ -468,7 +474,7 @@ func (registry *Registry) Definitions() []provider.ToolDefinition {
 	}
 	definitionsSource := registry.definitions
 	if registry.store != nil {
-		definitionsSource = builtInDefinitions(registry.noTasks())
+		definitionsSource = builtInDefinitions(registry.noTasks(), registry.noWeb())
 	}
 	definitions := make([]provider.ToolDefinition, len(definitionsSource))
 	for index, definition := range definitionsSource {
@@ -519,6 +525,10 @@ func (registry *Registry) ExecuteWithDisplayContext(ctx context.Context, call co
 			result = registry.runBashContext(ctx, arguments, imageInput, display)
 		case "task_wait":
 			result = registry.runTaskWaitContext(ctx, arguments, imageInput, display)
+		case "web_fetch":
+			result = registry.runWebFetchContext(ctx, arguments)
+		case "web_search":
+			result = registry.runWebSearchContext(ctx, arguments)
 		default:
 			result = registry.RunWithDisplay(toolName, arguments, imageInput, display)
 		}
@@ -558,6 +568,10 @@ func (registry *Registry) RunWithDisplay(name, arguments string, imageInput int,
 		run = registry.runBash
 	case "task_wait":
 		run = registry.runTaskWait
+	case "web_fetch":
+		run = registry.runWebFetch
+	case "web_search":
+		run = registry.runWebSearch
 	default:
 		return Result{Text: fmt.Sprintf("error: unknown tool %q", name)}
 	}
@@ -625,6 +639,15 @@ func (registry *Registry) Presentation(call conversation.Item) ToolPresentation 
 		validID = validID && id != ""
 		presentation.RawArgument = !validID && arguments != ""
 		presentation.HasArgument = validID || presentation.RawArgument
+		presentation.PreviewMode = PreviewHeadTail
+	case "web_fetch", "web_search":
+		key := "url"
+		if name == "web_search" {
+			key = "query"
+		}
+		presentation.Argument, presentation.HasArgument = argument(key)
+		presentation.RawArgument = !presentation.HasArgument && arguments != ""
+		presentation.HasArgument = presentation.HasArgument || presentation.RawArgument
 		presentation.PreviewMode = PreviewHeadTail
 	}
 	if !presentation.HasArgument && arguments != "" {
@@ -788,7 +811,7 @@ func isImagePath(path string) bool {
 	}
 }
 
-func builtInDefinitions(noTasks bool) []provider.ToolDefinition {
+func builtInDefinitions(noTasks, noWeb bool) []provider.ToolDefinition {
 	definitions := []provider.ToolDefinition{
 		{
 			Name:        "read",
@@ -821,6 +844,9 @@ func builtInDefinitions(noTasks bool) []provider.ToolDefinition {
 	definitions = append(definitions, bashDefinition(noTasks))
 	if !noTasks {
 		definitions = append(definitions, taskWaitDefinition())
+	}
+	if !noWeb {
+		definitions = append(definitions, webFetchDefinition(), webSearchDefinition())
 	}
 	return definitions
 }

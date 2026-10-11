@@ -15,14 +15,14 @@ import (
 func TestBashDefinitionsExposeTaskFields(t *testing.T) {
 	registry := New(Options{})
 	definitions := registry.Definitions()
-	if len(definitions) != 5 {
-		t.Fatalf("default tools = %d, want read/write/edit/bash/task_wait", len(definitions))
+	if len(definitions) != 7 {
+		t.Fatalf("default tools = %d, want read/write/edit/bash/task_wait/web_fetch/web_search", len(definitions))
 	}
 	if definitions[3].Name != "bash" || definitions[4].Name != "task_wait" {
 		t.Fatalf("shell tool definitions = %q, %q", definitions[3].Name, definitions[4].Name)
 	}
 	noTasks := New(Options{NoTasks: true}).Definitions()
-	if len(noTasks) != 4 || noTasks[3].Name != "bash" || len(noTasks[3].Params) != 2 {
+	if len(noTasks) != 6 || noTasks[3].Name != "bash" || len(noTasks[3].Params) != 2 {
 		t.Fatalf("no-tasks tool definitions = %#v", noTasks)
 	}
 }
@@ -40,7 +40,7 @@ func TestNewFromConfigPreservesExplicitZeroDurations(t *testing.T) {
 		registry.options.BackgroundYield != 0 || registry.options.TaskWaitTimeout != 0 || registry.options.TaskMaxRunning != 4 {
 		t.Fatalf("config values were not preserved: cap=%d options=%+v", registry.outputCap, registry.options)
 	}
-	if len(registry.Definitions()) != 4 {
+	if len(registry.Definitions()) != 6 {
 		t.Fatalf("no_tasks config still advertised task_wait: %#v", registry.Definitions())
 	}
 }

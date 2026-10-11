@@ -135,8 +135,9 @@ at that tier and restores the built-in default.
 Every setting has a `GAX_`-prefixed environment variable (`GAX_PROVIDER`, `GAX_MODEL`,
 `GAX_EFFORT`, `GAX_PRESET`, `GAX_THEME`, `GAX_SHOW_REASONING`, `GAX_NO_SESSION`, `GAX_TRACE`,
 `GAX_TRANSCRIPT`, `GAX_BASH_TIMEOUT`, `GAX_COMPACT_AUTO`, `GAX_CATALOG_URL`, …). Run `/config`
-in the REPL for the complete, ordered list; provider keys are unprefixed (`OPENAI_API_KEY`,
-`DEEPSEEK_API_KEY`, …). Credential values are redacted from diagnostics and wire traces.
+in the REPL for the complete, ordered list; provider and search keys are unprefixed
+(`OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `BRAVE_API_KEY`, …). Credential values are redacted from
+diagnostics and wire traces.
 
 Example `config.json`:
 
@@ -185,10 +186,16 @@ project context, skills, and the subagents section.
 with the provider/model/effort/git state, then the conversation items, then a final `result`
 record (`outcome`, `turns`, `elapsed_ms`, `text`, `context_tokens`, `cost`, `session_id`).
 
-The agent ships these built-in tools: `read`, `edit`, `write`, `bash`, and `task_wait`.
-`bash` commands that outlive their timeout detach into background tasks, and `gax -p "<task>"`
-can be run through `bash` to delegate to a subagent with clean context. Besides files, `read`
-accepts the `gax:skills/<name>/SKILL.md` paths of the skills built into the binary.
+The agent ships these built-in tools: `read`, `edit`, `write`, `bash`, `task_wait`, `web_fetch`,
+and `web_search`. `bash` commands that outlive their timeout detach into background tasks, and
+`gax -p "<task>"` can be run through `bash` to delegate to a subagent with clean context. Besides
+files, `read` accepts the `gax:skills/<name>/SKILL.md` paths of the skills built into the binary.
+
+`web_fetch` retrieves a URL and converts an HTML response to plain text unless the model passes
+`strip: false` for the raw body; `web_search` returns ranked titles, URLs, and snippets, searching
+through the Brave Search API when `BRAVE_API_KEY` is set and through DuckDuckGo's HTML endpoint
+otherwise. Both follow `web.timeout` and `web.max_bytes`, and `GAX_NO_WEB=on` (or `no_web` in
+`config.json`) drops them from the toolset.
 
 ## Development
 

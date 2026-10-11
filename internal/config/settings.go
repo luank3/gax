@@ -14,6 +14,7 @@ func DefaultSettings() []Setting {
 		{Key: "no_skills", EnvVar: "GAX_NO_SKILLS", Description: "Skip the skills listing in the system prompt", Choices: "on|off"},
 		{Key: "no_subagents", EnvVar: "GAX_NO_SUBAGENTS", Description: "Skip the subagents section in the system prompt", Choices: "on|off"},
 		{Key: "no_tasks", EnvVar: "GAX_NO_TASKS", Description: "Disable background tasks: bash timeouts kill instead of detaching, and the task tools are not offered", Choices: "on|off"},
+		{Key: "no_web", EnvVar: "GAX_NO_WEB", Description: "Disable the web tools: web_fetch and web_search are not offered", Choices: "on|off"},
 
 		{Key: "markdown", EnvVar: "GAX_MARKDOWN", Default: "1", Description: "Render Markdown in the terminal (TTY only; piped output is always raw)", Choices: "on|off", Editable: true},
 		{Key: "show_reasoning", EnvVar: "GAX_SHOW_REASONING", Description: "Show reasoning/CoT deltas live (default off)", Choices: "on|off", Editable: true},
@@ -46,6 +47,10 @@ func DefaultSettings() []Setting {
 		{Key: "bash.shell", EnvVar: "GAX_BASH_SHELL", Description: "Shell for the bash tool, a $PATH name or path (default: bash, else sh)"},
 		{Key: "task.wait_timeout", EnvVar: "GAX_TASK_WAIT_TIMEOUT", Default: "10m", Description: "Default task_wait timeout when the model omits one (kill waits default to immediate)", Kind: KindDuration, Editable: true},
 		{Key: "task.max_running", EnvVar: "GAX_TASK_MAX_RUNNING", Default: "32", Description: "Maximum concurrently running background tasks", Kind: KindInt, Min: 1, Max: 64, Editable: true},
+
+		{Key: "web.brave_api_key", EnvVar: "BRAVE_API_KEY", Description: "Brave Search API key for the web_search tool; unset falls back to DuckDuckGo", Secret: true},
+		{Key: "web.timeout", EnvVar: "GAX_WEB_TIMEOUT", Default: "30s", Description: "Timeout for one web_fetch or web_search request", Kind: KindDuration, Editable: true},
+		{Key: "web.max_bytes", EnvVar: "GAX_WEB_MAX_BYTES", Default: "2M", Description: "Maximum response bytes the web tools download", Kind: KindSize, Editable: true},
 
 		{Key: "http.max_retries", EnvVar: "GAX_HTTP_MAX_RETRIES", Default: "4", Description: "Additional retries for transient HTTP failures", Kind: KindInt, Max: 100, Editable: true},
 		{Key: "http.retry_base", EnvVar: "GAX_HTTP_RETRY_BASE", Default: "1s", Description: "Base backoff between HTTP retries", Kind: KindDuration, Min: 1, Editable: true},

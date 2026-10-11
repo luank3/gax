@@ -17,10 +17,10 @@ import (
 func TestBuiltInToolDefinitions(t *testing.T) {
 	registry := New(Options{})
 	definitions := registry.Definitions()
-	if len(definitions) != 5 {
-		t.Fatalf("got %d definitions, want read/edit/write/bash/task_wait", len(definitions))
+	if len(definitions) != 7 {
+		t.Fatalf("got %d definitions, want read/edit/write/bash/task_wait/web_fetch/web_search", len(definitions))
 	}
-	for index, name := range []string{"read", "edit", "write", "bash", "task_wait"} {
+	for index, name := range []string{"read", "edit", "write", "bash", "task_wait", "web_fetch", "web_search"} {
 		if definitions[index].Name != name {
 			t.Fatalf("definition %d is %q, want %q", index, definitions[index].Name, name)
 		}
@@ -316,6 +316,8 @@ func TestToolPresentationResolvesUpstreamBuiltInMetadata(t *testing.T) {
 		{"bash", map[string]any{"command": "cat file.txt | tee copy.txt"}, "cat file.txt | tee copy.txt", "", "", OutputPlain, PreviewHeadTail, 3},
 		{"bash", map[string]any{"command": "printf ok"}, "printf ok", "", "", OutputPlain, PreviewHeadTail, 3},
 		{"task_wait", map[string]any{"id": "worker_1", "timeout_seconds": 2, "kill": true}, "worker_1 (up to 2s, then kill)", "", "", OutputPlain, PreviewHeadTail, 0},
+		{"web_fetch", map[string]any{"url": "https://example.com/a"}, "https://example.com/a", "", "", OutputPlain, PreviewHeadTail, 0},
+		{"web_search", map[string]any{"query": "golang timeout"}, "golang timeout", "", "", OutputPlain, PreviewHeadTail, 0},
 	}
 	for _, test := range cases {
 		call := conversation.Item{Kind: conversation.KindToolCall, ToolName: conversation.String(test.name), Arguments: conversation.String(jsonArgs(test.arguments))}

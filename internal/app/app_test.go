@@ -171,7 +171,7 @@ func TestRunOneShotStreamsAnswerThroughConfiguredProviderAndTools(t *testing.T) 
 			t.Errorf("request model = %q", model)
 		}
 		var tools []json.RawMessage
-		if err := json.Unmarshal(body["tools"], &tools); err != nil || len(tools) != 5 {
+		if err := json.Unmarshal(body["tools"], &tools); err != nil || len(tools) != 7 {
 			t.Errorf("request tools = %d, err=%v", len(tools), err)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
