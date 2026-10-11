@@ -517,3 +517,17 @@ against upstream and cannot attribute by itself.
 Method, for repeating it: write `"<base64 input> <width>"` per line to `/tmp/corpus.txt`, render
 each line with `/tmp/mdrender <width>`, render the same lines through `Render(input, width, true)`
 in a throwaway test that writes base64 to `/tmp/go_out.txt`, then compare.
+
+### Are the deviations deliberate? (2026-10-11)
+
+The five rules above could be intentional choices rather than gaps, so the port's own fixtures were
+run through the same driver: 21 fixture inputs from `stream_test.go`, at their own widths, in both
+styled modes. **20 of 21 match upstream byte for byte.** The one that does not is the carriage-return
+case (`foo\r\nbar`), and no test in the package asserts the port's trimmed form as upstream's
+behavior — the CR tests (`TestStreamMatchesRenderForCRLines`, the fixture list entry) compare the
+stream against `Render`, which is self-consistency, not parity.
+
+So the deviations are gaps rather than deliberate choices: wherever the port has an upstream-derived
+fixture it matches, and the rules it lacks were simply never ported. Fixing them is therefore
+"mirror upstream" work, not a taste question. Each has a C-verified repro, and any fixture whose
+expected bytes encode the port's form of a rule must be corrected from the C in the same change.
