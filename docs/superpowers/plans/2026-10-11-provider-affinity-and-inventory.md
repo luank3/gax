@@ -3,8 +3,8 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make requests that belong to no recorded conversation carry a real session id, so the
-OpenCode Go gateway's required `x-opencode-session` header is never empty; retire the
-`opencode-zen` and `agnes` shipped defs.
+OpenCode Go gateway's required `x-opencode-session` header is never empty; give Codex's streamed
+requests the identity headers upstream sends; retire the `opencode-zen` and `agnes` shipped defs.
 
 **Architecture:** `runtime.ProcessSessionID()` lazily generates one UUID v4 per process — the port
 of upstream `provider_process_session_id()` (`src/providers/provider_config.c:237`). Every place
@@ -32,6 +32,8 @@ without one (`src/providers/registry.c:26`). gax resolves it where it expands th
 - Retired ids fail with the ordinary `unknown provider '<id>' (supported: ...)` diagnostic. No
   compatibility shim, no hidden config-defined stub, no re-add of the removed `/usage` hook.
 - `opencode-go` keeps its definition, its catalog id, and its `/usage` backend unchanged.
+- The Codex identity headers stay scoped to Codex: no other provider's request grows a session or
+  beta header, and the metadata/usage paths keep their own Accept handling.
 
 ## Tasks
 
@@ -60,7 +62,15 @@ without one (`src/providers/registry.c:26`). gax resolves it where it expands th
       unknown capabilities and no invented pricing" coverage survives.
 - [x] Update the `unknown provider` diagnostic in the selection test.
 
-### 4. Document the change
+### 4. Port the Codex session headers
+
+- [x] Write failing header assertions: the streamed Responses request carries `session-id`,
+      `x-client-request-id`, and `OpenAI-Beta: responses=experimental`; the non-streamed metadata
+      request carries `Accept: application/json` and none of the three.
+- [x] Add both branches to `Provider.Headers`, resolving the session id when the caller has none.
+- [x] Verify `internal/provider/runtime` tests.
+
+### 5. Document the change
 
 - [x] Update the README provider inventory and table, the changelog, and the built-in
       `customize-gax` skill's credential list.
@@ -80,6 +90,12 @@ without one (`src/providers/registry.c:26`). gax resolves it where it expands th
   run gets a fresh one.
 - The fallback lives at the expansion boundary rather than at each caller, so model listing and
   `/usage` requests (which pass `""` on purpose) get the same non-empty header as model requests.
+- `Provider.Headers` resolves the id too, because the Codex branch needs it: upstream's
+  `codex_auth_headers` (`src/providers/codex_auth.c:275`) keys its session identity and beta flag
+  off the *streaming* flag, which gax no longer passes on the request path — the SSE Accept and
+  Content-Type moved to the transport, so the Responses wire marks the streamed case instead. The
+  non-streamed branch sends upstream's `Accept: application/json`, which the Codex `/models`
+  request previously went without.
 - Retiring `agnes` also drops its catalog-less listing behavior; that path is still covered by the
   `openai-compatible` test, which asserts unknown capabilities and unpriced metadata.
 - Upstream still ships both defs; gax diverges deliberately because the Zen endpoint no longer

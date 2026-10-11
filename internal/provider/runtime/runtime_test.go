@@ -21,6 +21,7 @@ import (
 	"github.com/luank3/gax/internal/provider/registry"
 	"github.com/luank3/gax/internal/provider/runtime"
 	"github.com/luank3/gax/internal/transport"
+	"github.com/luank3/gax/internal/version"
 )
 
 func TestPinnedProviderCannotBeRedirectedOrRewired(t *testing.T) {
@@ -1651,6 +1652,20 @@ func TestCodexAuthSourceLoadsCLIAccountAndBuildsAuthenticatedHeaders(t *testing.
 		if !strings.Contains(headers, want) {
 			t.Errorf("Codex request headers omit %q: %s", want, headers)
 		}
+	}
+	extra := []string{"originator: codex_cli_rs", "User-Agent: codex_cli_rs/0.144.1 gax/" + version.Value}
+	want := append([]string{
+		"Authorization: Bearer access-secret", "chatgpt-account-id: account-123",
+		"session-id: conversation-7", "x-client-request-id: conversation-7", "OpenAI-Beta: responses=experimental",
+	}, extra...)
+	if got := provider.Headers(runtime.WireResponses, "conversation-7", false); !reflect.DeepEqual(got, want) {
+		t.Fatalf("streamed Codex headers = %q, want %q", got, want)
+	}
+	want = append([]string{
+		"Authorization: Bearer access-secret", "chatgpt-account-id: account-123", "Accept: application/json",
+	}, extra...)
+	if got := provider.MetadataHeaders("conversation-7"); !reflect.DeepEqual(got, want) {
+		t.Fatalf("non-streamed Codex headers = %q, want %q", got, want)
 	}
 }
 

@@ -1477,6 +1477,11 @@ func (provider *Provider) Headers(wire Wire, sessionID string, streaming bool) [
 	if provider == nil {
 		return nil
 	}
+	// The Codex session headers below need an id even when the request has no conversation; the
+	// configured headers resolve their own placeholder.
+	if sessionID == "" {
+		sessionID = ProcessSessionID()
+	}
 	headers := make([]string, 0, len(provider.extraHeaders)+4)
 	if wire == WireAnthropic {
 		if credentials := provider.Credentials(); credentials != "" {
@@ -1490,8 +1495,20 @@ func (provider *Provider) Headers(wire Wire, sessionID string, streaming bool) [
 	} else if credentials := provider.Credentials(); credentials != "" {
 		headers = append(headers, "Authorization: Bearer "+credentials)
 	}
-	if provider.Definition != nil && provider.Definition.ID == "codex" && provider.authAccountID != "" {
-		headers = append(headers, "chatgpt-account-id: "+provider.authAccountID)
+	if provider.Definition != nil && provider.Definition.ID == "codex" {
+		if provider.authAccountID != "" {
+			headers = append(headers, "chatgpt-account-id: "+provider.authAccountID)
+		}
+		// Upstream's codex_auth_headers pins a streamed request to the session the official CLI
+		// sends and flags the experimental Responses dialect; everything else gets a plain Accept.
+		// gax streams every Codex model request over the Responses wire and leaves the SSE headers
+		// to the transport, so that wire is the streamed case here.
+		if streaming || wire == WireResponses {
+			headers = append(headers, "session-id: "+sessionID, "x-client-request-id: "+sessionID,
+				"OpenAI-Beta: responses=experimental")
+		} else {
+			headers = append(headers, "Accept: application/json")
+		}
 	}
 	if streaming {
 		headers = append(headers, "Accept: text/event-stream", "Content-Type: application/json")
