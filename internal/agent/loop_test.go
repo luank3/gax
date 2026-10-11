@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/luank3/gax/internal/agent"
@@ -509,5 +510,125 @@ func TestRunLoopCompactsAtToolSeamAndReportsLatestContext(t *testing.T) {
 	})
 	if result.Outcome != agent.LoopComplete || result.Turns != 2 || calls != 2 || compactions != 1 || result.LastContextTokens != -1 {
 		t.Fatalf("tool seam compaction or latest context differs: result=%+v calls=%d compactions=%d", result, calls, compactions)
+	}
+}
+
+func TestRunLoopObservesEveryToolCallBeforeDispatchingAny(t *testing.T) {
+	state := agent.NewSession()
+	state.Tools = []coreprovider.ToolDefinition{{Name: "read"}}
+	var order []string
+	turnCalls := 0
+	stream := agent.StreamFunc(func(_ context.Context, _ *transport.Client, _ *runtime.Provider, _ string,
+		_ coreprovider.Context, _ client.StreamOptions, _ func() bool, callback func(conversation.Event),
+	) (transport.Response, error) {
+		turnCalls++
+		if turnCalls == 1 {
+			for _, id := range []string{"c1", "c2"} {
+				callback(conversation.Event{Kind: conversation.EventToolCallStart, ID: conversation.String(id), Name: "read"})
+				callback(conversation.Event{Kind: conversation.EventToolCallEnd, ID: conversation.String(id)})
+			}
+		} else {
+			callback(conversation.Event{Kind: conversation.EventTextDelta, Text: "finished"})
+		}
+		callback(conversation.Event{Kind: conversation.EventDone})
+		return transport.Response{StatusCode: 200}, nil
+	})
+	result := agent.RunLoop(context.Background(), agent.LoopOptions{
+		Session: state, Stream: stream,
+		ToolSeen: func(call conversation.Item) { order = append(order, "seen:"+*call.CallID) },
+		ToolCall: func(call conversation.Item, _ agent.ToolAction, _ int) conversation.Item {
+			order = append(order, "run:"+*call.CallID)
+			return agent.ToolResult(call, "ok", conversation.Origin(""))
+		},
+	})
+	want := []string{"seen:c1", "seen:c2", "run:c1", "run:c2"}
+	if result.Outcome != agent.LoopComplete || !reflect.DeepEqual(order, want) {
+		t.Fatalf("tool observation order = %v, want %v (result=%+v)", order, want, result)
+	}
+}
+
+// Upstream repairs a provider failure with turn_keep_text, which drops every non-assistant item,
+// so the observed repair range never holds a tool call and no skipped result is synthesized.
+func TestRunLoopProviderFailureDropsUnrunCallBeforeObservation(t *testing.T) {
+	state := agent.NewSession()
+	state.Tools = []coreprovider.ToolDefinition{{Name: "read"}}
+	var seen []string
+	stream := agent.StreamFunc(func(_ context.Context, _ *transport.Client, _ *runtime.Provider, _ string,
+		_ coreprovider.Context, _ client.StreamOptions, _ func() bool, callback func(conversation.Event),
+	) (transport.Response, error) {
+		callback(conversation.Event{Kind: conversation.EventTextDelta, Text: "partial"})
+		callback(conversation.Event{Kind: conversation.EventToolCallStart, ID: conversation.String("c1"), Name: "read"})
+		callback(conversation.Event{Kind: conversation.EventToolCallEnd, ID: conversation.String("c1")})
+		callback(conversation.Event{Kind: conversation.EventError, ErrorMessage: "boom"})
+		return transport.Response{}, errors.New("boom")
+	})
+	result := agent.RunLoop(context.Background(), agent.LoopOptions{
+		Session: state, Stream: stream,
+		ToolSeen: func(call conversation.Item) { seen = append(seen, *call.CallID) },
+	})
+	if result.Outcome != agent.LoopProviderError || len(seen) != 0 {
+		t.Fatalf("provider repair keeps text only, so no call may be observed: result=%+v seen=%v", result, seen)
+	}
+	for _, item := range state.Items {
+		if item.Kind == conversation.KindToolCall || item.Kind == conversation.KindToolResult {
+			t.Fatalf("provider repair must drop the unrun call and synthesize no result: %+v", state.Items)
+		}
+	}
+	if result.FinalItemsFrom >= result.FinalItemsTo {
+		t.Fatalf("kept partial text should occupy the repaired range: from=%d to=%d",
+			result.FinalItemsFrom, result.FinalItemsTo)
+	}
+	for index := result.FinalItemsFrom; index < result.FinalItemsTo; index++ {
+		if state.Items[index].Kind != conversation.KindAssistant {
+			t.Fatalf("repaired range holds a non-assistant item: %+v", state.Items[index])
+		}
+	}
+}
+
+func TestRunLoopObservesToolCallsOnUserCancelWithoutDispatching(t *testing.T) {
+	state := agent.NewSession()
+	state.Tools = []coreprovider.ToolDefinition{{Name: "read"}}
+	var seen []string
+	dispatched := 0
+	stream := agent.StreamFunc(func(_ context.Context, _ *transport.Client, _ *runtime.Provider, _ string,
+		_ coreprovider.Context, _ client.StreamOptions, _ func() bool, callback func(conversation.Event),
+	) (transport.Response, error) {
+		callback(conversation.Event{Kind: conversation.EventToolCallStart, ID: conversation.String("c1"), Name: "read"})
+		callback(conversation.Event{Kind: conversation.EventToolCallEnd, ID: conversation.String("c1")})
+		callback(conversation.Event{Kind: conversation.EventDone})
+		return transport.Response{StatusCode: 200}, nil
+	})
+	result := agent.RunLoop(context.Background(), agent.LoopOptions{
+		Session: state, Stream: stream,
+		Checkpoint: func() agent.Signal { return agent.SignalAbort },
+		ToolSeen:   func(call conversation.Item) { seen = append(seen, *call.CallID) },
+		ToolCall: func(call conversation.Item, _ agent.ToolAction, _ int) conversation.Item {
+			dispatched++
+			return agent.ToolResult(call, agent.SkippedResult, conversation.OriginSkipped)
+		},
+	})
+	if result.Outcome != agent.LoopInterrupted || !result.AbortMarkerPlaced || dispatched != 0 {
+		t.Fatalf("cancelled turn must not dispatch tools: result=%+v dispatched=%d", result, dispatched)
+	}
+	if len(seen) != 1 || seen[0] != "c1" {
+		t.Fatalf("cancelled turn should still report its streamed call: seen=%v", seen)
+	}
+}
+
+func TestRunLoopObservesNoCallsForToolFreeTurn(t *testing.T) {
+	state := agent.NewSession()
+	seen := 0
+	stream := agent.StreamFunc(func(_ context.Context, _ *transport.Client, _ *runtime.Provider, _ string,
+		_ coreprovider.Context, _ client.StreamOptions, _ func() bool, callback func(conversation.Event),
+	) (transport.Response, error) {
+		callback(conversation.Event{Kind: conversation.EventTextDelta, Text: "just text"})
+		callback(conversation.Event{Kind: conversation.EventDone})
+		return transport.Response{StatusCode: 200}, nil
+	})
+	result := agent.RunLoop(context.Background(), agent.LoopOptions{
+		Session: state, Stream: stream, ToolSeen: func(conversation.Item) { seen++ },
+	})
+	if result.Outcome != agent.LoopComplete || seen != 0 {
+		t.Fatalf("tool-free turn reported calls: result=%+v seen=%d", result, seen)
 	}
 }

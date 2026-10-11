@@ -32,7 +32,9 @@ const (
 )
 
 // Session holds the canonical item history and its provider-facing settings. Item slices are
-// mutable through the methods below; Context returns a view that remains valid until mutation.
+// mutable through the methods below; Context returns a view that remains valid only until the
+// next mutation. Retire in particular clears the tail of the backing array in place, so a Context
+// captured before a Retire must be discarded rather than reused.
 type Session struct {
 	Model              *string
 	ModelLabel         *string

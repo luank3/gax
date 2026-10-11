@@ -119,6 +119,7 @@ func RunLoop(ctx context.Context, options LoopOptions) LoopResult {
 				options.Session.AddBoundary()
 			}
 			outcome := AbsorbAbort(options.Session, &turn, AbortProviderError)
+			observeTools(options, outcome.ItemsFrom, outcome.ItemsTo)
 			result.FinalItemsFrom = outcome.ItemsFrom
 			result.FinalItemsTo = outcome.ItemsTo
 			result.AbortMarkerPlaced = outcome.MarkerPlaced
@@ -139,6 +140,7 @@ func RunLoop(ctx context.Context, options LoopOptions) LoopResult {
 				options.Session.AddBoundary()
 			}
 			outcome := AbsorbAbort(options.Session, &turn, AbortUserCancel)
+			observeTools(options, outcome.ItemsFrom, outcome.ItemsTo)
 			result.FinalItemsFrom = outcome.ItemsFrom
 			result.FinalItemsTo = outcome.ItemsTo
 			result.AbortMarkerPlaced = outcome.MarkerPlaced
@@ -157,6 +159,7 @@ func RunLoop(ctx context.Context, options LoopOptions) LoopResult {
 		}
 		absorbed := options.Session.Absorb(turn.Assembly)
 		streamedTo := len(options.Session.Items)
+		observeTools(options, absorbed.ItemsFrom, streamedTo)
 		result.FinalItemsFrom = absorbed.ItemsFrom
 		result.FinalItemsTo = streamedTo
 
@@ -189,13 +192,6 @@ func RunLoop(ctx context.Context, options LoopOptions) LoopResult {
 				action = ToolRefuse
 			} else if abortBatch {
 				action = ToolSkip
-			}
-			if options.ToolSeen != nil {
-				options.ToolSeen(call)
-				if loopCheckpoint(options) == SignalAbort {
-					abortBatch = true
-					action = ToolSkip
-				}
 			}
 			options.Session.Append(runTool(options, call, action))
 		}
@@ -239,6 +235,23 @@ func RunLoop(ctx context.Context, options LoopOptions) LoopResult {
 		}
 	}
 	return result
+}
+
+// observeTools reports every streamed tool call in the given range before any of them is
+// dispatched, so a frontend renders each assembled call before execution begins. Upstream also
+// observes the repair range of a failed or cancelled turn, where the calls never ran.
+func observeTools(options LoopOptions, from, to int) {
+	if options.ToolSeen == nil {
+		return
+	}
+	if to > len(options.Session.Items) {
+		to = len(options.Session.Items)
+	}
+	for index := from; index < to; index++ {
+		if options.Session.Items[index].Kind == conversation.KindToolCall {
+			options.ToolSeen(options.Session.Items[index])
+		}
+	}
 }
 
 func loopCheckpoint(options LoopOptions) Signal {
