@@ -312,8 +312,11 @@ func TestCodexStreamRefreshesAndRetriesOnceAfterUnauthorized(t *testing.T) {
 			return streamResponse(request, http.StatusOK, `{"access_token":"`+rotatedAccess+`","refresh_token":"`+rotatedRefresh+`"}`), nil
 		}
 		modelRequests.Add(1)
-		if request.URL.Path != "/backend-api/codex/responses" || request.Header.Get("chatgpt-account-id") != "account-123" {
-			t.Errorf("Codex model request target or account mismatch: %s headers=%v", request.URL, request.Header)
+		session := request.Header.Get("session-id")
+		if request.URL.Path != "/backend-api/codex/responses" || request.Header.Get("chatgpt-account-id") != "account-123" ||
+			session != runtime.ProcessSessionID() || request.Header.Get("x-client-request-id") != session ||
+			request.Header.Get("OpenAI-Beta") != "responses=experimental" {
+			t.Errorf("Codex model request target, account, or session identity mismatch: %s headers=%v", request.URL, request.Header)
 		}
 		switch request.Header.Get("Authorization") {
 		case "Bearer " + newAccess:
