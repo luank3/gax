@@ -23,8 +23,8 @@ baseline commit `ff45833`.
   DeepSeek's required reasoning replay.
 - Built-in tools (`read`, `edit`, `write`, `bash`, `task_wait`, `web_fetch`, `web_search`, `skill`),
   background tasks, and `gax -p` subagents with recursion limits.
-- A `skill` tool that lists and loads skill documents on demand, keeping skill descriptions and
-  paths out of the system prompt.
+- A `skill` tool that loads a skill by name, so the skill listing in the system prompt carries
+  descriptions without document paths.
 - Live terminal rendering: incremental Markdown, streamed tool output, reflowed to the display
   width, with the Ctrl-T transcript view.
 - Layered configuration (`GAX_*` environment variables, `config.json`, `state.json`,

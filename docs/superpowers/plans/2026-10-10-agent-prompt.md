@@ -1,6 +1,6 @@
 # Agent system prompt assembly
 
-> Skills note (2026-10-11): the `# Skills` listing this plan ported moved into the `skill` tool, so the prompt no longer carries it; see `2026-10-11-skill-tool.md`.
+> Skills note (2026-10-11): the `# Skills` listing this plan ported now carries names and descriptions only, with the document path dropped; the `skill` tool resolves a skill by name. See `2026-10-11-skill-tool.md`.
 
 ## Goal
 

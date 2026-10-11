@@ -179,10 +179,10 @@ func TestBuildSystemPromptUsesUpstreamSpacingBeforeProjectContext(t *testing.T) 
 	}
 }
 
-func TestBuildSystemPromptLeavesSkillsToTheSkillTool(t *testing.T) {
+func TestBuildSystemPromptListsSkillsWithoutPaths(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
 	project := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(project, ".git"), 0o755); err != nil {
 		t.Fatal(err)
@@ -196,48 +196,49 @@ func TestBuildSystemPromptLeavesSkillsToTheSkillTool(t *testing.T) {
 	}
 	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_subagents":true,"no_tasks":true}`)
 	result := BuildSystemPrompt(store, "", PromptOptions{CWD: project, Home: home})
-	for _, unwanted := range []string{"# Skills", "SKILL.md", "customize-gax", "project guide"} {
+	if !strings.Contains(result.Text, "Load a skill with the `skill` tool when a task matches its description:") {
+		t.Fatalf("skill section does not point at the tool: %q", result.Text)
+	}
+	if !strings.Contains(result.Text, "- guide: project guide\n") {
+		t.Fatalf("discovered skill is not listed with its description: %q", result.Text)
+	}
+	if !strings.Contains(result.Text, "- customize-gax: Change gax's own settings, providers, models, or presets") {
+		t.Fatalf("built-in skill is not listed: %q", result.Text)
+	}
+	for _, unwanted := range []string{"SKILL.md", "gax:skills/", directory, ".agents/skills"} {
 		if strings.Contains(result.Text, unwanted) {
-			t.Fatalf("the prompt still carries skill %q: %q", unwanted, result.Text)
+			t.Fatalf("the prompt still carries skill path %q: %q", unwanted, result.Text)
 		}
 	}
+
+	disabled := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_skills":true,"no_subagents":true,"no_tasks":true}`)
+	if result := BuildSystemPrompt(disabled, "", PromptOptions{CWD: project, Home: home}); strings.Contains(result.Text, "customize-gax") {
+		t.Fatalf("no_skills kept the skill listing: %q", result.Text)
+	}
 }
 
-func TestBuildSystemPromptPreservesProjectInstructionTrailingNewline(t *testing.T) {
+func TestBuildSystemPromptDiscoveredSkillShadowsBuiltinSkill(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
 	project := t.TempDir()
-	if err := os.WriteFile(filepath.Join(project, "AGENTS.md"), []byte("project rule\n"), 0o600); err != nil {
+	if err := os.MkdirAll(filepath.Join(project, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":false,"no_skills":true,"no_subagents":true,"no_tasks":true}`)
-	result := BuildSystemPrompt(store, "", PromptOptions{CWD: project, Home: filepath.Dir(project)})
-	if !strings.HasSuffix(result.Text, "project rule\n") {
-		t.Fatalf("project instruction terminator differs from upstream: %q", result.Text)
-	}
-}
-
-func TestBuildSystemPromptFallsBackWhenConfiguredPromptFileIsMissing(t *testing.T) {
-	store := promptTestStore(t, `{"system_prompt":"@/missing/prompt","no_env":true,"no_agents_md":true,"no_skills":true,"no_subagents":true,"no_tasks":true}`)
-	result := BuildSystemPrompt(store, "", PromptOptions{})
-	if !strings.HasPrefix(result.Text, DefaultSystemPrompt) || len(result.Warnings) != 1 {
-		t.Fatalf("fallback result = %#v", result)
-	}
-}
-
-func TestBuildSystemPromptExpandsPromptFiles(t *testing.T) {
-	configHome := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configHome)
-	t.Setenv("HOME", filepath.Join(configHome, "home"))
-	promptFile := filepath.Join(configHome, "gax", "prompt.txt")
-	if err := os.MkdirAll(filepath.Dir(promptFile), 0o755); err != nil {
+	directory := filepath.Join(project, ".agents", "skills", "customize-gax")
+	if err := os.MkdirAll(directory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(promptFile, []byte("prompt from file\n\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte("---\ndescription: project override\n---\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	store := promptTestStore(t, `{"system_prompt":"@prompt.txt","no_env":true,"no_agents_md":true,"no_subagents":true,"no_tasks":true}`)
-	result := BuildSystemPrompt(store, "", PromptOptions{CWD: t.TempDir(), Home: filepath.Join(configHome, "home")})
-	if !strings.HasPrefix(result.Text, "prompt from file") || len(result.Warnings) != 0 {
-		t.Fatalf("prompt file expansion = %#v", result)
+	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_subagents":true,"no_tasks":true}`)
+	result := BuildSystemPrompt(store, "", PromptOptions{CWD: project, Home: home})
+	if !strings.Contains(result.Text, "- customize-gax: project override\n") {
+		t.Fatalf("discovered skill did not shadow the built-in: %q", result.Text)
+	}
+	if strings.Count(result.Text, "- customize-gax:") != 1 {
+		t.Fatalf("the built-in skill was listed beside its shadow: %q", result.Text)
 	}
 }
 

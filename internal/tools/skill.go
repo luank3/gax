@@ -12,10 +12,10 @@ import (
 func skillDefinition() provider.ToolDefinition {
 	return provider.ToolDefinition{
 		Name: "skill",
-		Description: "List the available skills, or load one by name. A skill is a document of instructions for a " +
-			"kind of task: loading it puts those instructions in context for the rest of the session. Call this with " +
-			"no arguments to list what is available, then call it again with `name` to load the one whose description " +
-			"matches the task. The loaded document is followed with the other tools (read, edit, write, bash).",
+		Description: "Load a skill by name: the system prompt lists the available skills with their descriptions. " +
+			"Loading one puts its document of instructions in context for the rest of the session, to be followed " +
+			"with the other tools (read, edit, write, bash). Call this with no arguments to list the skills again " +
+			"with the paths of their documents.",
 		Params: []provider.ToolParam{
 			{Name: "name", Type: "string", Description: "Skill to load. Omit to list the available skills."},
 		},

@@ -13,6 +13,7 @@ import (
 
 	"github.com/luank3/gax/internal/config"
 	"github.com/luank3/gax/internal/provider/registry"
+	"github.com/luank3/gax/internal/skill"
 	systemfs "github.com/luank3/gax/internal/system/fs"
 	terminalgit "github.com/luank3/gax/internal/system/git"
 	terminalosinfo "github.com/luank3/gax/internal/system/osinfo"
@@ -122,7 +123,31 @@ func buildEnvironmentSuffix(store *config.Store, model string, options PromptOpt
 			parts = append(parts, project)
 		}
 	}
+	if !options.Bare && !configBool(store, "no_skills") {
+		if skills := buildSkills(options); skills != "" {
+			parts = append(parts, skills)
+		}
+	}
 	return joinPromptSections(parts), warnings
+}
+
+// buildSkills lists what a session can load. The path stays out: the skill tool resolves a skill
+// by name, so the prompt does not spend tokens on a path the model would only echo back.
+func buildSkills(options PromptOptions) string {
+	entries := skill.Discover(skill.Options{Home: options.Home, CWD: options.CWD})
+	if len(entries) == 0 {
+		return ""
+	}
+	var out strings.Builder
+	out.WriteString("# Skills\n\nLoad a skill with the `skill` tool when a task matches its description:\n\n")
+	for _, entry := range entries {
+		if entry.Description != "" {
+			fmt.Fprintf(&out, "- %s: %s\n", entry.Name, entry.Description)
+			continue
+		}
+		fmt.Fprintf(&out, "- %s\n", entry.Name)
+	}
+	return out.String()
 }
 
 func joinPromptSections(parts []string) string {

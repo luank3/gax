@@ -114,7 +114,7 @@ a `providers.<name>` block; context and recording switches belong on the command
 - `system_prompt` replaces the built-in base prompt and `system_prompt_append` adds text after it;
   `(none)` sends no system message at all. Both accept `@path`.
 - `no_env`, `no_agents_md`, `no_subagents`, and `no_tasks` drop whole prompt sections; `no_skills`
-  drops the `skill` tool, so no skill can be listed or loaded.
+  drops the skill listing and the `skill` tool, so no skill can be found or loaded.
 - New skills go in `~/.config/gax/skills/<name>/SKILL.md` (gax only) or `<repo>/.agents/skills/`
   (project, shared with other agents). The frontmatter `description` is what the `skill` tool lists
   and the body is loaded on demand. A discovered skill with the same name shadows a built-in one, so this
