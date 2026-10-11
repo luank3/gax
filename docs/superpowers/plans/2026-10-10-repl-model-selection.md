@@ -8,7 +8,7 @@
 
 **Tech Stack:** Slash command parser, app REPL dispatch, provider runtime model listing, session selection records.
 
-**Spec:** `/home/dat/dev/hax/src/slash.c`, `/home/dat/dev/hax/src/select.c`, and `/home/dat/dev/hax/docs/usage.md`.
+**Spec:** hax `src/slash.c`, `src/select.c`, and `docs/usage.md`.
 
 ## Constraints
 

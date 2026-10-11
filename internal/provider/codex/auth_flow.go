@@ -125,7 +125,7 @@ func (options LoginOptions) endpoints() LoginEndpoints {
 }
 
 // LoginBrowser runs the loopback OAuth authorization-code flow and installs the resulting
-// rotating Codex token in Hax's credential store.
+// rotating Codex token in gax's credential store.
 func LoginBrowser(options LoginOptions) (LoginResult, error) {
 	ctx := options.Context
 	if ctx == nil {
@@ -345,7 +345,7 @@ func openLoginURL(value string) {
 }
 
 // LoginDevice performs OpenAI's device-code flow and installs the resulting rotating Codex token
-// in Hax's credential store.
+// in gax's credential store.
 func LoginDevice(options LoginOptions) (LoginResult, error) {
 	ctx := options.Context
 	if ctx == nil {

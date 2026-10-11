@@ -42,7 +42,7 @@ func writeWithDiff(path string, content []byte) (created bool, diff string, err 
 	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return false, "", fmt.Errorf("creating %s: %w", parent, err)
 	}
-	temporaryDir, err := os.MkdirTemp(parent, ".hax-write-*")
+	temporaryDir, err := os.MkdirTemp(parent, ".gax-write-*")
 	if err != nil {
 		return false, "", fmt.Errorf("mkstemp in %s: %w", parent, err)
 	}

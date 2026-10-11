@@ -1,4 +1,4 @@
-// Package path implements hax's POSIX path rules without filepath.Clean normalization.
+// Package path implements POSIX path rules without filepath.Clean normalization.
 package path
 
 import (
@@ -143,14 +143,14 @@ func Dir(value string) string {
 	return value[:parentEnd]
 }
 
-// XDGHaxPath mirrors xdg_hax_path's string construction and reports false when neither the XDG
+// XDGGaxPath mirrors the upstream XDG path construction and reports false when neither the XDG
 // base nor HOME can resolve a location.
-func XDGHaxPath(xdgBase, home, homeRelative, relative string) (string, bool) {
+func XDGGaxPath(xdgBase, home, homeRelative, relative string) (string, bool) {
 	if xdgBase != "" {
-		return fmt.Sprintf("%s/hax/%s", xdgBase, relative), true
+		return fmt.Sprintf("%s/gax/%s", xdgBase, relative), true
 	}
 	if home == "" {
 		return "", false
 	}
-	return fmt.Sprintf("%s/%s/hax/%s", home, homeRelative, relative), true
+	return fmt.Sprintf("%s/%s/gax/%s", home, homeRelative, relative), true
 }

@@ -73,7 +73,7 @@ func containsString(values []string, value string) bool {
 
 func TestUnknownLeadingWordListsAvailablePresets(t *testing.T) {
 	configRoot := t.TempDir()
-	configDir := filepath.Join(configRoot, "hax")
+	configDir := filepath.Join(configRoot, "gax")
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func TestUnknownLeadingWordListsAvailablePresets(t *testing.T) {
 
 func TestUnknownLeadingWordWarnsOnceForInvalidPresetDefinitions(t *testing.T) {
 	configRoot := t.TempDir()
-	configDir := filepath.Join(configRoot, "hax")
+	configDir := filepath.Join(configRoot, "gax")
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -586,7 +586,7 @@ func TestRunExportsLiveSelectionToBashChild(t *testing.T) {
 	defer server.Close()
 	prepareTTYAppEnv(t, server.URL)
 	configRoot := t.TempDir()
-	configDir := filepath.Join(configRoot, "hax")
+	configDir := filepath.Join(configRoot, "gax")
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -803,7 +803,7 @@ func TestPresetSaveOmitsDiscoveredLlamaModel(t *testing.T) {
 	t.Setenv("GAX_NO_SESSION", "on")
 	var stdout, stderr strings.Builder
 	code := Run(nil, strings.NewReader("/preset-save local teal\n/session\n"), false, &stdout, &stderr)
-	configData, readErr := os.ReadFile(filepath.Join(configRoot, "hax", "config.json"))
+	configData, readErr := os.ReadFile(filepath.Join(configRoot, "gax", "config.json"))
 	var root map[string]json.RawMessage
 	if readErr == nil {
 		readErr = json.Unmarshal(configData, &root)
@@ -955,10 +955,10 @@ func TestRunOneShotEmitsProviderWarningsBeforeMissingModelError(t *testing.T) {
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
 	configHome := filepath.Join(root, "config")
-	if err := os.MkdirAll(filepath.Join(configHome, "hax"), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configHome, "gax"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(configHome, "hax", "config.json"),
+	if err := os.WriteFile(filepath.Join(configHome, "gax", "config.json"),
 		[]byte(`{"providers":{"openai":{"api":"openai-completions"}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -1069,7 +1069,7 @@ func TestRunLoginAndLogoutCommandArgumentHandling(t *testing.T) {
 			t.Setenv("GAX_OPENAI_API_KEY", "test-key")
 			t.Setenv("GAX_NO_SESSION", "on")
 			if test.managed {
-				path := filepath.Join(stateHome, "hax", "auth.json")
+				path := filepath.Join(stateHome, "gax", "auth.json")
 				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 					t.Fatal(err)
 				}
@@ -1180,7 +1180,7 @@ func TestRunUsesCodexProviderDefaultsWhenModelAndEffortAreUnset(t *testing.T) {
 		[]byte("model = \"gpt-5.6\"\nmodel_reasoning_effort = \"high\"\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(stateRoot, "hax", "auth.json")
+	path := filepath.Join(stateRoot, "gax", "auth.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -1325,7 +1325,7 @@ func TestRunEmptyREPLEOFDoesNotCreateResumableSession(t *testing.T) {
 	if strings.Contains(stdout.String(), "resume with: gax --resume=") {
 		t.Fatalf("empty REPL advertised a resumable session: %q", stdout.String())
 	}
-	files, err := filepath.Glob(filepath.Join(stateRoot, "hax", "sessions", "*", "*.jsonl"))
+	files, err := filepath.Glob(filepath.Join(stateRoot, "gax", "sessions", "*", "*.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1636,11 +1636,11 @@ func TestRunAutomaticallyCompactsAtConfiguredContextThreshold(t *testing.T) {
 	defer server.Close()
 	home := t.TempDir()
 	configRoot := filepath.Join(t.TempDir(), "config")
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	config := `{"catalog":{"models":{"openai-compatible":{"test-model":{"limit":{"context":1000}}}}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(config), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(config), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", filepath.Join(home, "home"))
@@ -1694,11 +1694,11 @@ func TestRunDefersAutoCompactionAndContinuesAtEmptySubmit(t *testing.T) {
 	}))
 	defer server.Close()
 	configRoot := filepath.Join(t.TempDir(), "config")
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configBody := `{"catalog":{"models":{"openai-compatible":{"test-model":{"limit":{"context":1000}}}}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configBody), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configBody), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", filepath.Join(t.TempDir(), "home"))
@@ -2218,11 +2218,11 @@ func TestRunREPLConfigCommandReadsValidatesAndUpdatesEditableSettings(t *testing
 
 func TestRunREPLPresetAppliesLiveSelectionAndPersistsItsName(t *testing.T) {
 	configRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configText := `{"presets":{"review":{"description":"Review changes","provider":"openai-compatible","model":"review-model","system_prompt":"review-only system directive"}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configText), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configText), 0600); err != nil {
 		t.Fatal(err)
 	}
 	stateRoot := filepath.Join(t.TempDir(), "state")
@@ -2271,7 +2271,7 @@ func TestRunREPLPresetAppliesLiveSelectionAndPersistsItsName(t *testing.T) {
 	if !strings.Contains(stdout.String(), "preset") || !strings.Contains(stdout.String(), "review") {
 		t.Fatalf("session summary did not reflect active preset: %q", stdout.String())
 	}
-	stateData, err := os.ReadFile(filepath.Join(stateRoot, "hax", "state.json"))
+	stateData, err := os.ReadFile(filepath.Join(stateRoot, "gax", "state.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2286,11 +2286,11 @@ func TestRunREPLPresetAppliesLiveSelectionAndPersistsItsName(t *testing.T) {
 
 func TestRunREPLPresetDropsUnsupportedEffort(t *testing.T) {
 	configRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configText := `{"presets":{"high":{"provider":"mock","model":"mock-model","effort":"high"}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configText), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configText), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", t.TempDir())
@@ -2307,11 +2307,11 @@ func TestRunREPLPresetDropsUnsupportedEffort(t *testing.T) {
 
 func TestRunREPLPresetUsesProviderDefaultAndDisplaysPresetErrors(t *testing.T) {
 	configRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configText := `{"presets":{"broken":{"provider":"missing-provider","model":"other-model"},"default-model":{"provider":"mock"},"no-credential":{"provider":"openai","model":"gpt-model"},"unconfigured":{"provider":"openai-compatible","model":"other-model"}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configText), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configText), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", t.TempDir())
@@ -2346,11 +2346,11 @@ func TestRunREPLPresetDiscoveryFailureUsesUpstreamDiagnostic(t *testing.T) {
 	}))
 	defer server.Close()
 	configRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configText := `{"presets":{"local":{"provider":"llamacpp"}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configText), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configText), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", t.TempDir())
@@ -2424,10 +2424,10 @@ func TestLoadPresetReportsInvalidMembersInConfigOrder(t *testing.T) {
 
 func TestRunREPLPresetSavePersistsAndActivatesLiveSelection(t *testing.T) {
 	configRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"),
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"),
 		[]byte(`{"keep":"value","presets":{}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -2448,7 +2448,7 @@ func TestRunREPLPresetSavePersistsAndActivatesLiveSelection(t *testing.T) {
 	if code != 0 || stderr.Len() != 0 {
 		t.Fatalf("save preset: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
-	data, err := os.ReadFile(filepath.Join(configRoot, "hax", "config.json"))
+	data, err := os.ReadFile(filepath.Join(configRoot, "gax", "config.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2469,7 +2469,7 @@ func TestRunREPLPresetSavePersistsAndActivatesLiveSelection(t *testing.T) {
 		!strings.Contains(plainOutput, "preset        review") {
 		t.Fatalf("saved preset was not activated: %q", stdout.String())
 	}
-	stateData, err := os.ReadFile(filepath.Join(stateRoot, "hax", "state.json"))
+	stateData, err := os.ReadFile(filepath.Join(stateRoot, "gax", "state.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2481,11 +2481,11 @@ func TestRunREPLPresetSavePersistsAndActivatesLiveSelection(t *testing.T) {
 
 func TestRunREPLNewWithPresetStartsFreshConversation(t *testing.T) {
 	configRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configText := `{"presets":{"review":{"provider":"openai-compatible","model":"review-model","system_prompt":"review-only system directive"}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configText), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configText), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", filepath.Join(t.TempDir(), "home"))
@@ -3208,7 +3208,7 @@ func TestRunOneShotElapsedExcludesStartupModelProbe(t *testing.T) {
 	defer server.Close()
 
 	root := t.TempDir()
-	configDir := filepath.Join(root, "config", "hax")
+	configDir := filepath.Join(root, "config", "gax")
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -3280,7 +3280,7 @@ func TestJSONRecordsLeaveHTMLCharactersUnescaped(t *testing.T) {
 func TestRunJSONResultMarksCatalogCostAsEstimated(t *testing.T) {
 	root := t.TempDir()
 	configRoot := filepath.Join(root, "config")
-	configDir := filepath.Join(configRoot, "hax")
+	configDir := filepath.Join(configRoot, "gax")
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -3400,7 +3400,7 @@ func TestRunHelpDescribesJSONLAndResumeOptions(t *testing.T) {
 
 func TestRunContinuesAfterMalformedConfigAndStateFiles(t *testing.T) {
 	configRoot, stateRoot := t.TempDir(), t.TempDir()
-	configDir, stateDir := filepath.Join(configRoot, "hax"), filepath.Join(stateRoot, "hax")
+	configDir, stateDir := filepath.Join(configRoot, "gax"), filepath.Join(stateRoot, "gax")
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -3433,7 +3433,7 @@ func TestRunContinuesAfterMalformedConfigAndStateFiles(t *testing.T) {
 
 func TestLoadStoreRejectsOversizedConfigWithoutOverwriting(t *testing.T) {
 	configRoot := t.TempDir()
-	configDir := filepath.Join(configRoot, "hax")
+	configDir := filepath.Join(configRoot, "gax")
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		t.Fatal(err)
 	}

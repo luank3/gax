@@ -753,7 +753,7 @@ type Log struct {
 	context      provider.Context
 }
 
-// Init truncates the configured transcript before provider/session setup, matching hax startup.
+// Init truncates the configured transcript before provider/session setup, matching gax startup.
 func Init(path string) error {
 	if path == "" {
 		return nil

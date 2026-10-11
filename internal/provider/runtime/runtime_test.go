@@ -873,7 +873,7 @@ func TestCodexModelProbeUsesAuthenticatedVersionedCatalog(t *testing.T) {
 
 func TestCodexResolverLoadsManagedCredentialsWithoutHome(t *testing.T) {
 	stateHome := t.TempDir()
-	storePath := filepath.Join(stateHome, "hax", "auth.json")
+	storePath := filepath.Join(stateHome, "gax", "auth.json")
 	if err := os.MkdirAll(filepath.Dir(storePath), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -891,7 +891,7 @@ func TestCodexResolverLoadsManagedCredentialsWithoutHome(t *testing.T) {
 
 	provider, err := runtime.NewResolver(store, registry.New(store)).Resolve("codex")
 	if err != nil || !provider.Availability.Ready() || !provider.HasAPIKey() {
-		t.Fatalf("configured Hax credentials should load without HOME: provider=%+v err=%v", provider, err)
+		t.Fatalf("configured gax credentials should load without HOME: provider=%+v err=%v", provider, err)
 	}
 }
 
@@ -1569,7 +1569,7 @@ func TestRequestHeadersMergeProviderDefaultsAndExpandSession(t *testing.T) {
 	got := resolved.Headers(runtime.WireChat, "session-123", true)
 	want := []string{
 		"Authorization: Bearer router-key", "Accept: text/event-stream", "Content-Type: application/json",
-		"HTTP-Referer: https://usehax.dev", "X-OpenRouter-Categories: cli-agent", "x-title: custom title",
+		"HTTP-Referer: https://github.com/luank3/gax", "X-OpenRouter-Categories: cli-agent", "x-title: custom title",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("provider header defaults and overrides differ: got=%q want=%q", got, want)

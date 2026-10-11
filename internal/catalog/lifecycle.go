@@ -250,7 +250,7 @@ func isDone(done <-chan struct{}) bool {
 }
 
 func defaultCachePath() string {
-	path, ok := systempath.XDGHaxPath(os.Getenv("XDG_CACHE_HOME"), os.Getenv("HOME"), ".cache", "catalog.json")
+	path, ok := systempath.XDGGaxPath(os.Getenv("XDG_CACHE_HOME"), os.Getenv("HOME"), ".cache", "catalog.json")
 	if !ok {
 		return ""
 	}

@@ -300,7 +300,7 @@ func TestPersistStateAtomicallyWritesNestedKeysAndUpdatesStore(t *testing.T) {
 	if got := store.String("providers.gateway.api"); got == nil || *got != "chat" {
 		t.Fatalf("in-memory state value = %v, want chat", got)
 	}
-	path := filepath.Join(root, "hax", "state.json")
+	path := filepath.Join(root, "gax", "state.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -335,7 +335,7 @@ func TestPersistStateAtomicallyWritesNestedKeysAndUpdatesStore(t *testing.T) {
 func TestPersistDoesNotChangeExistingDirectoryPermissions(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", root)
-	directory := filepath.Join(root, "hax")
+	directory := filepath.Join(root, "gax")
 	if err := os.Mkdir(directory, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -392,7 +392,7 @@ func TestPersistSelectionPreservesSameProviderDefaultsAndRollsBackFailure(t *tes
 			store.String("model"), store.String("effort"), store.String("preset"))
 	}
 
-	before, err := os.ReadFile(filepath.Join(root, "hax", "state.json"))
+	before, err := os.ReadFile(filepath.Join(root, "gax", "state.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,7 +407,7 @@ func TestPersistSelectionPreservesSameProviderDefaultsAndRollsBackFailure(t *tes
 	if got := store.String("provider"); got == nil || *got != "mock" {
 		t.Fatalf("failed write changed in-memory provider: %v", got)
 	}
-	after, err := os.ReadFile(filepath.Join(root, "hax", "state.json"))
+	after, err := os.ReadFile(filepath.Join(root, "gax", "state.json"))
 	if err != nil || !reflect.DeepEqual(before, after) {
 		t.Fatalf("failed write modified persisted state: before=%s after=%s err=%v", before, after, err)
 	}
@@ -424,7 +424,7 @@ func TestPersistConfigRefusesUnusableFilesAndKeepsOtherValues(t *testing.T) {
 	if err := store.PersistConfig("providers.demo.api", stringPtr("responses")); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(root, "hax", "config.json")
+	path := filepath.Join(root, "gax", "config.json")
 	before, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -465,7 +465,7 @@ func TestPersistPresetAddsOrderedDefinitionWithoutLosingConfig(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(root, "hax", "config.json")
+	path := filepath.Join(root, "gax", "config.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -519,7 +519,7 @@ func TestPersistPresetRefusesStateDefinitionAndInvalidPresetBlock(t *testing.T) 
 	if err := store.LoadConfig([]byte(`{"presets":"not-an-object"}`)); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(root, "hax", "config.json")
+	path := filepath.Join(root, "gax", "config.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -554,7 +554,7 @@ func TestPersistPresetValidatesNameAndTintBeforeWriting(t *testing.T) {
 			t.Errorf("PersistPreset(%q) error = %v, want %q", test.name, err, test.want)
 		}
 	}
-	path := filepath.Join(root, "hax", "config.json")
+	path := filepath.Join(root, "gax", "config.json")
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("invalid preset created or changed config file: stat error = %v", err)
 	}
@@ -580,7 +580,7 @@ func TestPersistPresetRejectsUnreadablePromptFiles(t *testing.T) {
 			}
 		})
 	}
-	path := filepath.Join(root, "hax", "config.json")
+	path := filepath.Join(root, "gax", "config.json")
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("invalid prompt preset created or changed config file: stat error = %v", err)
 	}

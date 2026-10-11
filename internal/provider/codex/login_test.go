@@ -17,14 +17,14 @@ func TestAuthStorePathPreservesConfiguredStateHomeFormatting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "/tmp/state//hax/auth.json"; path != want {
+	if want := "/tmp/state//gax/auth.json"; path != want {
 		t.Fatalf("authStorePath() = %q, want %q", path, want)
 	}
 }
 
 func TestLogoutManagedRemovesCodexAndRevokesStoredRefreshToken(t *testing.T) {
 	stateHome := t.TempDir()
-	storePath := filepath.Join(stateHome, "hax", "auth.json")
+	storePath := filepath.Join(stateHome, "gax", "auth.json")
 	if err := os.MkdirAll(filepath.Dir(storePath), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestLogoutManagedRemovesCodexAndRevokesStoredRefreshToken(t *testing.T) {
 
 func TestLogoutManagedRemovesOfflineAndReturnsRevocationWarning(t *testing.T) {
 	stateHome := t.TempDir()
-	storePath := filepath.Join(stateHome, "hax", "auth.json")
+	storePath := filepath.Join(stateHome, "gax", "auth.json")
 	if err := os.MkdirAll(filepath.Dir(storePath), 0700); err != nil {
 		t.Fatal(err)
 	}

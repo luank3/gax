@@ -1,4 +1,4 @@
-// Package width implements hax's terminal content-width rules.
+// Package width implements the terminal content-width rules.
 package width
 
 import "strings"

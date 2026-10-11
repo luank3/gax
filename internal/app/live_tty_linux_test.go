@@ -662,11 +662,11 @@ func TestRunTTYFirstEscapePausesAutoCompactionAndDefersIt(t *testing.T) {
 	defer server.Close()
 	prepareTTYAppEnv(t, server.URL)
 	configRoot := filepath.Join(t.TempDir(), "config")
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configBody := `{"catalog":{"models":{"openai-compatible":{"test-model":{"limit":{"context":1000}}}}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configBody), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configBody), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", configRoot)
@@ -760,11 +760,11 @@ func TestRunTTYFirstEscapeCancelsManualCompaction(t *testing.T) {
 	}()
 	prepareTTYAppEnv(t, server.URL)
 	configRoot := filepath.Join(t.TempDir(), "config")
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configBody := `{"catalog":{"models":{"openai-compatible":{"test-model":{"limit":{"context":1000}}}}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configBody), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configBody), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", configRoot)
@@ -865,11 +865,11 @@ func TestRunTTYFirstEscapeCancelsDeferredCompactionBeforeSendingPrompt(t *testin
 	defer close(release)
 	prepareTTYAppEnv(t, server.URL)
 	configRoot := filepath.Join(t.TempDir(), "config")
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configBody := `{"catalog":{"models":{"openai-compatible":{"test-model":{"limit":{"context":1000}}}}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configBody), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configBody), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", configRoot)
@@ -1289,11 +1289,11 @@ func TestRunTTYSlashEffortPickerAppliesSelectedLevel(t *testing.T) {
 	defer server.Close()
 	prepareTTYAppEnv(t, server.URL)
 	configRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configText := `{"catalog":{"models":{"openai-compatible":{"test-model":{"reasoning_options":[{"type":"effort","values":["low","high"]}]}}}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configText), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configText), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", configRoot)
@@ -1558,11 +1558,11 @@ func TestRunTTYSlashProviderPickerChainsModelAndEffortSelection(t *testing.T) {
 	defer server.Close()
 	prepareTTYAppEnv(t, "http://127.0.0.1:1")
 	configRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configText := `{"providers":{"test":{"base_url":"` + server.URL + `","api_key":"test-key"}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configText), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configText), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", configRoot)
@@ -1620,11 +1620,11 @@ func TestRunTTYSlashPresetPickerAppliesSelectedPreset(t *testing.T) {
 	defer server.Close()
 	prepareTTYAppEnv(t, server.URL)
 	configRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configText := `{"presets":{"review":{"description":"Review changes","provider":"openai-compatible","model":"review-model","system_prompt":"review-only system directive"}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configText), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configText), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", configRoot)
@@ -1681,10 +1681,10 @@ func TestRunTTYPresetSavePreseedsNameAndActivatesSavedPreset(t *testing.T) {
 	defer server.Close()
 	prepareTTYAppEnv(t, server.URL)
 	configRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(`{"presets":{}}`), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(`{"presets":{}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", configRoot)
@@ -1718,7 +1718,7 @@ func TestRunTTYPresetSavePreseedsNameAndActivatesSavedPreset(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatalf("TTY preset save did not exit; output=%q stderr=%q", capture.string(), stderr.String())
 	}
-	data, err := os.ReadFile(filepath.Join(configRoot, "hax", "config.json"))
+	data, err := os.ReadFile(filepath.Join(configRoot, "gax", "config.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1748,11 +1748,11 @@ func TestRunTTYPresetSaveConfirmsOverwriteAndCanClearTint(t *testing.T) {
 	defer server.Close()
 	prepareTTYAppEnv(t, server.URL)
 	configRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(configRoot, "hax"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(configRoot, "gax"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	configText := `{"presets":{"review":{"description":"Keep this description","provider":"openai-compatible","model":"old-model","tint":"sage"}}}`
-	if err := os.WriteFile(filepath.Join(configRoot, "hax", "config.json"), []byte(configText), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(configRoot, "gax", "config.json"), []byte(configText), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", configRoot)
@@ -1789,7 +1789,7 @@ func TestRunTTYPresetSaveConfirmsOverwriteAndCanClearTint(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatalf("TTY preset overwrite did not exit; output=%q stderr=%q", capture.string(), stderr.String())
 	}
-	data, err := os.ReadFile(filepath.Join(configRoot, "hax", "config.json"))
+	data, err := os.ReadFile(filepath.Join(configRoot, "gax", "config.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

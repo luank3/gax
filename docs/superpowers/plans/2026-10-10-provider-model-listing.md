@@ -6,11 +6,11 @@
 
 **Goal:** Add authenticated model listing and cache provider model IDs from both explicit listings and background metadata probes.
 
-**Architecture:** A runtime method fetches `<base_url>/models` with the provider's resolved metadata headers, validates the `data` array, and retains usable model IDs. OpenRouter and Openference listings use OpenRouter's parser; Agnes keeps generic IDs with unknown metadata. Background probes parse selected metadata and listing IDs independently; IDs use a generation guard so an older response cannot replace a newer picker result.
+**Architecture:** A runtime method fetches `<base_url>/models` with the provider's resolved metadata headers, validates the `data` array, and retains usable model IDs. OpenRouter listings use OpenRouter's parser, DeepSeek listings use its own parser, and Agnes keeps generic IDs with unknown metadata. Background probes parse selected metadata and listing IDs independently; IDs use a generation guard so an older response cannot replace a newer picker result.
 
 **Tech Stack:** Go provider runtime, OpenRouter metadata parser, shared bounded HTTP transport.
 
-**Spec:** Official `github.com/luank3/hax` master commit `ff458337f8ba7366d71fad4da0210a53b658678a`, especially `src/providers/openai_models.c` and `src/providers/registry.c`.
+**Spec:** the porting baseline commit `ff458337f8ba7366d71fad4da0210a53b658678a` (pinned in `internal/version.Value`), especially `src/providers/openai_models.c` and `src/providers/registry.c`.
 
 ## Constraints
 

@@ -27,4 +27,4 @@ Connect the existing CLI, config, provider, agent, tool, and session packages be
 
 ## Source
 
-Official `github.com/luank3/hax` master at commit `ff458337f8ba7366d71fad4da0210a53b658678a`, including `src/main.c`, `src/cli.c`, `src/oneshot.c`, `src/agent.c`, `src/session.c`, `src/providers/registry.c`, and `docs/sessions.md`.
+The porting baseline commit `ff458337f8ba7366d71fad4da0210a53b658678a` (pinned in `internal/version.Value`), including `src/main.c`, `src/cli.c`, `src/oneshot.c`, `src/agent.c`, `src/session.c`, `src/providers/registry.c`, and `docs/sessions.md`.

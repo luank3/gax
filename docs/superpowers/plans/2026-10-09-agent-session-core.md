@@ -16,4 +16,4 @@ This slice owns session state and transformations only. Provider setup, tools, r
 
 ## Source
 
-`/tmp/luank3-hax-upstream/src/agent_core.c` and `agent_core.h` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
+hax `src/agent_core.c` and `agent_core.h` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.

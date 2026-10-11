@@ -1,6 +1,6 @@
 # Superseded: DeepSeek Model and Usage Hooks Plan
 
-> Superseded on 2026-10-11. This plan followed the local fork snapshot `23988f9`, not official `github.com/luank3/hax` master. Official master at `ff458337f8ba7366d71fad4da0210a53b658678a` has no DeepSeek provider, custom model hook, or balance `/usage` command, so these fork-only paths were removed from the Go port.
+> Superseded on 2026-10-11. This plan followed the fork snapshot `23988f9`, not the porting baseline `ff458337f8ba7366d71fad4da0210a53b658678a`, which has no DeepSeek provider, custom model hook, or balance `/usage` command; the implementation was removed from the Go port at the time. DeepSeek's model parser and `/user/balance` reporting were later restored as a deliberate divergence from the baseline.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -10,7 +10,7 @@
 
 **Tech Stack:** Go provider runtime, shared HTTP transport, REPL slash command.
 
-**Spec:** `/home/dat/dev/hax/src/providers/deepseek.c`, `/home/dat/dev/hax/src/providers/usage_fetch.c`, `/home/dat/dev/hax/src/providers/usage_render.c`, and `/home/dat/dev/hax/tests/providers/test_deepseek.c`.
+**Spec:** hax `src/providers/deepseek.c`, `src/providers/usage_fetch.c`, `src/providers/usage_render.c`, and `tests/providers/test_deepseek.c`.
 
 ## Constraints
 

@@ -23,7 +23,7 @@ var files struct {
 	nextID    uint64
 }
 
-// Create makes a 0600 file inside a private hax-* directory and tracks it for Cleanup.
+// Create makes a 0600 file inside a private gax-* directory and tracks it for Cleanup.
 // Prefix and suffix are literal filename fragments and may not contain path separators.
 func Create(prefix, suffix string) (*os.File, string, error) {
 	if !validFragment(prefix) || !validFragment(suffix) {
@@ -116,7 +116,7 @@ func ensureDirectoryLocked() (string, error) {
 	if files.directory != "" && files.tmpdir == tmpdir {
 		return files.directory, nil
 	}
-	newDirectory, err := os.MkdirTemp(tmpdir, "hax-")
+	newDirectory, err := os.MkdirTemp(tmpdir, "gax-")
 	if err != nil {
 		return "", err
 	}

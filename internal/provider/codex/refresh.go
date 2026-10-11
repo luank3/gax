@@ -33,11 +33,11 @@ const (
 	refreshDead
 )
 
-// ensureFresh refreshes Hax-managed credentials under the auth-store lock. A dispatched refresh
+// ensureFresh refreshes gax-managed credentials under the auth-store lock. A dispatched refresh
 // ignores cancellation because the authorization server may consume the rotating refresh token.
 func ensureFresh(ctx context.Context, auth *Auth, force bool, client *transport.Client,
 	tick func() bool) (refreshResult, string) {
-	if auth.Source != SourceHax {
+	if auth.Source != SourceGax {
 		if force {
 			return refreshDead, ""
 		}
@@ -67,7 +67,7 @@ func ensureFresh(ctx context.Context, auth *Auth, force bool, client *transport.
 	}
 	root := jsonObject(json.RawMessage(body))
 	entryRaw := root["codex"]
-	stored, err := parseHaxAuth(entryRaw)
+	stored, err := parseGaxAuth(entryRaw)
 	if err != nil {
 		return refreshDead, ""
 	}
@@ -106,7 +106,7 @@ func ensureFresh(ctx context.Context, auth *Auth, force bool, client *transport.
 			if refreshToken == stored.RefreshToken {
 				delete(root, "codex")
 				if saveErr := writeAuthStore(auth.storePath, root); saveErr != nil {
-					warning = "could not remove rejected Codex credentials from the Hax auth store"
+					warning = "could not remove rejected Codex credentials from the gax auth store"
 				}
 			}
 			return refreshDead, warning
@@ -129,20 +129,20 @@ func ensureFresh(ctx context.Context, auth *Auth, force bool, client *transport.
 	}
 	updatedEntry, _ := json.Marshal(merged)
 	root["codex"] = updatedEntry
-	updated, err := parseHaxAuth(updatedEntry)
+	updated, err := parseGaxAuth(updatedEntry)
 	if err != nil {
 		return refreshTransient, ""
 	}
 	wiretrace.Default().RegisterSecret(updated.RefreshToken)
 	warning := ""
 	if saveErr := writeAuthStore(auth.storePath, root); saveErr != nil {
-		warning = "could not persist refreshed Codex credentials to the Hax auth store"
+		warning = "could not persist refreshed Codex credentials to the gax auth store"
 	}
 	adoptStoredAuth(auth, updated)
 	return refreshFresh, warning
 }
 
-// PrepareRequestAuth refreshes an expiring Hax-managed token before an outbound model request.
+// PrepareRequestAuth refreshes an expiring gax-managed token before an outbound model request.
 // Refresh failures remain best-effort until the request itself is rejected.
 func PrepareRequestAuth(ctx context.Context, auth *Auth, client *transport.Client, tick func() bool) string {
 	if auth == nil {
@@ -164,7 +164,7 @@ func RecoverUnauthorized(ctx context.Context, auth *Auth, client *transport.Clie
 	if auth == nil || auth.AccessToken == "" {
 		return false, "", "codex is not logged in — run /login"
 	}
-	if auth.Source != SourceHax {
+	if auth.Source != SourceGax {
 		return false, "", "codex CLI token expired — rerun `codex`, or use /login"
 	}
 	result, warning := ensureFresh(ctx, auth, true, client, tick)

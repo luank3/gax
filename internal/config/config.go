@@ -1,4 +1,4 @@
-// Package config implements hax's layered JSON and environment configuration.
+// Package config implements the layered JSON and environment configuration.
 package config
 
 import (
@@ -50,7 +50,7 @@ type orderedObject struct {
 }
 
 // Store is foreground-owned, like upstream's process-wide config object. Its load operations and
-// setters replace tiers; getters resolve them in the documented hax precedence order.
+// setters replace tiers; getters resolve them in the documented precedence order.
 type Store struct {
 	settings               map[string]Setting
 	run                    map[string]json.RawMessage

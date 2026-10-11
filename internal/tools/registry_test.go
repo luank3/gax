@@ -267,7 +267,7 @@ func TestExecuteRelativizesFileToolPathsInsideWorkingDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	relative := filepath.Join("missing-hax-path-preprocess-test", "notes.txt")
+	relative := filepath.Join("missing-gax-path-preprocess-test", "notes.txt")
 	absolute := filepath.Join(cwd, relative)
 	call := conversation.Item{
 		Kind: conversation.KindToolCall, CallID: conversation.String("read-1"),

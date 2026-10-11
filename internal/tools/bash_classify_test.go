@@ -13,7 +13,7 @@ func TestIsExplorationBashMatchesUpstreamCommandShapes(t *testing.T) {
 		"find . -name foo 2>/dev/null",
 		"grep -r foo src 2>&1 | head",
 		"git log -1 --stat && git show --stat HEAD | head -50",
-		"git -C ~/source/hax log -1",
+		"git -C ~/source/gax log -1",
 		"git --git-dir=.git status",
 		"find . -name '*.c' -printf '%p\\n'",
 		"wc -l foo.c",

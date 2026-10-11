@@ -31,7 +31,7 @@ func TestCreateUsesPrivateTrackedFilesAndCleanupRemovesThem(t *testing.T) {
 	if plainPath == imagePath || filepath.Dir(plainPath) != filepath.Dir(imagePath) {
 		t.Fatalf("created paths = %q and %q, want distinct files in one private directory", plainPath, imagePath)
 	}
-	if !strings.HasPrefix(filepath.Base(filepath.Dir(plainPath)), "hax-") || !strings.HasPrefix(filepath.Base(plainPath), "t-") ||
+	if !strings.HasPrefix(filepath.Base(filepath.Dir(plainPath)), "gax-") || !strings.HasPrefix(filepath.Base(plainPath), "t-") ||
 		!strings.HasSuffix(imagePath, ".png") {
 		t.Fatalf("created names = %q, %q", plainPath, imagePath)
 	}
@@ -223,8 +223,8 @@ func TestInvalidUTF8TMPDIRFallsBackToTmp(t *testing.T) {
 	if err := file.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(path, "/tmp/hax-") {
-		t.Fatalf("invalid UTF-8 TMPDIR path = %q, want /tmp/hax-*", path)
+	if !strings.HasPrefix(path, "/tmp/gax-") {
+		t.Fatalf("invalid UTF-8 TMPDIR path = %q, want /tmp/gax-*", path)
 	}
 	if err := Cleanup(); err != nil {
 		t.Fatal(err)

@@ -32,7 +32,7 @@ func TestDirectoryPreservesXDGPathFormatting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "/tmp/state//hax/sessions/" + EncodeCWD(cwd)
+	want := "/tmp/state//gax/sessions/" + EncodeCWD(cwd)
 	if got != want {
 		t.Fatalf("Directory() = %q, want %q", got, want)
 	}

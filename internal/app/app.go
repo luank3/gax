@@ -2056,7 +2056,7 @@ func (warning *resumePresetWarning) Error() string { return warning.message }
 
 func loadStore(stderr io.Writer) (*config.Store, error) {
 	store := config.New(config.DefaultSettings())
-	if path, ok := systempath.XDGHaxPath(os.Getenv("XDG_CONFIG_HOME"), os.Getenv("HOME"), ".config", "config.json"); ok {
+	if path, ok := systempath.XDGGaxPath(os.Getenv("XDG_CONFIG_HOME"), os.Getenv("HOME"), ".config", "config.json"); ok {
 		data, truncated, err := systemfs.ReadFileCapped(path, config.MaxTierFileBytes)
 		if err != nil {
 			if !errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
@@ -2070,7 +2070,7 @@ func loadStore(stderr io.Writer) (*config.Store, error) {
 			writeWarningDiagnostic(stderr, "ignoring malformed config at %s (expected a JSON object)", path)
 		}
 	}
-	if path, ok := systempath.XDGHaxPath(os.Getenv("XDG_STATE_HOME"), os.Getenv("HOME"), ".local/state", "state.json"); ok {
+	if path, ok := systempath.XDGGaxPath(os.Getenv("XDG_STATE_HOME"), os.Getenv("HOME"), ".local/state", "state.json"); ok {
 		data, truncated, err := systemfs.ReadFileCapped(path, config.MaxTierFileBytes)
 		if err != nil {
 			if !errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {

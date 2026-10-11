@@ -171,7 +171,7 @@ func TestStartPruneMarksCompletedSweepAndAppliesDailyThrottle(t *testing.T) {
 	}
 	ShutdownPrune()
 	assertPruneTestMissing(t, first)
-	marker := filepath.Join(stateHome, "hax", "sessions", ".prune")
+	marker := filepath.Join(stateHome, "gax", "sessions", ".prune")
 	markerInfo, err := os.Stat(marker)
 	if err != nil || markerInfo.Size() == 0 {
 		t.Fatalf("completed sweep marker = %v, err=%v", markerInfo, err)

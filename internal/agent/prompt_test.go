@@ -59,7 +59,7 @@ func TestBuildSystemPromptTasklessSubagentGuidanceMatchesUpstream(t *testing.T) 
 	}
 }
 
-func TestBuildSystemPromptUsesHaxPlatformAndResolvedShellLabels(t *testing.T) {
+func TestBuildSystemPromptUsesGaxPlatformAndResolvedShellLabels(t *testing.T) {
 	root := t.TempDir()
 	store := promptTestStore(t, `{"system_prompt":"base","no_agents_md":true,"no_skills":true,"no_subagents":true,"no_tasks":true}`)
 	result := BuildSystemPrompt(store, "m", PromptOptions{
@@ -68,7 +68,7 @@ func TestBuildSystemPromptUsesHaxPlatformAndResolvedShellLabels(t *testing.T) {
 	architectureLabel := "Operating system: " + runtime.GOOS + "/" + runtime.GOARCH
 	if !strings.Contains(result.Text, "- Operating system: ") || strings.Contains(strings.ToLower(result.Text), strings.ToLower(architectureLabel)) ||
 		!strings.Contains(result.Text, "- Command shell: /bin/bash\n") {
-		t.Fatalf("environment labels do not match Hax platform details: %q", result.Text)
+		t.Fatalf("environment labels do not match gax platform details: %q", result.Text)
 	}
 }
 
@@ -131,7 +131,7 @@ func TestBuildSystemPromptValidatesPresetsAndWarnsOnce(t *testing.T) {
 func TestBuildSystemPromptLoadsConfigFilesAndProjectInstructionsRootFirst(t *testing.T) {
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)
-	globalPath := filepath.Join(configHome, "hax", "AGENTS.md")
+	globalPath := filepath.Join(configHome, "gax", "AGENTS.md")
 	if err := os.MkdirAll(filepath.Dir(globalPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +220,7 @@ func TestBuildSystemPromptExpandsPromptFilesAndListsNearestSkillsFirst(t *testin
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)
 	t.Setenv("HOME", filepath.Join(configHome, "home"))
-	promptFile := filepath.Join(configHome, "hax", "prompt.txt")
+	promptFile := filepath.Join(configHome, "gax", "prompt.txt")
 	if err := os.MkdirAll(filepath.Dir(promptFile), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestBuildSystemPromptBareKeepsEnvironmentAndSkipsProjectGuidance(t *testing
 	}
 }
 
-func TestBuildSystemPromptSharedSkillSymlinkDoesNotShadowHaxSkills(t *testing.T) {
+func TestBuildSystemPromptSharedSkillSymlinkDoesNotShadowGaxSkills(t *testing.T) {
 	home := t.TempDir()
 	sharedRoot := filepath.Join(home, ".agents", "skills")
 	writeSkill := func(root, name, description string) {
@@ -293,7 +293,7 @@ func TestBuildSystemPromptSharedSkillSymlinkDoesNotShadowHaxSkills(t *testing.T)
 	writeSkill(sharedRoot, "duplicate", "shared skill")
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)
-	writeSkill(filepath.Join(configHome, "hax", "skills"), "duplicate", "hax skill")
+	writeSkill(filepath.Join(configHome, "gax", "skills"), "duplicate", "gax skill")
 	project := t.TempDir()
 	if err := os.Mkdir(filepath.Join(project, ".git"), 0o755); err != nil {
 		t.Fatal(err)
@@ -307,8 +307,8 @@ func TestBuildSystemPromptSharedSkillSymlinkDoesNotShadowHaxSkills(t *testing.T)
 	}
 	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_subagents":true,"no_tasks":true}`)
 	result := BuildSystemPrompt(store, "", PromptOptions{CWD: project, Home: home})
-	if !strings.Contains(result.Text, "- duplicate: hax skill (") || strings.Contains(result.Text, "shared skill") {
-		t.Fatalf("shared skill symlink shadowed the higher-priority hax skill: %q", result.Text)
+	if !strings.Contains(result.Text, "- duplicate: gax skill (") || strings.Contains(result.Text, "shared skill") {
+		t.Fatalf("shared skill symlink shadowed the higher-priority gax skill: %q", result.Text)
 	}
 }
 

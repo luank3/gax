@@ -23,7 +23,7 @@ func TestScopedValuesUseRegistryEnvironmentAliases(t *testing.T) {
 	})
 	providers := providerconfig.New(store)
 	if got := providers.String("providers.openai-compatible", "base_url"); got == nil || *got != "https://gateway.example/v1" {
-		t.Fatalf("provider field did not use its HAX alias: %v", got)
+		t.Fatalf("provider field did not use its GAX alias: %v", got)
 	}
 }
 

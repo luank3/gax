@@ -33,7 +33,7 @@ func (store *Store) PersistState(key string, value *string) error {
 	if store == nil {
 		return errors.New("config store is unavailable")
 	}
-	path, err := xdgHaxPath("XDG_STATE_HOME", ".local/state", "state.json")
+	path, err := xdgGaxPath("XDG_STATE_HOME", ".local/state", "state.json")
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func (store *Store) PersistConfig(key string, value *string) error {
 	if store.fileUnusable {
 		return errors.New("config file could not be loaded; refusing to overwrite it")
 	}
-	path, err := xdgHaxPath("XDG_CONFIG_HOME", ".config", "config.json")
+	path, err := xdgGaxPath("XDG_CONFIG_HOME", ".config", "config.json")
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (store *Store) PersistPreset(name string, preset Preset) error {
 			}
 		}
 	}
-	path, err := xdgHaxPath("XDG_CONFIG_HOME", ".config", "config.json")
+	path, err := xdgGaxPath("XDG_CONFIG_HOME", ".config", "config.json")
 	if err != nil {
 		return err
 	}
@@ -170,7 +170,7 @@ func validatePresetPromptFile(value string) error {
 	case strings.HasPrefix(spec, "/"):
 		path = spec
 	default:
-		configPath, err := xdgHaxPath("XDG_CONFIG_HOME", ".config", spec)
+		configPath, err := xdgGaxPath("XDG_CONFIG_HOME", ".config", spec)
 		if err != nil {
 			return fmt.Errorf("couldn't resolve prompt file %q: %w", spec, err)
 		}
@@ -187,7 +187,7 @@ func validatePresetPromptFile(value string) error {
 	return nil
 }
 
-// ValidPresetName matches the names accepted by hax's preset registry and persistence path.
+// ValidPresetName matches the names accepted by the preset registry and persistence path.
 func ValidPresetName(name string) bool {
 	if len(name) == 0 || len(name) >= 64 || !presetNameAlphaNumeric(name[0]) {
 		return false
@@ -254,7 +254,7 @@ func (store *Store) PersistSelection(provider string, model, effort *string) err
 		}
 		setOrderedValue(&updated, "effort", marshalString(*value))
 	}
-	path, err := xdgHaxPath("XDG_STATE_HOME", ".local/state", "state.json")
+	path, err := xdgGaxPath("XDG_STATE_HOME", ".local/state", "state.json")
 	if err != nil {
 		return err
 	}
@@ -484,8 +484,8 @@ func resolveLinkTarget(path string) (string, error) {
 	return "", errors.New("too many config file symlinks")
 }
 
-func xdgHaxPath(environment, homeRelative, relative string) (string, error) {
-	path, ok := systempath.XDGHaxPath(os.Getenv(environment), os.Getenv("HOME"), homeRelative, relative)
+func xdgGaxPath(environment, homeRelative, relative string) (string, error) {
+	path, ok := systempath.XDGGaxPath(os.Getenv(environment), os.Getenv("HOME"), homeRelative, relative)
 	if !ok {
 		return "", fmt.Errorf("cannot resolve config path without %s or HOME", environment)
 	}

@@ -22,7 +22,7 @@ func EditBuffer(text string, stdin io.Reader, stdout, stderr io.Writer) (string,
 	if err != nil {
 		return "", false, err
 	}
-	temporary, err := os.CreateTemp("", "hax-edit-*")
+	temporary, err := os.CreateTemp("", "gax-edit-*")
 	if err != nil {
 		return "", false, err
 	}

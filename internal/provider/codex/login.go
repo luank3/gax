@@ -19,20 +19,20 @@ const (
 	revokeTimeout  = 10 * time.Second
 )
 
-// HasManagedAuth reports whether Hax has a complete Codex credential. Borrowed Codex CLI
-// credentials deliberately do not count as a Hax-managed login.
+// HasManagedAuth reports whether gax has a complete Codex credential. Borrowed Codex CLI
+// credentials deliberately do not count as a gax-managed login.
 func HasManagedAuth(home, stateHome string) (bool, error) {
 	_, exists, err := loadManagedAuth(home, stateHome)
 	return exists, err
 }
 
-// LoginStatus describes the Codex credential visible to Hax for interactive login pickers.
+// LoginStatus describes the Codex credential visible to gax for interactive login pickers.
 func LoginStatus(home, stateHome string) string {
 	auth, err := LoadAuth(home, stateHome)
 	if err != nil {
 		return "not logged in"
 	}
-	if auth.Source == SourceHax {
+	if auth.Source == SourceGax {
 		if auth.Email != "" {
 			return "logged in as " + auth.Email + " — gax manages this token"
 		}
@@ -61,9 +61,9 @@ func loadManagedAuth(home, stateHome string) (Auth, bool, error) {
 	}
 	root := jsonObject(body)
 	if root == nil {
-		return Auth{}, false, errors.New("Hax credential store is not a JSON object")
+		return Auth{}, false, errors.New("gax credential store is not a JSON object")
 	}
-	auth, err := parseHaxAuth(root["codex"])
+	auth, err := parseGaxAuth(root["codex"])
 	if err != nil {
 		return Auth{}, false, nil
 	}
@@ -73,7 +73,7 @@ func loadManagedAuth(home, stateHome string) (Auth, bool, error) {
 	return auth, true, nil
 }
 
-// LogoutManaged removes the Hax-owned Codex entry under the same sidecar lock used by token
+// LogoutManaged removes the gax-owned Codex entry under the same sidecar lock used by token
 // refresh, then revokes its refresh token best-effort. Local removal succeeds even when offline.
 func LogoutManaged(ctx context.Context, home, stateHome string, client *transport.Client,
 	revokeURL string) (removed bool, warning string, err error) {
@@ -100,7 +100,7 @@ func LogoutManaged(ctx context.Context, home, stateHome string, client *transpor
 	root := jsonObject(body)
 	if root == nil {
 		unlock()
-		return false, "", errors.New("Hax credential store is not a JSON object")
+		return false, "", errors.New("gax credential store is not a JSON object")
 	}
 	rawEntry, exists := root["codex"]
 	if !exists {
@@ -128,7 +128,7 @@ func LogoutManaged(ctx context.Context, home, stateHome string, client *transpor
 }
 
 func authStorePath(home, stateHome string) (string, error) {
-	path, ok := systempath.XDGHaxPath(stateHome, home, ".local/state", "auth.json")
+	path, ok := systempath.XDGGaxPath(stateHome, home, ".local/state", "auth.json")
 	if !ok {
 		return "", errors.New("could not determine the state directory")
 	}

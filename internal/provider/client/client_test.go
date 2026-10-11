@@ -272,7 +272,7 @@ func TestCodexStreamRefreshesAndRetriesOnceAfterUnauthorized(t *testing.T) {
 	home, stateHome := t.TempDir(), t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_STATE_HOME", stateHome)
-	storePath := filepath.Join(stateHome, "hax", "auth.json")
+	storePath := filepath.Join(stateHome, "gax", "auth.json")
 	if err := os.MkdirAll(filepath.Dir(storePath), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -351,7 +351,7 @@ func TestCodexDeferredModelProbeRestartsAfterRequestAuthRefresh(t *testing.T) {
 	home, stateHome := t.TempDir(), t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_STATE_HOME", stateHome)
-	storePath := filepath.Join(stateHome, "hax", "auth.json")
+	storePath := filepath.Join(stateHome, "gax", "auth.json")
 	if err := os.MkdirAll(filepath.Dir(storePath), 0700); err != nil {
 		t.Fatal(err)
 	}

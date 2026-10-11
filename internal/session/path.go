@@ -27,7 +27,7 @@ func StateRoot() (string, error) {
 }
 
 func statePath(relative string) (string, error) {
-	path, ok := systempath.XDGHaxPath(os.Getenv("XDG_STATE_HOME"), os.Getenv("HOME"), ".local/state", relative)
+	path, ok := systempath.XDGGaxPath(os.Getenv("XDG_STATE_HOME"), os.Getenv("HOME"), ".local/state", relative)
 	if !ok {
 		return "", errors.New("cannot resolve XDG state directory without HOME or XDG_STATE_HOME")
 	}

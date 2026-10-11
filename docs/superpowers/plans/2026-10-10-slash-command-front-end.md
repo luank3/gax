@@ -10,7 +10,7 @@
 
 **Tech Stack:** Go standard library only.
 
-**Spec:** `/home/dat/dev/hax/src/slash.c` and `/home/dat/dev/hax/tests/test_slash.c` at official master commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
+**Spec:** hax `src/slash.c` and `tests/test_slash.c` at the porting baseline commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
 
 ## Global Constraints
 

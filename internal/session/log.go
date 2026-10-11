@@ -40,7 +40,7 @@ type HeaderInput struct {
 type HeaderRecord struct {
 	Type       string  `json:"type"`
 	Version    int     `json:"version"`
-	HaxVersion string  `json:"hax_version"`
+	GaxVersion string  `json:"gax_version"`
 	ID         *string `json:"id,omitempty"`
 	Timestamp  *string `json:"timestamp,omitempty"`
 	CWD        *string `json:"cwd,omitempty"`
@@ -60,7 +60,7 @@ func NewHeaderRecord(input HeaderInput) HeaderRecord {
 	return HeaderRecord{
 		Type:       "session",
 		Version:    FormatVersion,
-		HaxVersion: version.Value,
+		GaxVersion: version.Value,
 		ID:         cloneString(input.ID),
 		Timestamp:  cloneString(input.Timestamp),
 		CWD:        cloneString(input.CWD),

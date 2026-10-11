@@ -12,4 +12,4 @@ Port per-attempt usage footers from upstream `agent_usage.c` and `agent_core.c`,
 
 ## Source
 
-`/tmp/luank3-hax-upstream/src/agent_usage.c`, `agent_core.c`, and `provider.h` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
+hax `src/agent_usage.c`, `agent_core.c`, and `provider.h` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.

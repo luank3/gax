@@ -126,7 +126,7 @@ func readX11ClipboardImage(ctx context.Context) ([]byte, bool) {
 }
 
 func readDarwinClipboardImage(ctx context.Context) ([]byte, bool) {
-	file, err := os.CreateTemp("", "hax-clip-*")
+	file, err := os.CreateTemp("", "gax-clip-*")
 	if err != nil {
 		return nil, false
 	}

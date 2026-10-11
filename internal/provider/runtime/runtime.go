@@ -388,7 +388,7 @@ func (provider *Provider) HasAPIKey() bool {
 	return provider.apiKey != ""
 }
 
-// SortModels reports whether model choices should use hax's version-aware ordering. The global
+// SortModels reports whether model choices should use version-aware ordering. The global
 // setting accepts auto, which inherits the provider-specific sort_models setting (on by default).
 func (provider *Provider) SortModels() bool {
 	providerDefault := provider.boolOr("sort_models", true)

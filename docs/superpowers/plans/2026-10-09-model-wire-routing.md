@@ -6,7 +6,7 @@
 
 **Tech:** Go 1.25 standard library; no new dependencies.
 
-**Sources:** `/tmp/luank3-hax-upstream/src/providers/http_provider.c` and `wire.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
+**Sources:** hax `src/providers/http_provider.c` and `wire.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
 
 ## Task 1: Close runtime review findings
 

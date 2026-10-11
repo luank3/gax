@@ -75,7 +75,7 @@ var shipped = []Definition{
 	{
 		ID: "openrouter", BaseURL: "https://openrouter.ai/api/v1", Pinned: true, APIKeyEnv: "OPENROUTER_API_KEY",
 		SendCacheKey: true, Cache: "auto", RequestCost: true, ReasoningFormat: "nested",
-		ExtraHeaders: json.RawMessage(`{"X-Title":"gax","HTTP-Referer":"https://usehax.dev","X-OpenRouter-Categories":"cli-agent","x-session-id":"{session_id}"}`),
+		ExtraHeaders: json.RawMessage(`{"X-Title":"gax","HTTP-Referer":"https://github.com/luank3/gax","X-OpenRouter-Categories":"cli-agent","x-session-id":"{session_id}"}`),
 		Hooks:        HookParseModel | HookProbeModel | HookQueryUsage,
 	},
 	{ID: "opencode-zen", API: "catalog", BaseURL: "https://opencode.ai/zen/v1", APIKeyEnv: "OPENCODE_API_KEY", CatalogID: "opencode", MetadataAPI: "openai", ExtraHeaders: openCodeHeaders()},

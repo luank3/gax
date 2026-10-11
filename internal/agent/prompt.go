@@ -461,7 +461,7 @@ func presetJSON(store *config.Store, name string) json.RawMessage {
 }
 
 func promptConfigPath(relative string) (string, bool) {
-	return systempath.XDGHaxPath(os.Getenv("XDG_CONFIG_HOME"), os.Getenv("HOME"), ".config", relative)
+	return systempath.XDGGaxPath(os.Getenv("XDG_CONFIG_HOME"), os.Getenv("HOME"), ".config", relative)
 }
 
 func collapseHome(path, home string) string {

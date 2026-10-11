@@ -21,7 +21,7 @@ type toolPreviewRow struct {
 	color   string
 }
 
-// toolPreviewRenderer mirrors the settled-row behavior of hax's tool renderer. It keeps the
+// toolPreviewRenderer mirrors the settled-row behavior of the upstream tool renderer. It keeps the
 // newest row open so later output can settle it and finalization can replace its gutter.
 type toolPreviewRenderer struct {
 	mode   coretools.ToolPreviewMode

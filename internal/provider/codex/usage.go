@@ -29,7 +29,7 @@ const (
 	maxBodySize   = 1 << 20
 )
 
-// Auth is a resolved Codex credential, either Hax-managed or borrowed from the Codex CLI.
+// Auth is a resolved Codex credential, either gax-managed or borrowed from the Codex CLI.
 type Auth struct {
 	AccessToken  string
 	RefreshToken string
@@ -41,12 +41,12 @@ type Auth struct {
 	stateHome    string
 }
 
-// Source identifies whether Codex credentials are Hax-managed or borrowed from the CLI.
+// Source identifies whether Codex credentials are gax-managed or borrowed from the CLI.
 type Source string
 
 const (
 	SourceCLI Source = "codex-cli"
-	SourceHax Source = "hax"
+	SourceGax Source = "gax"
 )
 
 // UsageWindow is one Codex quota window. Unrecognized windows retain their fallback label.
@@ -82,7 +82,7 @@ func LoadCLIAuth(home string) (Auth, error) {
 	return ParseCLIAuth(body)
 }
 
-// LoadAuth prefers Hax-managed credentials at <stateHome>/hax/auth.json, then falls back to the
+// LoadAuth prefers gax-managed credentials at <stateHome>/gax/auth.json, then falls back to the
 // Codex CLI's auth.json when the store is absent, unreadable, or has no complete Codex entry.
 func LoadAuth(home, stateHome string) (Auth, error) {
 	if storePath, pathErr := authStorePath(home, stateHome); pathErr == nil {
@@ -90,7 +90,7 @@ func LoadAuth(home, stateHome string) (Auth, error) {
 		if err == nil {
 			root := jsonObject(json.RawMessage(body))
 			if entry := root["codex"]; len(entry) > 0 {
-				if auth, authErr := parseHaxAuth(entry); authErr == nil {
+				if auth, authErr := parseGaxAuth(entry); authErr == nil {
 					if resolved, resolveErr := filepath.EvalSymlinks(storePath); resolveErr == nil {
 						storePath = resolved
 					}
@@ -127,14 +127,14 @@ func ParseCLIAuth(body []byte) (Auth, error) {
 	return auth, nil
 }
 
-func parseHaxAuth(raw json.RawMessage) (Auth, error) {
+func parseGaxAuth(raw json.RawMessage) (Auth, error) {
 	entry := jsonObject(raw)
 	auth := Auth{
 		AccessToken:  jsonString(entry["access_token"]),
 		RefreshToken: jsonString(entry["refresh_token"]),
 		AccountID:    jsonString(entry["account_id"]),
 		Email:        jwtEmail(jsonString(entry["id_token"])),
-		Source:       SourceHax,
+		Source:       SourceGax,
 	}
 	if auth.AccessToken == "" || auth.RefreshToken == "" || auth.AccountID == "" {
 		return Auth{}, errors.New("credential entry has no complete Codex token set")
@@ -201,7 +201,7 @@ func QueryUsage(ctx context.Context, auth *Auth, extraHeaders []string,
 	body, status, err := fetchUsage(ctx, auth, extraHeaders, client, tick)
 	if err != nil {
 		if status == http.StatusUnauthorized {
-			if auth.Source == SourceHax {
+			if auth.Source == SourceGax {
 				result, warning := ensureFresh(ctx, auth, true, client, tick)
 				if warning != "" {
 					warnings = append(warnings, warning)

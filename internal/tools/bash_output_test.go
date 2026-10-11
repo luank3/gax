@@ -48,8 +48,8 @@ func TestCommandCaptureSpillsToSharedTempfilesAfterByteCap(t *testing.T) {
 		t.Fatal(err)
 	}
 	if capture.path == "" || filepath.Dir(filepath.Dir(capture.path)) != tmpdir ||
-		!strings.HasPrefix(filepath.Base(filepath.Dir(capture.path)), "hax-") {
-		t.Fatalf("spill path = %q, want a file in TMPDIR/hax-*", capture.path)
+		!strings.HasPrefix(filepath.Base(filepath.Dir(capture.path)), "gax-") {
+		t.Fatalf("spill path = %q, want a file in TMPDIR/gax-*", capture.path)
 	}
 	data, err := os.ReadFile(capture.path)
 	if err != nil || string(data) != "1234" {

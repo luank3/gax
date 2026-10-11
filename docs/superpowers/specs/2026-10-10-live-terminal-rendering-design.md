@@ -87,6 +87,6 @@ the command-entrypoint plan.
 
 ## Upstream reference
 
-`/home/dat/dev/hax/src/agent.c`, `render/render_ctx.c`, `agent_dispatch.c`, `agent_tool.c`,
+hax `src/agent.c`, `render/render_ctx.c`, `agent_dispatch.c`, `agent_tool.c`,
 `tool.h`, and tool implementations at upstream commit
 `ff458337f8ba7366d71fad4da0210a53b658678a`.

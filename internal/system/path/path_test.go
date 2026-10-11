@@ -54,7 +54,7 @@ func TestCollapseHomeMatchesUpstreamPathRules(t *testing.T) {
 	for _, test := range []struct {
 		path, home, want string
 	}{
-		{path: "/Users/alice/source/hax", home: "/Users/alice", want: "~/source/hax"},
+		{path: "/Users/alice/source/gax", home: "/Users/alice", want: "~/source/gax"},
 		{path: "/Users/alice", home: "/Users/alice", want: "~"},
 		{path: "/etc/hosts", home: "/Users/alice", want: "/etc/hosts"},
 		{path: "/Users/alice2/x", home: "/Users/alice", want: "/Users/alice2/x"},
@@ -129,19 +129,19 @@ func TestDirMatchesPOSIXParentRulesWithoutCleaning(t *testing.T) {
 	}
 }
 
-func TestXDGHaxPathPreservesUpstreamFormatting(t *testing.T) {
+func TestXDGGaxPathPreservesUpstreamFormatting(t *testing.T) {
 	for _, test := range []struct {
 		base, home, homeRelative, relative, want string
 		ok                                       bool
 	}{
-		{base: "/config", home: "/home/alice", homeRelative: ".config", relative: "config.json", want: "/config/hax/config.json", ok: true},
-		{base: "/config/", home: "/home/alice", homeRelative: ".config", relative: "nested/../config.json", want: "/config//hax/nested/../config.json", ok: true},
-		{base: "", home: "/home/alice", homeRelative: ".config", relative: "config.json", want: "/home/alice/.config/hax/config.json", ok: true},
+		{base: "/config", home: "/home/alice", homeRelative: ".config", relative: "config.json", want: "/config/gax/config.json", ok: true},
+		{base: "/config/", home: "/home/alice", homeRelative: ".config", relative: "nested/../config.json", want: "/config//gax/nested/../config.json", ok: true},
+		{base: "", home: "/home/alice", homeRelative: ".config", relative: "config.json", want: "/home/alice/.config/gax/config.json", ok: true},
 		{base: "", home: "", homeRelative: ".config", relative: "config.json", ok: false},
 	} {
-		got, ok := systempath.XDGHaxPath(test.base, test.home, test.homeRelative, test.relative)
+		got, ok := systempath.XDGGaxPath(test.base, test.home, test.homeRelative, test.relative)
 		if got != test.want || ok != test.ok {
-			t.Errorf("XDGHaxPath(%q, %q, %q, %q) = %q, %t; want %q, %t",
+			t.Errorf("XDGGaxPath(%q, %q, %q, %q) = %q, %t; want %q, %t",
 				test.base, test.home, test.homeRelative, test.relative, got, ok, test.want, test.ok)
 		}
 	}

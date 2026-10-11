@@ -1,6 +1,6 @@
 # Superseded: DeepSeek Provider Parity Implementation Plan
 
-> Superseded on 2026-10-11. This plan followed the local fork snapshot `23988f9`, not official `github.com/luank3/hax` master. Official master at `ff458337f8ba7366d71fad4da0210a53b658678a` has no DeepSeek provider or `reasoning_required` setting, so this fork-only implementation was removed from the Go port.
+> Superseded on 2026-10-11. This plan followed the fork snapshot `23988f9`, not the porting baseline `ff458337f8ba7366d71fad4da0210a53b658678a`, which has no DeepSeek provider or `reasoning_required` setting; the implementation was removed from the Go port at the time. DeepSeek and its required-reasoning replay were later restored as a deliberate divergence from the baseline.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -10,7 +10,7 @@
 
 **Tech Stack:** Go provider registry, provider config/runtime, OpenAI-compatible Chat Completions body builder, Go tests.
 
-**Spec:** `/home/dat/dev/hax/src/providers/registry.c`, `/home/dat/dev/hax/src/providers/deepseek.c`, `/home/dat/dev/hax/src/providers/http_provider.c`, and `/home/dat/dev/hax/src/providers/chat_body.c`.
+**Spec:** hax `src/providers/registry.c`, `src/providers/deepseek.c`, `src/providers/http_provider.c`, and `src/providers/chat_body.c`.
 
 ## Global Constraints
 

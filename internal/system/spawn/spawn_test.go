@@ -56,7 +56,7 @@ func TestCaptureStdoutRejectsEmptyAndNonzeroResults(t *testing.T) {
 }
 
 func TestCaptureStdoutRejectsMissingCommandAndInvalidArguments(t *testing.T) {
-	if output, err := CaptureStdout([]string{"hax-no-such-spawn-helper"}, 32, time.Second); err == nil || output != nil {
+	if output, err := CaptureStdout([]string{"gax-no-such-spawn-helper"}, 32, time.Second); err == nil || output != nil {
 		t.Fatalf("missing command result = %q, %v; want failure", output, err)
 	}
 	for _, test := range []struct {

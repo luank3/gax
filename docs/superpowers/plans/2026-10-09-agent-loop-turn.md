@@ -12,4 +12,4 @@ Port one provider round-trip and its abort repair from upstream `agent_loop.c`, 
 
 ## Source
 
-`/tmp/luank3-hax-upstream/src/agent_loop.c` and `agent_loop.h` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
+hax `src/agent_loop.c` and `agent_loop.h` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.

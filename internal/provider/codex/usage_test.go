@@ -58,7 +58,7 @@ func TestLoadCLIAuthUsesLiteralTildeWhenHomeIsMissing(t *testing.T) {
 	}
 }
 
-func TestLoadAuthPrefersHaxCredentialStoreAndFallsBackWhenItsEntryIsPartial(t *testing.T) {
+func TestLoadAuthPrefersGaxCredentialStoreAndFallsBackWhenItsEntryIsPartial(t *testing.T) {
 	home := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(home, ".codex"), 0700); err != nil {
 		t.Fatal(err)
@@ -68,19 +68,19 @@ func TestLoadAuthPrefersHaxCredentialStoreAndFallsBackWhenItsEntryIsPartial(t *t
 		t.Fatal(err)
 	}
 	stateHome := t.TempDir()
-	storePath := filepath.Join(stateHome, "hax", "auth.json")
+	storePath := filepath.Join(stateHome, "gax", "auth.json")
 	if err := os.MkdirAll(filepath.Dir(storePath), 0700); err != nil {
 		t.Fatal(err)
 	}
-	idToken := testJWT(t, `{"email":"hax@example.com"}`)
-	storeBody := `{"codex":{"access_token":"hax-access","refresh_token":"hax-refresh","id_token":"` + idToken + `","account_id":"hax-account"}}`
+	idToken := testJWT(t, `{"email":"gax@example.com"}`)
+	storeBody := `{"codex":{"access_token":"gax-access","refresh_token":"gax-refresh","id_token":"` + idToken + `","account_id":"gax-account"}}`
 	if err := os.WriteFile(storePath, []byte(storeBody), 0600); err != nil {
 		t.Fatal(err)
 	}
 	auth, err := codex.LoadAuth(home, stateHome)
-	if err != nil || auth.Source != codex.SourceHax || auth.AccessToken != "hax-access" || auth.RefreshToken != "hax-refresh" ||
-		auth.AccountID != "hax-account" || auth.Email != "hax@example.com" {
-		t.Fatalf("Hax credentials should take precedence: auth=%+v err=%v", auth, err)
+	if err != nil || auth.Source != codex.SourceGax || auth.AccessToken != "gax-access" || auth.RefreshToken != "gax-refresh" ||
+		auth.AccountID != "gax-account" || auth.Email != "gax@example.com" {
+		t.Fatalf("gax credentials should take precedence: auth=%+v err=%v", auth, err)
 	}
 
 	if err := os.WriteFile(storePath, []byte(`{"codex":{"access_token":"partial"}}`), 0600); err != nil {
@@ -88,14 +88,14 @@ func TestLoadAuthPrefersHaxCredentialStoreAndFallsBackWhenItsEntryIsPartial(t *t
 	}
 	auth, err = codex.LoadAuth(home, stateHome)
 	if err != nil || auth.Source != codex.SourceCLI || auth.AccessToken != "cli-access" || auth.AccountID != "cli-account" {
-		t.Fatalf("partial Hax entry should fall back to Codex CLI: auth=%+v err=%v", auth, err)
+		t.Fatalf("partial gax entry should fall back to Codex CLI: auth=%+v err=%v", auth, err)
 	}
 }
 
 func TestLoadAuthUsesConfiguredStateHomeWithoutHome(t *testing.T) {
-	_, stateHome := writeHaxAuth(t, "hax-access", "hax-refresh")
+	_, stateHome := writeGaxAuth(t, "gax-access", "gax-refresh")
 	auth, err := codex.LoadAuth("", stateHome)
-	if err != nil || auth.Source != codex.SourceHax || auth.AccessToken != "hax-access" {
+	if err != nil || auth.Source != codex.SourceGax || auth.AccessToken != "gax-access" {
 		t.Fatalf("configured state store should load without HOME: auth=%+v err=%v", auth, err)
 	}
 }
@@ -154,8 +154,8 @@ func TestQueryUsageSendsCodexAccountHeadersToFixedEndpoint(t *testing.T) {
 	}
 }
 
-func TestQueryUsageProactivelyRefreshesAndPersistsRotatedHaxTokens(t *testing.T) {
-	home, stateHome := writeHaxAuth(t, testJWTWithExpiry(t, time.Now().Add(-time.Minute).Unix()), "old-refresh")
+func TestQueryUsageProactivelyRefreshesAndPersistsRotatedGaxTokens(t *testing.T) {
+	home, stateHome := writeGaxAuth(t, testJWTWithExpiry(t, time.Now().Add(-time.Minute).Unix()), "old-refresh")
 	auth, err := codex.LoadAuth(home, stateHome)
 	if err != nil {
 		t.Fatal(err)
@@ -196,14 +196,14 @@ func TestQueryUsageProactivelyRefreshesAndPersistsRotatedHaxTokens(t *testing.T)
 	if err != nil || updated.AccessToken != newAccess || updated.RefreshToken != "new-refresh" {
 		t.Fatalf("rotated tokens not persisted: auth=%+v err=%v", updated, err)
 	}
-	info, err := os.Stat(filepath.Join(stateHome, "hax", "auth.json"))
+	info, err := os.Stat(filepath.Join(stateHome, "gax", "auth.json"))
 	if err != nil || info.Mode().Perm() != 0600 {
 		t.Fatalf("credential store permissions = %v, err=%v; want 0600", info.Mode().Perm(), err)
 	}
 }
 
 func TestQueryUsageForceRefreshesAfterOneUnauthorizedResponse(t *testing.T) {
-	home, stateHome := writeHaxAuth(t, testJWTWithExpiry(t, time.Now().Add(time.Hour).Unix()), "old-refresh")
+	home, stateHome := writeGaxAuth(t, testJWTWithExpiry(t, time.Now().Add(time.Hour).Unix()), "old-refresh")
 	auth, err := codex.LoadAuth(home, stateHome)
 	if err != nil {
 		t.Fatal(err)
@@ -231,7 +231,7 @@ func TestQueryUsageForceRefreshesAfterOneUnauthorizedResponse(t *testing.T) {
 }
 
 func TestQueryUsagePreservesRetryServerErrorsAfterRefresh(t *testing.T) {
-	home, stateHome := writeHaxAuth(t, testJWTWithExpiry(t, time.Now().Add(time.Hour).Unix()), "old-refresh")
+	home, stateHome := writeGaxAuth(t, testJWTWithExpiry(t, time.Now().Add(time.Hour).Unix()), "old-refresh")
 	auth, err := codex.LoadAuth(home, stateHome)
 	if err != nil {
 		t.Fatal(err)
@@ -262,7 +262,7 @@ func TestQueryUsageRedactsExpiredTokenAndReportsMalformedResponse(t *testing.T) 
 		source           codex.Source
 	}{
 		{name: "expired token", status: http.StatusUnauthorized, want: "codex CLI token expired"},
-		{name: "expired Hax token", status: http.StatusUnauthorized, want: "codex login expired — run /login again", source: codex.SourceHax},
+		{name: "expired gax token", status: http.StatusUnauthorized, want: "codex login expired — run /login again", source: codex.SourceGax},
 		{name: "invalid JSON", status: http.StatusOK, body: "not-json", want: "usage response is not valid JSON:"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -288,10 +288,10 @@ func testJWTWithExpiry(t *testing.T, expiry int64) string {
 	return testJWT(t, `{"exp":`+strconv.FormatInt(expiry, 10)+`}`)
 }
 
-func writeHaxAuth(t *testing.T, accessToken, refreshToken string) (home, stateHome string) {
+func writeGaxAuth(t *testing.T, accessToken, refreshToken string) (home, stateHome string) {
 	t.Helper()
 	home, stateHome = t.TempDir(), t.TempDir()
-	storePath := filepath.Join(stateHome, "hax", "auth.json")
+	storePath := filepath.Join(stateHome, "gax", "auth.json")
 	if err := os.MkdirAll(filepath.Dir(storePath), 0700); err != nil {
 		t.Fatal(err)
 	}

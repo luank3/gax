@@ -121,7 +121,7 @@ func appendHistoryFile(path, line string) {
 }
 
 func rewriteHistoryFile(core *Core, path string) {
-	temporary, err := os.CreateTemp(systempath.Dir(path), ".hax-hist.*")
+	temporary, err := os.CreateTemp(systempath.Dir(path), ".gax-hist.*")
 	if err != nil {
 		return
 	}

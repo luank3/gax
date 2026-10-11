@@ -15,4 +15,4 @@ Port the `read`, `write`, and `edit` model tools with provider schemas, bounded 
 
 ## Source
 
-`/tmp/luank3-hax-upstream/src/tools/read.c`, `write.c`, `edit.c`, `image_sniff.c`, `output_cap.c`, `path_preprocess.c`, `system/fs.c`, and `text/diff.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
+hax `src/tools/read.c`, `write.c`, `edit.c`, `image_sniff.c`, `output_cap.c`, `path_preprocess.c`, `system/fs.c`, and `text/diff.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.

@@ -1,4 +1,4 @@
-// Package shell resolves executable shells with hax's POSIX PATH rules.
+// Package shell resolves executable shells using POSIX PATH rules.
 package shell
 
 import (
@@ -8,7 +8,7 @@ import (
 )
 
 // Find returns name as an executable path, or an empty string when it is not an executable
-// regular file. PATH lookup intentionally ignores relative entries, as hax's fs_which does.
+// regular file. PATH lookup intentionally ignores relative entries, as the upstream implementation does.
 func Find(name string) string {
 	if name == "" {
 		return ""
@@ -31,7 +31,7 @@ func Find(name string) string {
 	return ""
 }
 
-// Resolve returns the configured shell or hax's default fallback. invalidConfigured is true when
+// Resolve returns the configured shell or the default fallback. invalidConfigured is true when
 // a nonempty configured shell could not be resolved and should be diagnosed once by the caller.
 func Resolve(configured string) (path string, invalidConfigured bool) {
 	if configured != "" {

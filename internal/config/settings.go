@@ -1,6 +1,6 @@
 package config
 
-// DefaultSettings returns hax's ordered setting registry. The order is user-visible in /config.
+// DefaultSettings returns the ordered setting registry. The order is user-visible in /config.
 func DefaultSettings() []Setting {
 	return []Setting{
 		{Key: "preset", EnvVar: "GAX_PRESET", Description: "Preset from presets.<name> to apply at startup; empty disables", KeepEmpty: true},

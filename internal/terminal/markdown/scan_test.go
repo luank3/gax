@@ -109,8 +109,8 @@ func TestScanLineTabIndentDoesNotOpenBlocks(t *testing.T) {
 }
 
 func TestRenderFormatsInlineMarkdown(t *testing.T) {
-	got := Render("I'm **hax**, with `read` and *bash* tools.", 0, true)
-	want := "I'm \x1b[1mhax\x1b[22m, with \x1b[36mread\x1b[39m and \x1b[3mbash\x1b[23m tools."
+	got := Render("I'm **gax**, with `read` and *bash* tools.", 0, true)
+	want := "I'm \x1b[1mgax\x1b[22m, with \x1b[36mread\x1b[39m and \x1b[3mbash\x1b[23m tools."
 	if got != want {
 		t.Fatalf("Render() = %q, want %q", got, want)
 	}

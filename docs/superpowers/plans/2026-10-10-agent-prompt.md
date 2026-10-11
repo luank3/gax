@@ -13,4 +13,4 @@ Port upstream base-prompt selection and the dynamic suffix containing environmen
 
 ## Source
 
-`/tmp/luank3-hax-upstream/src/agent_core.c`, `agent_env.c`, `config.c`, and `text/frontmatter.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
+hax `src/agent_core.c`, `agent_env.c`, `config.c`, and `text/frontmatter.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.

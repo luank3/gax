@@ -16,4 +16,4 @@ Port upstream `bash` and `task_wait` execution behavior: shell selection, bounde
 
 ## Source
 
-`/tmp/luank3-hax-upstream/src/tools/bash.c`, `bash_process.c`, `bash_output.c`, `bash_shell.c`, `bash_env.c`, `task_registry.c`, and `task_wait.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
+hax `src/tools/bash.c`, `bash_process.c`, `bash_output.c`, `bash_shell.c`, `bash_env.c`, `task_registry.c`, and `task_wait.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.

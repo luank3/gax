@@ -1,4 +1,4 @@
-// Package tools implements the model-callable tools built into hax.
+// Package tools implements the model-callable tools built into gax.
 package tools
 
 import (

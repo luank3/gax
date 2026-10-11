@@ -8,7 +8,7 @@
 
 **Tech Stack:** Go 1.25 standard library, `encoding/json`, `os`, and `testing`; no third-party dependencies.
 
-**Spec:** `/tmp/luank3-hax-upstream/docs/configuration.md`, `/tmp/luank3-hax-upstream/docs/providers.md`, and upstream `src/config.c`, `src/providers/provider_config.c`, and `src/providers/registry.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
+**Spec:** hax `docs/configuration.md`, `docs/providers.md`, and upstream `src/config.c`, `src/providers/provider_config.c`, and `src/providers/registry.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
 
 ## Global Constraints
 

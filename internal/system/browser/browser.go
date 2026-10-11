@@ -8,7 +8,7 @@ import (
 )
 
 // OpenURL asks the platform's URL handler to open value. The handler runs independently so a
-// browser that stays open cannot keep hax attached to it.
+// browser that stays open cannot keep gax attached to it.
 func OpenURL(value string) {
 	name, args := openerCommand(runtime.GOOS, value)
 	_ = spawn.StartDetached(append([]string{name}, args...))

@@ -127,7 +127,7 @@
 **Interfaces:**
 - Replace the interim stream parser with the upstream behavior of `md_feed`, `md_flush`, `md_reset`, line scanning, inline parsing, wrapping, table layout/reflow, and style transitions in package-local Go code.
 - Keep the `Stream` API from Task 1. Preserve eager output, feed-partition invariance, UTF-8 boundaries, writer-error latching, and reusable boundaries.
-- Port the behavior covered by `/home/dat/dev/hax/tests/render/test_markdown.c` into checked-in Go fixtures, grouped by pass-through, block/inline syntax, feed partitioning, hard/soft breaks, wrapping, links, tables, styles, and width behavior. Tests must not require the C checkout at runtime.
+- Port the behavior covered by hax `tests/render/test_markdown.c` into checked-in Go fixtures, grouped by pass-through, block/inline syntax, feed partitioning, hard/soft breaks, wrapping, links, tables, styles, and width behavior. Tests must not require the C checkout at runtime.
 
 - [x] **Step 1: Add failing Go regression fixtures** for upstream behavior missing from the interim renderer, including eager wrapped prose, block and inline state across feeds, cursor-safe wrapping, link wrapping, table caps/reflow/alignment, and style transitions.
 - [x] **Step 2: Run `go test ./internal/terminal/markdown -count=1`** and confirm the parity fixtures fail.

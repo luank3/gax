@@ -6,7 +6,7 @@
 
 **Tech:** Go 1.25 standard library; no new dependencies.
 
-**Sources:** `/tmp/luank3-hax-upstream/src/providers/http_provider.c`, `chat_body.c`, and `catalog.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`; per-item reasoning replay from `/home/dat/dev/hax` commit `e040365`.
+**Sources:** hax `src/providers/http_provider.c`, `chat_body.c`, and `catalog.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`; per-item reasoning replay from `the hax checkout` commit `e040365`.
 
 ## Task 1: Resolve provider and model request policy
 

@@ -165,7 +165,7 @@ func TestLoginBrowserValidatesStateAndInstallsCredential(t *testing.T) {
 		t.Fatalf("LoginBrowser() = %+v, err=%v authorize=%q exchanged=%t", result, err, shownURL, exchanged.Load())
 	}
 	auth, err := LoadAuth(t.TempDir(), stateHome)
-	if err != nil || auth.Source != SourceHax || auth.AccountID != "browser-account" || auth.RefreshToken != "browser-refresh" {
+	if err != nil || auth.Source != SourceGax || auth.AccountID != "browser-account" || auth.RefreshToken != "browser-refresh" {
 		t.Fatalf("browser managed auth = %+v, err=%v", auth, err)
 	}
 }
@@ -328,7 +328,7 @@ func TestLoginDevicePollsExchangesAndAtomicallyReplacesManagedCredential(t *test
 	}))
 	defer server.Close()
 	stateHome := t.TempDir()
-	storePath := filepath.Join(stateHome, "hax", "auth.json")
+	storePath := filepath.Join(stateHome, "gax", "auth.json")
 	if err := os.MkdirAll(filepath.Dir(storePath), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -359,7 +359,7 @@ func TestLoginDevicePollsExchangesAndAtomicallyReplacesManagedCredential(t *test
 		t.Fatalf("device login busy scopes = %v with %d ends, want %v", busyLabels, busyEnds, want)
 	}
 	managed, err := LoadAuth(t.TempDir(), stateHome)
-	if err != nil || managed.Source != SourceHax || managed.AccountID != "account-2" || managed.RefreshToken != "new-refresh" {
+	if err != nil || managed.Source != SourceGax || managed.AccountID != "account-2" || managed.RefreshToken != "new-refresh" {
 		t.Fatalf("new managed auth = %+v, err=%v", managed, err)
 	}
 	updated, err := os.ReadFile(storePath)
@@ -372,7 +372,7 @@ func TestInstallManagedLoginReplacesInvalidCredentialStore(t *testing.T) {
 	for _, existing := range []string{"{broken", `[]`} {
 		t.Run(existing, func(t *testing.T) {
 			stateHome := t.TempDir()
-			storePath := filepath.Join(stateHome, "hax", "auth.json")
+			storePath := filepath.Join(stateHome, "gax", "auth.json")
 			if err := os.MkdirAll(filepath.Dir(storePath), 0700); err != nil {
 				t.Fatal(err)
 			}

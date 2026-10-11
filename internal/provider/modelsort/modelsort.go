@@ -1,4 +1,4 @@
-// Package modelsort orders model IDs by family and version, matching hax's picker order.
+// Package modelsort orders model IDs by family and version, matching gax's picker order.
 package modelsort
 
 import "sort"

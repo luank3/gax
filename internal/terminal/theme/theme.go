@@ -1,4 +1,4 @@
-// Package theme provides the semantic terminal roles shared by hax's UI renderers.
+// Package theme provides the semantic terminal roles shared by the UI renderers.
 package theme
 
 import (

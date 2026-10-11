@@ -6,7 +6,7 @@
 
 **Tech:** Go 1.25 standard library; no new dependencies.
 
-**Sources:** `/tmp/luank3-hax-upstream/src/catalog.c`, `catalog.h`, and `providers/http_provider.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
+**Sources:** hax `src/catalog.c`, `catalog.h`, and `providers/http_provider.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
 
 ## Task 1: Parse and merge model metadata
 
