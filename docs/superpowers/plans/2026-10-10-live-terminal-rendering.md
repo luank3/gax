@@ -496,9 +496,14 @@ port:
 
 | Result | Count |
 | --- | --- |
-| Identical | 559 / 600 |
-| Differ only in whitespace | 35 |
-| Differ in content | 6 |
+| Identical | 585 / 600 after the rules below; 559 before |
+| Differ only in whitespace | 13 |
+| Differ in content | 2 |
+
+Four of the rules have since been ported (carriage returns kept, the heading's
+indentation and tab expansion, no closing-hash stripping, and hashes followed by
+a newline staying prose), each verified against the driver; the remaining
+whitespace cases and the nested-emphasis close order are still open.
 
 The whitespace class is the port's carriage-return and tab policy: a continued line's `\r` is
 trimmed where upstream keeps it as a text byte, a heading's leading tab is trimmed where upstream
