@@ -536,3 +536,17 @@ So the deviations are gaps rather than deliberate choices: wherever the port has
 fixture it matches, and the rules it lacks were simply never ported. Fixing them is therefore
 "mirror upstream" work, not a taste question. Each has a C-verified repro, and any fixture whose
 expected bytes encode the port's form of a rule must be corrected from the C in the same change.
+
+### Structured corpus: exact on realistic documents (2026-10-11)
+
+The adversarial alphabet above barely exercises tables, fences and real lists, so 45 hand-written
+documents were run through the same driver at widths 0, 20 and 40 (135 cases): headings with
+closing hash runs and tabs, paragraphs with emphasis, nested emphasis, inline code and bare URLs,
+hard breaks and trailing spaces, bullet and ordered lists including nesting and continuations,
+blockquotes, thematic breaks, setext-style underlines, fenced code with info strings, nested
+backticks, empty and unterminated fences, tables with alignment rows, ragged rows, inline styling
+inside cells, a row wider than the width and a table wider than the column cap, mixed documents,
+CRLF line endings, unclosed emphasis and code, and runs of blank lines.
+
+**0 of 135 differ.** The port is exact on realistic Markdown; the 15 / 600 residual in the
+adversarial sweep is confined to degenerate shapes that corpus does not produce.
