@@ -1148,18 +1148,8 @@ func (renderer *Renderer) trackWritten(data []byte) {
 }
 
 func (renderer *Renderer) failure() error {
-	if renderer.err != nil {
-		return renderer.err
-	}
-	if renderer.markdown != nil {
-		return renderer.markdownError()
-	}
-	return nil
-}
-
-func (renderer *Renderer) markdownError() error {
-	// Stream errors are surfaced by every operation that can emit; this method only guards writer
-	// failures latched through the stream callback.
+	// Markdown stream errors need no separate latch: the stream only fails when its writer
+	// callback does, and that callback is renderer.write, which latches through fail.
 	return renderer.err
 }
 

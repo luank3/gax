@@ -702,3 +702,27 @@ func TestRenderLeavesOversizedUnterminatedTableRowLiteral(t *testing.T) {
 		t.Fatal("Render() formatted an oversized unterminated row instead of falling back losslessly")
 	}
 }
+
+// TestRenderKeepsDeferredTailInsideOpenRun pins the end-of-input rule against the upstream renderer
+// (checked byte-for-byte with a driver linked against ~/dev/hax): a tail that stayed ambiguous
+// during streaming is emitted literally, inside whatever inline run is still open, and that run
+// closes after it, which is what markdown.c's newline handler and md_flush do.
+func TestRenderKeepsDeferredTailInsideOpenRun(t *testing.T) {
+	fixtures := []struct {
+		input string
+		width int
+		want  string
+	}{
+		{"===- **b\u2014\r\r\n*", 0, "===- \x1b[1mb \u2014\r\r *\x1b[22m"},
+		{"===- **b\u2014\r\r\n*", 20, "===- \x1b[1mb \u2014 *\x1b[22m"},
+		{"1. \r\n`\n", 0, "\x1b[2m1. \x1b[22m\r `\n"},
+		{"1. \r\n`\n", 20, "\x1b[2m1. \x1b[22m `\n"},
+		{"abc\n`\n", 0, "abc `\n"},
+		{"abc\n* ", 0, "abc\n* "},
+	}
+	for _, fixture := range fixtures {
+		if got := Render(fixture.input, fixture.width, true); got != fixture.want {
+			t.Errorf("Render(%q, %d) = %q\n  upstream =%q", fixture.input, fixture.width, got, fixture.want)
+		}
+	}
+}

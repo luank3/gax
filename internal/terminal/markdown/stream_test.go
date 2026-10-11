@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestStreamEmitsPlainProseBeforeClose(t *testing.T) {
@@ -15,8 +16,10 @@ func TestStreamEmitsPlainProseBeforeClose(t *testing.T) {
 	if err := stream.Feed("alpha "); err != nil {
 		t.Fatal(err)
 	}
-	if got := output.String(); got != "alpha " {
-		t.Fatalf("output before next feed = %q, want %q", got, "alpha ")
+	// The trailing space waits for the byte that decides it: a boundary may trim it, or re-emit it
+	// as a hard break. The prose itself is out before the next feed.
+	if got := output.String(); got != "alpha" {
+		t.Fatalf("output before next feed = %q, want %q", got, "alpha")
 	}
 	if err := stream.Feed("beta"); err != nil {
 		t.Fatal(err)
@@ -61,8 +64,8 @@ func TestStreamEmitsSoftJoinedProseAcrossPhysicalLines(t *testing.T) {
 	if err := stream.Feed("alpha\nbeta gamma "); err != nil {
 		t.Fatal(err)
 	}
-	if got := output.String(); got != "alpha beta gamma " {
-		t.Fatalf("soft-joined prose before close = %q, want the eager wrapped prefix", got)
+	if got := output.String(); got != "alpha beta gamma" {
+		t.Fatalf("soft-joined prose before close = %q, want the settled prefix", got)
 	}
 	if err := stream.Close(); err != nil {
 		t.Fatal(err)
@@ -81,8 +84,8 @@ func TestStreamEmitsCompletedWrappedWordsBeforeBoundary(t *testing.T) {
 	if err := stream.Feed("alpha beta "); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := output.String(), "alpha beta "; got != want {
-		t.Fatalf("wrapped prose before boundary = %q, want eager wrapped output %q", got, want)
+	if got, want := output.String(), "alpha beta"; got != want {
+		t.Fatalf("wrapped prose before boundary = %q, want settled wrapped output %q", got, want)
 	}
 	if err := stream.Feed("gamma delta "); err != nil {
 		t.Fatal(err)
@@ -195,6 +198,44 @@ func TestStreamBailsOversizedUnterminatedTableRowLosslessly(t *testing.T) {
 	}
 	if stream.InTable() {
 		t.Fatal("stream remained in table collection after the byte cap bailout")
+	}
+}
+
+// TestStreamResetLeavesNoStyleOpen pins that discarding a stream never strands a style sequence:
+// a heading or fence whose opening escape was written must be closed, and one that never wrote
+// anything must leave the terminal unstyled.
+func TestStreamResetLeavesNoStyleOpen(t *testing.T) {
+	fixtures := []struct {
+		input string
+		want  string
+	}{
+		{"# H\n", "tail"},
+		{"# *H\n", "tail"},
+		{"```\n", "tail"},
+		{"```\nx", "tail"},
+		{"```\nx\n", ansiDim + "x\n" + ansiBoldOff + "tail"},
+	}
+	for _, fixture := range fixtures {
+		var output strings.Builder
+		stream := NewStream(0, true, func(chunk string) error {
+			output.WriteString(chunk)
+			return nil
+		})
+		if err := stream.Feed(fixture.input); err != nil {
+			t.Fatalf("Feed(%q): %v", fixture.input, err)
+		}
+		if err := stream.Reset(); err != nil {
+			t.Fatalf("Reset(%q): %v", fixture.input, err)
+		}
+		if err := stream.Feed("tail"); err != nil {
+			t.Fatalf("Feed after Reset(%q): %v", fixture.input, err)
+		}
+		if err := stream.Close(); err != nil {
+			t.Fatalf("Close(%q): %v", fixture.input, err)
+		}
+		if got := output.String(); got != fixture.want {
+			t.Errorf("Reset(%q) then tail = %q, want %q", fixture.input, got, fixture.want)
+		}
 	}
 }
 
@@ -536,6 +577,125 @@ func TestRenderUpstreamSpacesTightEmDash(t *testing.T) {
 	for _, test := range cases {
 		if got := Render(test.input, 0, true); got != test.want {
 			t.Errorf("Render(%q) = %q, want %q", test.input, got, test.want)
+		}
+	}
+}
+
+// FuzzStreamFeedNeverLatchesOrCorrupts covers the streaming contract for arbitrary input and
+// width. Segment boundaries do not always compose with a whole-document render (see
+// TestStreamSegmentBoundaryAfterHeadingKnownGap), so this asserts the invariants that must hold
+// unconditionally: no feed or close may fail, a valid document may never render as invalid UTF-8,
+// and a re-render of the same input must be identical.
+func FuzzStreamFeedNeverLatchesOrCorrupts(f *testing.F) {
+	f.Add("plain **bold** and _italic_ with `code`", uint8(0), true)
+	f.Add("first line\nsecond line\n\n- item\n", uint8(0), false)
+	f.Add("before—after https://example.com/docs.", uint8(0), true)
+	f.Add("| Name | Note |\n|---|---|\n| A | **bold** |\n", uint8(40), true)
+	f.Add("A\n\r\n", uint8(18), true)
+	f.Add("A\n\v0", uint8(11), true)
+	f.Add("héllo wörld — ünïcode", uint8(8), false)
+	f.Add("", uint8(0), true)
+	f.Fuzz(func(t *testing.T, input string, widthByte uint8, styled bool) {
+		width := int(widthByte) % 40
+		want := Render(input, width, styled)
+
+		splits := []int{0, 1, len(input) / 2, len(input) - 1, len(input)}
+		for _, first := range splits {
+			for _, second := range splits {
+				if first < 0 || second < first || second > len(input) {
+					continue
+				}
+				var output strings.Builder
+				stream := NewStream(width, styled, func(chunk string) error {
+					output.WriteString(chunk)
+					return nil
+				})
+				for _, chunk := range []string{input[:first], input[first:second], input[second:]} {
+					if err := stream.Feed(chunk); err != nil {
+						t.Fatalf("Feed(%q, %d, %d, %d): %v", input, width, first, second, err)
+					}
+				}
+				if err := stream.Close(); err != nil {
+					t.Fatalf("Close(%q, %d, %d, %d): %v", input, width, first, second, err)
+				}
+				// Upstream feeds the answer stream to the Markdown renderer unsanitized, so
+				// invalid input may pass through. A valid document must never render as invalid
+				// UTF-8, which would mean wrapping sliced a rune.
+				if utf8.ValidString(input) && !utf8.ValidString(output.String()) {
+					t.Fatalf("stream(%q, %d, split %d/%d) rendered valid input as invalid UTF-8: %q",
+						input, width, first, second, output.String())
+				}
+				if got := output.String(); got != want {
+					t.Fatalf("stream(%q, %d, split %d/%d) = %q, want the whole-document render %q",
+						input, width, first, second, got, want)
+				}
+			}
+		}
+		if utf8.ValidString(input) && !utf8.ValidString(want) {
+			t.Fatalf("Render(%q, %d) rendered valid input as invalid UTF-8: %q", input, width, want)
+		}
+		if again := Render(input, width, styled); again != want {
+			t.Fatalf("Render(%q, %d) is not stable: %q then %q", input, width, want, again)
+		}
+	})
+}
+
+// FuzzStreamCloseAndBoundaryAreIdempotent pins the lifecycle contract: Close flushes once, and a
+// Boundary leaves the stream reusable without replaying already-emitted output.
+func FuzzStreamCloseAndBoundaryAreIdempotent(f *testing.F) {
+	f.Add("alpha beta\n\ngamma", uint8(0), true)
+	f.Add("| H |\n|---|\n| x |\n", uint8(40), true)
+	f.Add("**unclosed emphasis", uint8(0), true)
+	f.Fuzz(func(t *testing.T, input string, widthByte uint8, styled bool) {
+		width := int(widthByte) % 40
+		var output strings.Builder
+		stream := NewStream(width, styled, func(chunk string) error {
+			output.WriteString(chunk)
+			return nil
+		})
+		if err := stream.Feed(input); err != nil {
+			t.Fatalf("Feed(%q): %v", input, err)
+		}
+		if err := stream.Close(); err != nil {
+			t.Fatalf("Close(%q): %v", input, err)
+		}
+		settled := output.String()
+		if err := stream.Close(); err != nil {
+			t.Fatalf("second Close(%q): %v", input, err)
+		}
+		if output.String() != settled {
+			t.Fatalf("Close(%q) re-emitted output: %q then %q", input, settled, output.String())
+		}
+		if err := stream.Feed("more"); err == nil {
+			t.Fatalf("Feed after Close(%q) should fail", input)
+		}
+		if err := stream.Boundary(); err == nil {
+			t.Fatalf("Boundary after Close(%q) should fail", input)
+		}
+	})
+}
+
+// TestStreamMatchesRenderForCRLines pins the regression fuzzing found: a CR line makes the
+// renderer preserve a break the eager scanner cannot see, so "A\n\r\n" renders as "A \r\n".
+// Emitting the scanner's shorter prefix used to latch "output changed after it was emitted",
+// which aborted the whole answer stream.
+func TestStreamMatchesRenderForCRLines(t *testing.T) {
+	for _, input := range []string{"A\n\r\n", "A\r\n\r\n", "A\r\n", "A\r\nB", "A\n\rB", "\r\n", "A\n\r\n\r\nB"} {
+		for _, width := range []int{0, 18} {
+			var output strings.Builder
+			stream := NewStream(width, true, func(chunk string) error {
+				output.WriteString(chunk)
+				return nil
+			})
+			if err := stream.Feed(input); err != nil {
+				t.Fatalf("Feed(%q, %d): %v", input, width, err)
+			}
+			if err := stream.Close(); err != nil {
+				t.Fatalf("Close(%q, %d): %v", input, width, err)
+			}
+			if got, want := output.String(), Render(input, width, true); got != want {
+				t.Fatalf("stream(%q, %d) = %q, want Render = %q", input, width, got, want)
+			}
 		}
 	}
 }

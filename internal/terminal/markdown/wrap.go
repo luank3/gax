@@ -28,6 +28,7 @@ type terminalWrapper struct {
 	indentLocked     bool
 	rowHasContent    bool
 	pendingWrap      bool
+	pending          string
 	style            wrapStyle
 	styleAtLastBreak wrapStyle
 }
@@ -37,6 +38,24 @@ func wrapTerminal(input string, width, continuationIndent int) string {
 		width:           width,
 		requestedIndent: continuationIndent,
 		lastBreakByte:   -1,
+	}
+	wrapper.write(input)
+	wrapper.finish()
+	return wrapper.output.String()
+}
+
+// write classifies a rendered string into style sequences and text runes. It is the streaming
+// entry point a parser uses to feed one block at a time through the same wrapper the batch
+// renderer builds per block.
+//
+// A rune split across two calls is held rather than classified: its bytes are only worth one cell
+// once they are together, and a chunk boundary must not change where a row breaks.
+func (wrapper *terminalWrapper) write(input string) {
+	input = wrapper.pending + input
+	wrapper.pending = ""
+	if hold := incompleteRuneStart(input); hold >= 0 {
+		wrapper.pending = input[hold:]
+		input = input[:hold]
 	}
 	for index := 0; index < len(input); {
 		if input[index] == '\x1b' && index+1 < len(input) && input[index+1] == '[' {
@@ -57,10 +76,54 @@ func wrapTerminal(input string, width, continuationIndent int) string {
 		wrapper.rune(input[index:index+size], r)
 		index += size
 	}
-	// An edge-space is intentionally held so a terminal never autowraps it before
-	// the renderer can decide whether the next visible character starts a row.
+}
+
+// finish resolves the wrapper at the end of a block: an unterminated rune is written as the bytes
+// it is, and an edge-space is dropped rather than left to autowrap.
+func (wrapper *terminalWrapper) finish() {
+	if wrapper.pending != "" {
+		held := wrapper.pending
+		wrapper.pending = ""
+		wrapper.write(held)
+	}
 	wrapper.pendingWrap = false
-	return wrapper.output.String()
+}
+
+// incompleteRuneStart returns the index of a trailing multi-byte rune whose continuation bytes have
+// not all arrived, or -1 when the input ends on a rune boundary. An invalid sequence is not held:
+// it is classified byte by byte, as the batch renderer classifies invalid input.
+func incompleteRuneStart(input string) int {
+	index := len(input)
+	for index > 0 && len(input)-index < 3 && input[index-1]&0xc0 == 0x80 {
+		index--
+	}
+	if index == 0 {
+		return -1
+	}
+	lead := input[index-1]
+	size := 0
+	switch {
+	case lead&0xe0 == 0xc0:
+		size = 2
+	case lead&0xf0 == 0xe0:
+		size = 3
+	case lead&0xf8 == 0xf0:
+		size = 4
+	default:
+		return -1
+	}
+	if len(input)-(index-1) < size {
+		return index - 1
+	}
+	return -1
+}
+
+// drain returns the bytes the wrapper has finished and clears its buffer, so a parser can stream
+// a block without retaining it.
+func (wrapper *terminalWrapper) drain() string {
+	value := wrapper.output.String()
+	wrapper.output.Reset()
+	return value
 }
 
 func (wrapper *terminalWrapper) raw(value string) {
