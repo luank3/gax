@@ -540,6 +540,54 @@ func TestRendererKeepsCollapsedReadClusterAcrossProviderBoundaries(t *testing.T)
 	}
 }
 
+func TestRendererParksStatusBelowOpenCollapsedReadRow(t *testing.T) {
+	var output bytes.Buffer
+	renderer := NewRenderer(&output, 80, false, false)
+	_ = renderer.Begin()
+	read := func(name string) {
+		t.Helper()
+		presentation := coretools.ToolPresentation{Argument: name, HasArgument: true, PreviewMode: coretools.PreviewCollapsed, CollapsedArgument: name}
+		if err := renderer.ToolStart(conversation.Item{ToolName: conversation.String("read")}, presentation); err != nil {
+			t.Fatal(err)
+		}
+		if err := renderer.ToolResult(coretools.ToolExecution{Result: conversation.Item{Kind: conversation.KindToolResult}, Presentation: presentation}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	read("a.txt")
+	// The provider round trip between two reads paints the delayed working indicator.
+	if err := renderer.SetStatusLabel("working..."); err != nil {
+		t.Fatal(err)
+	}
+	if err := renderer.Tick(renderer.statusStarted.Add(statusShowGrace)); err != nil {
+		t.Fatal(err)
+	}
+	read("b.txt")
+	if err := renderer.SetStatusLabel("working..."); err != nil {
+		t.Fatal(err)
+	}
+	if err := renderer.Tick(renderer.statusStarted.Add(statusShowGrace)); err != nil {
+		t.Fatal(err)
+	}
+	if err := renderer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := output.String()
+	for _, frame := range spinnerFrames {
+		got = strings.ReplaceAll(got, frame, "X")
+	}
+	// A parked indicator sits below the open row and clearing it climbs back to the row's last
+	// column, so the next read still coalesces onto that row instead of a fresh line.
+	want := "[read] a.txt\n\nX working..." +
+		"\r\x1b[2K\x1b[2A\x1b[13G, b.txt" +
+		"\n\nX working..." +
+		"\r\x1b[2K\x1b[2A\x1b[20G\n"
+	if got != want {
+		t.Fatalf("parked status output = %q, want %q", got, want)
+	}
+}
+
 func TestRendererStartsNewCollapsedReadRowWhenClusterWouldOverflow(t *testing.T) {
 	var output bytes.Buffer
 	renderer := NewRenderer(&output, 20, false, false)

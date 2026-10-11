@@ -63,6 +63,8 @@ type Renderer struct {
 	statusLineNewlines int
 	statusFrame        int
 	statusPainted      string
+	statusParkedRows   int
+	statusParkedColumn int
 	turnStarted        time.Time
 	retryDeadline      time.Time
 	retryAttempt       int
@@ -893,7 +895,15 @@ func (renderer *Renderer) Tick(now time.Time) error {
 			return err
 		}
 	} else {
-		if renderer.outputStarted && renderer.lineNewlines == 0 {
+		if renderer.collapsedLineOpen {
+			// Park the indicator below the open read row: the extra row is the gap the cleared
+			// indicator leaves behind (upstream spinner_park).
+			if err := renderer.write("\n\n"); err != nil {
+				return err
+			}
+			renderer.statusParkedRows = 2
+			renderer.statusParkedColumn = renderer.collapsedCells
+		} else if renderer.outputStarted && renderer.lineNewlines == 0 {
 			if err := renderer.write("\n"); err != nil {
 				return err
 			}
@@ -1001,6 +1011,11 @@ func (renderer *Renderer) closeCollapsedCluster() error {
 	if !renderer.collapsedCluster {
 		return nil
 	}
+	// The indicator must be hidden first: a parked status restores the open row's cursor, which
+	// would otherwise be terminated from the row the status was painted on.
+	if err := renderer.clearStatus(); err != nil {
+		return err
+	}
 	if renderer.collapsedLineOpen {
 		if err := renderer.write("\n"); err != nil {
 			return err
@@ -1038,6 +1053,21 @@ func (renderer *Renderer) clearStatus() error {
 		return err
 	}
 	renderer.lineNewlines = renderer.statusLineNewlines
+	if renderer.statusParkedRows > 0 {
+		// A parked indicator sits below the open read row, so clearing it must climb back and
+		// restore the row's column for the next coalesced read.
+		if err := renderer.write(fmt.Sprintf("\x1b[%dA", renderer.statusParkedRows)); err != nil {
+			return err
+		}
+		if renderer.statusParkedColumn > 0 {
+			if err := renderer.write(fmt.Sprintf("\x1b[%dG", renderer.statusParkedColumn+1)); err != nil {
+				return err
+			}
+		}
+		renderer.lineNewlines = 0
+	}
+	renderer.statusParkedRows = 0
+	renderer.statusParkedColumn = 0
 	renderer.statusVisible = false
 	renderer.statusFrame = -1
 	renderer.statusPainted = ""

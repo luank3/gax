@@ -550,3 +550,27 @@ CRLF line endings, unclosed emphasis and code, and runs of blank lines.
 
 **0 of 135 differ.** The port is exact on realistic Markdown; the 15 / 600 residual in the
 adversarial sweep is confined to degenerate shapes that corpus does not produce.
+
+### Parked status below an open read row (2026-10-12)
+
+A `read` header stays open so later reads coalesce onto the same row, but the delayed status
+indicator was painted one row below it with no way back: clearing it left the cursor at column zero
+of the row it had borrowed, so the next `, file:range` suffix landed there. Reads separated by a
+provider round trip — the common case, since the indicator only appears after 300 ms of waiting —
+rendered as
+
+```
+[read] mock.go:445-574
+, registry_test.go:1-100
+, transcript.go:1-230
+```
+
+Upstream parks the indicator instead (`spinner_park`, `src/render/spinner.c:356`): it draws the
+label two rows below an open row and records the row's column, and hiding it (`erase_locked`)
+erases the label row, climbs back, and restores that column, so the next read still coalesces. The
+port now does the same — `Tick` writes the two-row park and `clearStatus` climbs back — and
+`closeCollapsedCluster` clears the indicator first, exactly as upstream's `close_mode`
+(`src/render/render_ctx.c:21`) hides the spinner before terminating an open row.
+`TestRendererParksStatusBelowOpenCollapsedReadRow` pins the byte stream: `\n\n` before the label,
+then `\r\x1b[2K\x1b[2A\x1b[13G` before `, b.txt`. The row the indicator borrows is the gap the
+block separator owes the next block anyway, so the committed layout is unchanged.
