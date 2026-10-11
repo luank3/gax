@@ -17,6 +17,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/luank3/gax/internal/conversation"
+	"github.com/luank3/gax/internal/skill"
 	systemfs "github.com/luank3/gax/internal/system/fs"
 	systempath "github.com/luank3/gax/internal/system/path"
 )
@@ -51,6 +52,16 @@ func (registry *Registry) runRead(arguments string, imageInput int, _ DisplaySin
 		return Result{Text: validationError}
 	}
 
+	// Built-in skills live in the binary, so they are resolved before any filesystem access. The
+	// whole document is returned: it is a fixed-size reference the cap should not slice, and the
+	// model-facing shape stays the numbered one the read tool promises.
+	if strings.HasPrefix(path, skill.Scheme) {
+		body, ok := skill.Read(path)
+		if !ok {
+			return Result{Text: fmt.Sprintf("error reading %s: no such built-in skill", path)}
+		}
+		return Result{Text: sanitizeUTF8(numberLines(body))}
+	}
 	path = expandHome(path)
 	info, err := os.Stat(path)
 	if err != nil {
@@ -93,6 +104,21 @@ func (registry *Registry) runRead(arguments string, imageInput int, _ DisplaySin
 		text += fmt.Sprintf("\n\n[truncated at %d lines; file has more — pass offset/limit to read more]", maxReadLines)
 	}
 	return Result{Text: text}
+}
+
+// numberLines renders text the way readTextSlice renders file content, so a built-in document is
+// indistinguishable from a file read apart from its path.
+func numberLines(text string) string {
+	lines := strings.SplitAfter(text, "\n")
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	var out strings.Builder
+	out.Grow(len(text) + 8*len(lines))
+	for index, line := range lines {
+		fmt.Fprintf(&out, "%6d%s%s", index+1, readLineDelimiter, line)
+	}
+	return out.String()
 }
 
 func hasBinaryPrefix(path string) (bool, error) {

@@ -196,6 +196,49 @@ func TestBuildSystemPromptPreservesSkillListTrailingNewline(t *testing.T) {
 	}
 }
 
+func TestBuildSystemPromptListsBuiltinSkills(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_subagents":true,"no_tasks":true}`)
+	result := BuildSystemPrompt(store, "", PromptOptions{CWD: t.TempDir(), Home: home})
+	if !strings.Contains(result.Text, "- customize-gax: Change gax's own settings, providers, models, or presets") {
+		t.Fatalf("built-in skill is not listed: %q", result.Text)
+	}
+	if !strings.Contains(result.Text, "(gax:skills/customize-gax/SKILL.md)") {
+		t.Fatalf("built-in skill path is not listed: %q", result.Text)
+	}
+	disabled := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_skills":true,"no_subagents":true,"no_tasks":true}`)
+	if result := BuildSystemPrompt(disabled, "", PromptOptions{CWD: t.TempDir(), Home: home}); strings.Contains(result.Text, "customize-gax") {
+		t.Fatalf("no_skills kept the built-in skill: %q", result.Text)
+	}
+}
+
+func TestBuildSystemPromptDiscoveredSkillShadowsBuiltinSkill(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	project := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(project, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	directory := filepath.Join(project, ".agents", "skills", "customize-gax")
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte("---\ndescription: project override\n---\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_subagents":true,"no_tasks":true}`)
+	result := BuildSystemPrompt(store, "", PromptOptions{CWD: project, Home: home})
+	if !strings.Contains(result.Text, "- customize-gax: project override (") {
+		t.Fatalf("discovered skill did not shadow the built-in: %q", result.Text)
+	}
+	if strings.Contains(result.Text, "gax:skills/") {
+		t.Fatalf("the built-in skill was listed beside its shadow: %q", result.Text)
+	}
+}
+
 func TestBuildSystemPromptPreservesProjectInstructionTrailingNewline(t *testing.T) {
 	project := t.TempDir()
 	if err := os.WriteFile(filepath.Join(project, "AGENTS.md"), []byte("project rule\n"), 0o600); err != nil {

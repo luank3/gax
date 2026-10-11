@@ -74,6 +74,21 @@ func TestReadTextSlicesAndCapsOutput(t *testing.T) {
 	}
 }
 
+func TestReadServesBuiltinSkillsWithoutTheFilesystem(t *testing.T) {
+	// The cap is deliberately below the document size: a built-in reference is never sliced.
+	registry := New(Options{OutputCap: 128})
+	got := registry.Run("read", jsonArgs(map[string]any{"path": "gax:skills/customize-gax/SKILL.md"}), 1)
+	if !strings.HasPrefix(got.Text, "     1→---\n") {
+		t.Fatalf("built-in read is not numbered like a file: %q", got.Text)
+	}
+	if !strings.Contains(got.Text, "# Customizing gax") || !strings.Contains(got.Text, "| `theme` | `GAX_THEME` |") {
+		t.Fatalf("built-in read lost the document: %q", got.Text)
+	}
+	if got := registry.Run("read", jsonArgs(map[string]any{"path": "gax:skills/missing/SKILL.md"}), 1).Text; !strings.Contains(got, "no such built-in skill") {
+		t.Fatalf("unknown built-in read = %q", got)
+	}
+}
+
 func TestReadRejectsBinaryAndNonRegularFiles(t *testing.T) {
 	dir := t.TempDir()
 	binaryPath := filepath.Join(dir, "binary.dat")

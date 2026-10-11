@@ -14,6 +14,7 @@ import (
 
 	"github.com/luank3/gax/internal/config"
 	"github.com/luank3/gax/internal/provider/registry"
+	"github.com/luank3/gax/internal/skill"
 	systemfs "github.com/luank3/gax/internal/system/fs"
 	terminalgit "github.com/luank3/gax/internal/system/git"
 	terminalosinfo "github.com/luank3/gax/internal/system/osinfo"
@@ -299,6 +300,17 @@ func buildSkills(options PromptOptions) string {
 	if sharedRoot != "" {
 		collectSkills(sharedRoot, options.Home, skills)
 	}
+	// Built-in skills are the fallback, so a discovered skill with the same name shadows them.
+	for _, entry := range skill.Builtin() {
+		if _, exists := skills[entry.Name]; exists {
+			continue
+		}
+		skills[entry.Name] = promptSkill{
+			name:        entry.Name,
+			path:        entry.Path,
+			description: skillDescription([]byte(entry.Body)),
+		}
+	}
 	if len(skills) == 0 {
 		return ""
 	}
@@ -310,11 +322,11 @@ func buildSkills(options PromptOptions) string {
 	var out strings.Builder
 	out.WriteString("# Skills\n\nRead the corresponding SKILL.md when a task matches the description:\n\n")
 	for _, name := range names {
-		skill := skills[name]
-		if skill.description != "" {
-			fmt.Fprintf(&out, "- %s: %s (%s)\n", skill.name, skill.description, skill.path)
+		entry := skills[name]
+		if entry.description != "" {
+			fmt.Fprintf(&out, "- %s: %s (%s)\n", entry.name, entry.description, entry.path)
 		} else {
-			fmt.Fprintf(&out, "- %s (%s)\n", skill.name, skill.path)
+			fmt.Fprintf(&out, "- %s (%s)\n", entry.name, entry.path)
 		}
 	}
 	return out.String()

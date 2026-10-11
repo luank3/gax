@@ -169,6 +169,11 @@ Example `config.json`:
 `system_prompt_append`, and can be selected with the leading shorthand (`gax review`) or
 `--preset=review`.
 
+gax ships one skill of its own: `customize-gax`, which tells the model how to change these settings,
+providers, and presets. It is listed with the discovered skills and read through the `gax:` path
+`gax:skills/customize-gax/SKILL.md`, which `read` resolves from the binary instead of the filesystem. A
+discovered skill named `customize-gax` shadows it.
+
 ## Sessions and output
 
 Sessions are recorded per working directory, so `-c` and `--resume` stay scoped to the project
@@ -183,7 +188,8 @@ record (`outcome`, `turns`, `elapsed_ms`, `text`, `context_tokens`, `cost`, `ses
 
 The agent ships these built-in tools: `read`, `edit`, `write`, `bash`, and `task_wait`.
 `bash` commands that outlive their timeout detach into background tasks, and `gax -p "<task>"`
-can be run through `bash` to delegate to a subagent with clean context.
+can be run through `bash` to delegate to a subagent with clean context. Besides files, `read`
+accepts the `gax:skills/<name>/SKILL.md` paths of the skills built into the binary.
 
 ## Development
 
