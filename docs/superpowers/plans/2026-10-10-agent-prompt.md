@@ -1,5 +1,7 @@
 # Agent system prompt assembly
 
+> Skills note (2026-10-11): the `# Skills` listing this plan ported moved into the `skill` tool, so the prompt no longer carries it; see `2026-10-11-skill-tool.md`.
+
 ## Goal
 
 Port upstream base-prompt selection and the dynamic suffix containing environment details, project `AGENTS.md` instructions, and skill descriptions.

@@ -10,11 +10,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/luank3/gax/internal/config"
 	"github.com/luank3/gax/internal/provider/registry"
-	"github.com/luank3/gax/internal/skill"
 	systemfs "github.com/luank3/gax/internal/system/fs"
 	terminalgit "github.com/luank3/gax/internal/system/git"
 	terminalosinfo "github.com/luank3/gax/internal/system/osinfo"
@@ -24,8 +22,6 @@ import (
 
 const (
 	agentsFileCap       = 64 * 1024
-	skillFrontmatterCap = 8 * 1024
-	skillDescriptionCap = 1024
 	projectWalkMaxDepth = 64
 )
 
@@ -124,11 +120,6 @@ func buildEnvironmentSuffix(store *config.Store, model string, options PromptOpt
 	if !options.Bare && !configBool(store, "no_agents_md") {
 		if project := buildProjectContext(store, options); project != "" {
 			parts = append(parts, project)
-		}
-	}
-	if !options.Bare && !configBool(store, "no_skills") {
-		if skills := buildSkills(options); skills != "" {
-			parts = append(parts, skills)
 		}
 	}
 	return joinPromptSections(parts), warnings
@@ -259,103 +250,6 @@ func readAgentsFile(path, displayPath string) string {
 		out.WriteString("[truncated]\n")
 	}
 	return out.String()
-}
-
-type promptSkill struct{ name, path, description string }
-
-func buildSkills(options PromptOptions) string {
-	skills := make(map[string]promptSkill)
-	sharedRoot := ""
-	var sharedRootInfo os.FileInfo
-	if options.Home != "" {
-		sharedRoot = systempath.Join(options.Home, ".agents/skills")
-		sharedRootInfo, _ = os.Stat(sharedRoot)
-	}
-	if options.CWD != "" {
-		root := terminalgit.FindWorktreeRoot(options.CWD)
-		for dir, depth := options.CWD, 0; depth < projectWalkMaxDepth; depth++ {
-			projectSkills := systempath.Join(dir, ".agents/skills")
-			sharedAlias := false
-			if sharedRootInfo != nil {
-				if projectInfo, err := os.Stat(projectSkills); err == nil && os.SameFile(projectInfo, sharedRootInfo) {
-					sharedAlias = true
-				}
-			}
-			if !sharedAlias {
-				collectSkills(projectSkills, options.Home, skills)
-			}
-			if root == "" || filepath.Clean(root) == filepath.Clean(dir) {
-				break
-			}
-			parent := filepath.Dir(dir)
-			if parent == dir {
-				break
-			}
-			dir = parent
-		}
-	}
-	if directory, ok := promptConfigPath("skills"); ok {
-		collectSkills(directory, options.Home, skills)
-	}
-	if sharedRoot != "" {
-		collectSkills(sharedRoot, options.Home, skills)
-	}
-	// Built-in skills are the fallback, so a discovered skill with the same name shadows them.
-	for _, entry := range skill.Builtin() {
-		if _, exists := skills[entry.Name]; exists {
-			continue
-		}
-		skills[entry.Name] = promptSkill{
-			name:        entry.Name,
-			path:        entry.Path,
-			description: skillDescription([]byte(entry.Body)),
-		}
-	}
-	if len(skills) == 0 {
-		return ""
-	}
-	names := make([]string, 0, len(skills))
-	for name := range skills {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	var out strings.Builder
-	out.WriteString("# Skills\n\nRead the corresponding SKILL.md when a task matches the description:\n\n")
-	for _, name := range names {
-		entry := skills[name]
-		if entry.description != "" {
-			fmt.Fprintf(&out, "- %s: %s (%s)\n", entry.name, entry.description, entry.path)
-		} else {
-			fmt.Fprintf(&out, "- %s (%s)\n", entry.name, entry.path)
-		}
-	}
-	return out.String()
-}
-
-func collectSkills(root, home string, skills map[string]promptSkill) {
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		return
-	}
-	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
-		name := cleanPromptText(entry.Name())
-		if _, exists := skills[name]; exists {
-			continue
-		}
-		path := systempath.Join(systempath.Join(root, entry.Name()), "SKILL.md")
-		data, _, err := systemfs.ReadFileCapped(path, skillFrontmatterCap)
-		if err != nil {
-			continue
-		}
-		skills[name] = promptSkill{name: name, path: cleanPromptText(collapseHome(path, home)), description: skillDescription(data)}
-	}
-}
-
-func skillDescription(data []byte) string {
-	return truncatePromptUTF8(frontmatterScalarLine(data, "description"), skillDescriptionCap)
 }
 
 func configuredShell(store *config.Store) string {
@@ -530,17 +424,6 @@ func appendPromptPart(parts *[]string, value string) {
 
 func cleanPromptText(value string) string {
 	return strings.ToValidUTF8(strings.ReplaceAll(value, "\x00", "\uFFFD"), "\uFFFD")
-}
-
-func truncatePromptUTF8(value string, limit int) string {
-	if len(value) <= limit {
-		return value
-	}
-	cut := limit
-	for cut > 0 && !utf8.RuneStart(value[cut]) {
-		cut--
-	}
-	return value[:cut]
 }
 
 func configValue(store *config.Store, key string) *string {

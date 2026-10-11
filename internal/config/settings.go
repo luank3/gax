@@ -11,7 +11,7 @@ func DefaultSettings() []Setting {
 		{Key: "system_prompt_append", EnvVar: "GAX_SYSTEM_PROMPT_APPEND", Description: "Text appended after the base system prompt; @path reads a file", KeepEmpty: true},
 		{Key: "no_env", EnvVar: "GAX_NO_ENV", Description: "Skip the Environment section in the system prompt", Choices: "on|off"},
 		{Key: "no_agents_md", EnvVar: "GAX_NO_AGENTS_MD", Description: "Skip AGENTS.md project instructions in the system prompt", Choices: "on|off"},
-		{Key: "no_skills", EnvVar: "GAX_NO_SKILLS", Description: "Skip the skills listing in the system prompt", Choices: "on|off"},
+		{Key: "no_skills", EnvVar: "GAX_NO_SKILLS", Description: "Disable the skill tool: the model is not told which skills exist and cannot load one", Choices: "on|off"},
 		{Key: "no_subagents", EnvVar: "GAX_NO_SUBAGENTS", Description: "Skip the subagents section in the system prompt", Choices: "on|off"},
 		{Key: "no_tasks", EnvVar: "GAX_NO_TASKS", Description: "Disable background tasks: bash timeouts kill instead of detaching, and the task tools are not offered", Choices: "on|off"},
 		{Key: "no_web", EnvVar: "GAX_NO_WEB", Description: "Disable the web tools: web_fetch and web_search are not offered", Choices: "on|off"},

@@ -179,7 +179,7 @@ func printHelpWithStyle(writer io.Writer, store *config.Store, styled bool) {
 		{"--resume[=ID]", "Resume a past conversation in this directory, restoring its recorded settings: pick from a list, or give a session ID. Works with -p; without a prompt, the conversation continues from where it stopped."},
 		{"--no-session", "Don't record this conversation: nothing to resume afterwards, and the prompts you type aren't added to Ctrl-R recall. Earlier sessions and prompts stay readable."},
 		{"--raw", "Send only the prompt text — no system prompt, no Environment section, no AGENTS.md, no skills, and no tools. Useful as a barebones chat interface."},
-		{"--bare", "Run without project and delegation context — no AGENTS.md, skills, or subagents section. The Environment section, tools, and base system prompt remain (unlike --raw)."},
+		{"--bare", "Run without project and delegation context — no AGENTS.md, no skills (the skill tool is not offered), and no subagents section. The Environment section, tools, and base system prompt remain (unlike --raw)."},
 		{"--provider=NAME", "Select the backend for this run."},
 		{"--model=ID", "Select the model for this run."},
 		{"--effort=LEVEL", "Select the reasoning effort for this run."},

@@ -31,6 +31,7 @@ type Options struct {
 	OutputCap        int
 	NoTasks          bool
 	NoWeb            bool
+	NoSkills         bool
 	BashTimeout      time.Duration
 	BashTimeoutMax   time.Duration
 	BashTimeoutGrace time.Duration
@@ -151,7 +152,7 @@ func New(options Options) *Registry {
 		options.TaskMaxRunning = 32
 	}
 	registry := &Registry{outputCap: capBytes, options: options, active: make(map[int]*commandTask)}
-	registry.definitions = builtInDefinitions(options.NoTasks, options.NoWeb)
+	registry.definitions = builtInDefinitions(options.NoTasks, options.NoWeb, options.NoSkills)
 	registry.tasks = newTaskManager(options.TaskMaxRunning)
 	return registry
 }
@@ -226,6 +227,7 @@ func NewFromConfig(store *config.Store) *Registry {
 	}
 	registry := New(Options{
 		OutputCap: int(store.Size("tool_output_cap")), NoTasks: store.Bool("no_tasks"), NoWeb: store.Bool("no_web"),
+		NoSkills:    store.Bool("no_skills"),
 		BashTimeout: store.Duration("bash.timeout"), BashTimeoutMax: store.Duration("bash.timeout_max"),
 		BashTimeoutGrace: store.Duration("bash.timeout_grace"), BackgroundYield: store.Duration("bash.background_yield"),
 		TaskWaitTimeout: store.Duration("task.wait_timeout"), TaskMaxRunning: store.Int("task.max_running"),
@@ -474,7 +476,7 @@ func (registry *Registry) Definitions() []provider.ToolDefinition {
 	}
 	definitionsSource := registry.definitions
 	if registry.store != nil {
-		definitionsSource = builtInDefinitions(registry.noTasks(), registry.noWeb())
+		definitionsSource = builtInDefinitions(registry.noTasks(), registry.noWeb(), registry.noSkills())
 	}
 	definitions := make([]provider.ToolDefinition, len(definitionsSource))
 	for index, definition := range definitionsSource {
@@ -572,6 +574,8 @@ func (registry *Registry) RunWithDisplay(name, arguments string, imageInput int,
 		run = registry.runWebFetch
 	case "web_search":
 		run = registry.runWebSearch
+	case "skill":
+		run = registry.runSkill
 	default:
 		return Result{Text: fmt.Sprintf("error: unknown tool %q", name)}
 	}
@@ -640,6 +644,14 @@ func (registry *Registry) Presentation(call conversation.Item) ToolPresentation 
 		presentation.RawArgument = !validID && arguments != ""
 		presentation.HasArgument = validID || presentation.RawArgument
 		presentation.PreviewMode = PreviewHeadTail
+	case "skill":
+		name, present := argument("name")
+		if present {
+			presentation.Argument, presentation.HasArgument = name, true
+			break
+		}
+		// A listing call carries no argument; malformed JSON keeps the raw-argument fallback below.
+		presentation.HasArgument = object != nil
 	case "web_fetch", "web_search":
 		key := "url"
 		if name == "web_search" {
@@ -811,7 +823,7 @@ func isImagePath(path string) bool {
 	}
 }
 
-func builtInDefinitions(noTasks, noWeb bool) []provider.ToolDefinition {
+func builtInDefinitions(noTasks, noWeb, noSkills bool) []provider.ToolDefinition {
 	definitions := []provider.ToolDefinition{
 		{
 			Name:        "read",
@@ -847,6 +859,9 @@ func builtInDefinitions(noTasks, noWeb bool) []provider.ToolDefinition {
 	}
 	if !noWeb {
 		definitions = append(definitions, webFetchDefinition(), webSearchDefinition())
+	}
+	if !noSkills {
+		definitions = append(definitions, skillDefinition())
 	}
 	return definitions
 }

@@ -179,42 +179,7 @@ func TestBuildSystemPromptUsesUpstreamSpacingBeforeProjectContext(t *testing.T) 
 	}
 }
 
-func TestBuildSystemPromptPreservesSkillListTrailingNewline(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	skillDir := filepath.Join(home, ".agents", "skills", "guide")
-	if err := os.MkdirAll(skillDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: guide\n---\nbody\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_subagents":true,"no_tasks":true}`)
-	result := BuildSystemPrompt(store, "", PromptOptions{CWD: t.TempDir(), Home: home})
-	if !strings.HasSuffix(result.Text, "- guide (~/.agents/skills/guide/SKILL.md)\n") {
-		t.Fatalf("skill list terminator differs from upstream: %q", result.Text)
-	}
-}
-
-func TestBuildSystemPromptListsBuiltinSkills(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_subagents":true,"no_tasks":true}`)
-	result := BuildSystemPrompt(store, "", PromptOptions{CWD: t.TempDir(), Home: home})
-	if !strings.Contains(result.Text, "- customize-gax: Change gax's own settings, providers, models, or presets") {
-		t.Fatalf("built-in skill is not listed: %q", result.Text)
-	}
-	if !strings.Contains(result.Text, "(gax:skills/customize-gax/SKILL.md)") {
-		t.Fatalf("built-in skill path is not listed: %q", result.Text)
-	}
-	disabled := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_skills":true,"no_subagents":true,"no_tasks":true}`)
-	if result := BuildSystemPrompt(disabled, "", PromptOptions{CWD: t.TempDir(), Home: home}); strings.Contains(result.Text, "customize-gax") {
-		t.Fatalf("no_skills kept the built-in skill: %q", result.Text)
-	}
-}
-
-func TestBuildSystemPromptDiscoveredSkillShadowsBuiltinSkill(t *testing.T) {
+func TestBuildSystemPromptLeavesSkillsToTheSkillTool(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -222,20 +187,19 @@ func TestBuildSystemPromptDiscoveredSkillShadowsBuiltinSkill(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(project, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	directory := filepath.Join(project, ".agents", "skills", "customize-gax")
+	directory := filepath.Join(project, ".agents", "skills", "guide")
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte("---\ndescription: project override\n---\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte("---\ndescription: project guide\n---\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_subagents":true,"no_tasks":true}`)
 	result := BuildSystemPrompt(store, "", PromptOptions{CWD: project, Home: home})
-	if !strings.Contains(result.Text, "- customize-gax: project override (") {
-		t.Fatalf("discovered skill did not shadow the built-in: %q", result.Text)
-	}
-	if strings.Contains(result.Text, "gax:skills/") {
-		t.Fatalf("the built-in skill was listed beside its shadow: %q", result.Text)
+	for _, unwanted := range []string{"# Skills", "SKILL.md", "customize-gax", "project guide"} {
+		if strings.Contains(result.Text, unwanted) {
+			t.Fatalf("the prompt still carries skill %q: %q", unwanted, result.Text)
+		}
 	}
 }
 
@@ -259,7 +223,7 @@ func TestBuildSystemPromptFallsBackWhenConfiguredPromptFileIsMissing(t *testing.
 	}
 }
 
-func TestBuildSystemPromptExpandsPromptFilesAndListsNearestSkillsFirst(t *testing.T) {
+func TestBuildSystemPromptExpandsPromptFiles(t *testing.T) {
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)
 	t.Setenv("HOME", filepath.Join(configHome, "home"))
@@ -270,34 +234,10 @@ func TestBuildSystemPromptExpandsPromptFilesAndListsNearestSkillsFirst(t *testin
 	if err := os.WriteFile(promptFile, []byte("prompt from file\n\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	project := t.TempDir()
-	nested := filepath.Join(project, "nested")
-	if err := os.MkdirAll(filepath.Join(project, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeSkill := func(root, name, description string) {
-		t.Helper()
-		path := filepath.Join(root, name, "SKILL.md")
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte("---\ndescription: "+description+"\n---\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	writeSkill(filepath.Join(project, ".agents", "skills"), "shared", "ancestor description")
-	writeSkill(filepath.Join(nested, ".agents", "skills"), "shared", "nearest description")
-	writeSkill(filepath.Join(nested, ".agents", "skills"), "local", "local description")
 	store := promptTestStore(t, `{"system_prompt":"@prompt.txt","no_env":true,"no_agents_md":true,"no_subagents":true,"no_tasks":true}`)
-	result := BuildSystemPrompt(store, "", PromptOptions{CWD: nested, Home: filepath.Join(configHome, "home")})
+	result := BuildSystemPrompt(store, "", PromptOptions{CWD: t.TempDir(), Home: filepath.Join(configHome, "home")})
 	if !strings.HasPrefix(result.Text, "prompt from file") || len(result.Warnings) != 0 {
 		t.Fatalf("prompt file expansion = %#v", result)
-	}
-	if !strings.Contains(result.Text, "- shared: nearest description") || strings.Contains(result.Text, "ancestor description") {
-		t.Fatalf("nearest skill did not shadow ancestor: %q", result.Text)
-	}
-	if strings.Index(result.Text, "- local:") > strings.Index(result.Text, "- shared:") {
-		t.Fatalf("skills were not sorted by name: %q", result.Text)
 	}
 }
 
@@ -316,61 +256,6 @@ func TestBuildSystemPromptBareKeepsEnvironmentAndSkipsProjectGuidance(t *testing
 	}
 	if strings.Contains(result.Text, "project rules") || strings.Contains(result.Text, "# Subagents") || strings.Contains(result.Text, "# Skills") {
 		t.Fatalf("bare mode kept project/delegation guidance: %q", result.Text)
-	}
-}
-
-func TestBuildSystemPromptSharedSkillSymlinkDoesNotShadowGaxSkills(t *testing.T) {
-	home := t.TempDir()
-	sharedRoot := filepath.Join(home, ".agents", "skills")
-	writeSkill := func(root, name, description string) {
-		t.Helper()
-		directory := filepath.Join(root, name)
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		body := "---\ndescription: " + description + "\n---\n"
-		if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte(body), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	writeSkill(sharedRoot, "duplicate", "shared skill")
-	configHome := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configHome)
-	writeSkill(filepath.Join(configHome, "gax", "skills"), "duplicate", "gax skill")
-	project := t.TempDir()
-	if err := os.Mkdir(filepath.Join(project, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	projectSkills := filepath.Join(project, ".agents", "skills")
-	if err := os.MkdirAll(filepath.Dir(projectSkills), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(sharedRoot, projectSkills); err != nil {
-		t.Skipf("symlinks unavailable: %v", err)
-	}
-	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_subagents":true,"no_tasks":true}`)
-	result := BuildSystemPrompt(store, "", PromptOptions{CWD: project, Home: home})
-	if !strings.Contains(result.Text, "- duplicate: gax skill (") || strings.Contains(result.Text, "shared skill") {
-		t.Fatalf("shared skill symlink shadowed the higher-priority gax skill: %q", result.Text)
-	}
-}
-
-func TestSkillDescriptionDecodesAndFoldsYamlScalars(t *testing.T) {
-	for _, test := range []struct {
-		name string
-		data string
-		want string
-	}{
-		{name: "plain comment", data: "---\ndescription: Build for AWS: ECS # deployment\n---\n", want: "Build for AWS: ECS"},
-		{name: "folded block", data: "---\ndescription: >\n  Build reliable services.\n  Verify deployment safety.\n---\n", want: "Build reliable services. Verify deployment safety."},
-		{name: "quoted continuation", data: "---\ndescription: 'it''s a\n  multi-line # description'\n---\n", want: "it's a multi-line # description"},
-		{name: "escaped unicode", data: "---\ndescription: \"Use caf\\u00e9 and \\U0001F600\"\n---\n", want: "Use café and 😀"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			if got := skillDescription([]byte(test.data)); got != test.want {
-				t.Fatalf("skill description = %q, want %q", got, test.want)
-			}
-		})
 	}
 }
 

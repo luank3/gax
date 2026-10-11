@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -154,6 +155,44 @@ func TestValidPresetNamesPreserveConfigOrderAndSkipInvalidEntries(t *testing.T) 
 	}
 }
 
+func TestRunBareDoesNotOfferTheSkillTool(t *testing.T) {
+	var offered []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode request body: %v", err)
+		}
+		var definitions []struct {
+			Function struct {
+				Name string `json:"name"`
+			} `json:"function"`
+		}
+		if err := json.Unmarshal(body["tools"], &definitions); err != nil {
+			t.Errorf("decode tools: %v", err)
+		}
+		for _, definition := range definitions {
+			offered = append(offered, definition.Function.Name)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"answer\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+	}))
+	defer server.Close()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "config"))
+	t.Setenv("GAX_OPENAI_BASE_URL", server.URL)
+	t.Setenv("GAX_OPENAI_API_KEY", "test-key")
+	t.Setenv("GAX_NO_SESSION", "on")
+	var stdout, stderr strings.Builder
+	code := Run([]string{"--bare", "-p", "--provider=openai-compatible", "--model=test-model", "hi"},
+		strings.NewReader(""), true, &stdout, &stderr)
+	if code != 0 || stdout.String() != "answer\n" {
+		t.Fatalf("bare run: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if len(offered) != 7 || slices.Contains(offered, "skill") {
+		t.Fatalf("--bare offered %v", offered)
+	}
+}
+
 func TestRunOneShotStreamsAnswerThroughConfiguredProviderAndTools(t *testing.T) {
 	var requestSeen atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -171,7 +210,7 @@ func TestRunOneShotStreamsAnswerThroughConfiguredProviderAndTools(t *testing.T) 
 			t.Errorf("request model = %q", model)
 		}
 		var tools []json.RawMessage
-		if err := json.Unmarshal(body["tools"], &tools); err != nil || len(tools) != 7 {
+		if err := json.Unmarshal(body["tools"], &tools); err != nil || len(tools) != 8 {
 			t.Errorf("request tools = %d, err=%v", len(tools), err)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")

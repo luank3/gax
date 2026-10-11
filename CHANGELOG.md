@@ -21,8 +21,10 @@ baseline commit `ff45833`.
   and config-defined custom providers.
 - Provider hooks for model metadata, account usage (`/usage`), Codex authentication, and
   DeepSeek's required reasoning replay.
-- Built-in tools (`read`, `edit`, `write`, `bash`, `task_wait`, `web_fetch`, `web_search`),
+- Built-in tools (`read`, `edit`, `write`, `bash`, `task_wait`, `web_fetch`, `web_search`, `skill`),
   background tasks, and `gax -p` subagents with recursion limits.
+- A `skill` tool that lists and loads skill documents on demand, keeping skill descriptions and
+  paths out of the system prompt.
 - Live terminal rendering: incremental Markdown, streamed tool output, reflowed to the display
   width, with the Ctrl-T transcript view.
 - Layered configuration (`GAX_*` environment variables, `config.json`, `state.json`,

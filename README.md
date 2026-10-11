@@ -170,8 +170,8 @@ Example `config.json`:
 `--preset=review`.
 
 gax ships one skill of its own: `customize-gax`, which tells the model how to change these settings,
-providers, and presets. It is listed with the discovered skills and read through the `gax:` path
-`gax:skills/customize-gax/SKILL.md`, which `read` resolves from the binary instead of the filesystem. A
+providers, and presets. It is listed with the discovered skills and loaded through the `gax:` path
+`gax:skills/customize-gax/SKILL.md`, which resolves from the binary instead of the filesystem. A
 discovered skill named `customize-gax` shadows it.
 
 ## Sessions and output
@@ -187,9 +187,14 @@ with the provider/model/effort/git state, then the conversation items, then a fi
 record (`outcome`, `turns`, `elapsed_ms`, `text`, `context_tokens`, `cost`, `session_id`).
 
 The agent ships these built-in tools: `read`, `edit`, `write`, `bash`, `task_wait`, `web_fetch`,
-and `web_search`. `bash` commands that outlive their timeout detach into background tasks, and
+`web_search`, and `skill`. `bash` commands that outlive their timeout detach into background tasks, and
 `gax -p "<task>"` can be run through `bash` to delegate to a subagent with clean context. Besides
 files, `read` accepts the `gax:skills/<name>/SKILL.md` paths of the skills built into the binary.
+
+`skill` lists the available skills and loads one by name, so the system prompt carries no skill
+listing: the model asks for the list when a task looks like it needs one, then loads the document
+whose description matches. `no_skills` (or `--bare`) drops the tool, and a discovered skill shadows
+a built-in of the same name.
 
 `web_fetch` retrieves a URL and converts an HTML response to plain text unless the model passes
 `strip: false` for the raw body; `web_search` returns ranked titles, URLs, and snippets, searching

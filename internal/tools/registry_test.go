@@ -17,10 +17,10 @@ import (
 func TestBuiltInToolDefinitions(t *testing.T) {
 	registry := New(Options{})
 	definitions := registry.Definitions()
-	if len(definitions) != 7 {
-		t.Fatalf("got %d definitions, want read/edit/write/bash/task_wait/web_fetch/web_search", len(definitions))
+	if len(definitions) != 8 {
+		t.Fatalf("got %d definitions, want read/edit/write/bash/task_wait/web_fetch/web_search/skill", len(definitions))
 	}
-	for index, name := range []string{"read", "edit", "write", "bash", "task_wait", "web_fetch", "web_search"} {
+	for index, name := range []string{"read", "edit", "write", "bash", "task_wait", "web_fetch", "web_search", "skill"} {
 		if definitions[index].Name != name {
 			t.Fatalf("definition %d is %q, want %q", index, definitions[index].Name, name)
 		}

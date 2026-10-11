@@ -65,12 +65,14 @@ baseline.
 
 ## Record
 
-- The rendered document is 16 422 bytes / 200 lines, of which the generated settings table is 68
+- The rendered document is 16 534 bytes / 201 lines, of which the generated settings table is 68
   rows. `read` returns it numbered like a file (`     1→---`), and the tool cap is deliberately not
   applied: the document is fixed-size and the tail is the reference table.
-- The listing line is `- customize-gax: Change gax's own settings, providers, models, or presets
-  (gax:skills/customize-gax/SKILL.md)`, sorted among discovered skills; `no_skills`, `--bare`, and
-  `--raw` drop it with the rest of the section.
+- The listing line is `- customize-gax: Change gax's own settings, providers, models, or presets —
+  where config.json lives, which keys exist, what applies live, and what needs a restart.
+  (gax:skills/customize-gax/SKILL.md)`, sorted among discovered skills. It is produced by the
+  `skill` tool now (2026-10-11-skill-tool.md), not by the system prompt; `no_skills`, `--bare`, and
+  `--raw` drop the tool.
 - `internal/skill` is the first use of `go:embed` in the port; `go.mod` still has no `require` block.
 
 ## Upstream interaction boundary

@@ -70,8 +70,8 @@ func TestWebToolDefinitionsAndDisable(t *testing.T) {
 	if !ok {
 		t.Fatalf("web_fetch is not advertised: %#v", definitions)
 	}
-	if fetchIndex != len(definitions)-2 || byName["web_search"] != len(definitions)-1 {
-		t.Fatalf("web tools are not last: %#v", definitions)
+	if byName["web_search"] != fetchIndex+1 || fetchIndex != len(definitions)-3 {
+		t.Fatalf("web tools are not adjacent and before the skill tool: %#v", definitions)
 	}
 	fetch := definitions[fetchIndex]
 	if len(fetch.Params) != 2 || fetch.Params[0].Name != "url" || !fetch.Params[0].Required || fetch.Params[1].Name != "strip" {
@@ -95,7 +95,7 @@ func TestWebToolDefinitionsAndDisable(t *testing.T) {
 	}
 	fromConfig := NewFromConfig(store)
 	defer fromConfig.Close()
-	if len(fromConfig.Definitions()) != 5 {
+	if len(fromConfig.Definitions()) != 6 {
 		t.Fatalf("no_web config still advertised the web tools: %#v", fromConfig.Definitions())
 	}
 }

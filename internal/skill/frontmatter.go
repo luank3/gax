@@ -1,4 +1,4 @@
-package agent
+package skill
 
 import (
 	"strconv"
@@ -235,7 +235,7 @@ func frontmatterLineEnd(value []byte, position int) int {
 }
 
 func cleanFrontmatterBytes(value []byte) []byte {
-	return []byte(cleanPromptText(string(value)))
+	return []byte(cleanText(string(value)))
 }
 
 func foldFrontmatterLine(value []byte) string {

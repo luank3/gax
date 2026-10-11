@@ -23,7 +23,7 @@ checkout before deciding.
 | `internal/provider/{openai,anthropic}` | Request bodies and stream parsers for the three wires. |
 | `internal/provider/{codex,deepseek,openrouter,opencodego,mock}` | Provider hooks: auth, model metadata, account usage. |
 | `internal/provider/{client,config}` | Wire dispatch and the `providers.<name>` configuration vocabulary. |
-| `internal/tools` | Built-in tools (`read`, `edit`, `write`, `bash`, `task_wait`, `web_fetch`, `web_search`) and background tasks. |
+| `internal/tools` | Built-in tools (`read`, `edit`, `write`, `bash`, `task_wait`, `web_fetch`, `web_search`, `skill`) and background tasks. |
 | `internal/web` | HTTP fetching, HTML-to-text conversion, and the Brave/DuckDuckGo search backends behind the web tools (a gax addition; upstream has none). |
 | `internal/config` | Setting registry, layered resolution, persistence, presets. |
 | `internal/session` | Session logs, resume, fork, prune, prompt history. |

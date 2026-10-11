@@ -260,6 +260,10 @@ func Run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 	if provider != nil && model != nil {
 		state.Effort = provider.ResolveEffort(*model, state.Effort)
 	}
+	if options.Bare {
+		// --bare promises no skills; with skills served by a tool, that means not offering it.
+		store.SetOverride("no_skills", stringPtr("on"))
+	}
 	if !options.Raw {
 		state.Tools = tools.Definitions()
 	}
