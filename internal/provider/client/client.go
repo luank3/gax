@@ -61,7 +61,8 @@ func Prepare(provider *runtime.Provider, model string, context coreprovider.Cont
 	if provider == nil {
 		return Request{}, fmt.Errorf("provider is unavailable")
 	}
-	settings := provider.RequestSettings(model, context.Effort, context.SessionID)
+	id := affinityID(context)
+	settings := provider.RequestSettings(model, context.Effort, &id)
 	context.Effort = settings.EffectiveEffort
 	return PrepareWithOptions(provider, model, context, bodyOptionsFromSettings(settings))
 }
@@ -84,10 +85,7 @@ func PrepareWithOptions(provider *runtime.Provider, model string, context corepr
 	if err != nil {
 		return Request{}, fmt.Errorf("provider %q extra_body: %w", provider.Definition.ID, err)
 	}
-	sessionID := ""
-	if context.SessionID != nil {
-		sessionID = *context.SessionID
-	}
+	sessionID := affinityID(context)
 	var body []byte
 	switch wire {
 	case runtime.WireChat:
@@ -181,7 +179,8 @@ func Stream(ctx context.Context, httpClient *transport.Client, provider *runtime
 		if provider == nil {
 			return transport.Response{}, fmt.Errorf("provider is unavailable")
 		}
-		settings := provider.RequestSettings(model, requestContext.Effort, requestContext.SessionID)
+		id := affinityID(requestContext)
+		settings := provider.RequestSettings(model, requestContext.Effort, &id)
 		requestContext.Effort = settings.EffectiveEffort
 		if options.LengthHint == "" {
 			options.LengthHint = settings.LengthHint
@@ -199,7 +198,7 @@ func Stream(ctx context.Context, httpClient *transport.Client, provider *runtime
 		auth := provider.CodexAuth()
 		recoverUnauthorized = func() ([]string, bool, string) {
 			retry, _, message := codex.RecoverUnauthorized(ctx, auth, httpClient, tick)
-			return provider.Headers(request.Wire, sessionID(requestContext), false), retry, message
+			return provider.Headers(request.Wire, affinityID(requestContext), false), retry, message
 		}
 	}
 	switch request.Wire {
@@ -225,9 +224,11 @@ func Stream(ctx context.Context, httpClient *transport.Client, provider *runtime
 	}
 }
 
-func sessionID(context coreprovider.Context) string {
-	if context.SessionID == nil {
-		return ""
+// affinityID resolves the request's session id: the conversation's when recording is on, else the
+// process id, so a provider that pins a conversation by header (OpenCode) always receives one.
+func affinityID(context coreprovider.Context) string {
+	if context.SessionID == nil || *context.SessionID == "" {
+		return runtime.ProcessSessionID()
 	}
 	return *context.SessionID
 }

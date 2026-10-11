@@ -1,5 +1,8 @@
 # Runnable command entry point
 
+> Inventory note (2026-10-11): the OpenCode Zen and Agnes AI defs were retired after this plan was
+> written; see `2026-10-11-provider-affinity-and-inventory.md`.
+
 ## Goal
 
 Connect the existing CLI, config, provider, agent, tool, and session packages behind a runnable `gax` command with one-shot, basic interactive, resume, and JSONL modes.

@@ -27,7 +27,7 @@ porting trail lives in [`docs/superpowers/plans`](docs/superpowers/plans).
 - **Inspectable** — review exactly what was sent and received with the Ctrl-T transcript view,
   or capture a wire-level HTTP/SSE trace with `GAX_TRACE`.
 - **Broad provider support** — OpenAI (+ compatible), Anthropic (+ compatible), Codex (ChatGPT
-  subscription), OpenRouter, OpenCode Zen/Go, DeepSeek, Agnes AI, llama.cpp, and Ollama.
+  subscription), OpenRouter, OpenCode Go, DeepSeek, llama.cpp, and Ollama.
 - **Well-behaved Unix tool** — XDG config/state paths, clean stdout in `-p` one-shot mode with
   resume hints on stderr, plain-text JSON config and session files, scriptable `--json` output.
 
@@ -63,9 +63,8 @@ providers and pick a model. Interactive selections are remembered.
 | `openai` | Set `OPENAI_API_KEY`. |
 | `anthropic` | Set `ANTHROPIC_API_KEY`. |
 | `openrouter` | Set `OPENROUTER_API_KEY`. |
-| `opencode-zen` / `opencode-go` | Set `OPENCODE_API_KEY`. |
+| `opencode-go` | Set `OPENCODE_API_KEY`. |
 | `deepseek` | Set `DEEPSEEK_API_KEY`. |
-| `agnes` | Set `AGNES_API_KEY`. |
 | `llama.cpp` | Run `llama-server`, then `gax --provider llama.cpp`. |
 | `ollama` | Run `ollama serve`, then `gax --provider ollama`. |
 | `openai-compatible` | Set `GAX_OPENAI_BASE_URL` (+ `GAX_OPENAI_API_KEY`). |

@@ -1453,9 +1453,14 @@ func (provider *Provider) CodexAuth() *codex.Auth {
 }
 
 // ConfiguredHeaders expands user-configured provider headers without adding runtime credentials.
+// A request with no conversation (recording off, or a metadata/usage call) falls back to the
+// process session id rather than expanding "{session_id}" to nothing.
 func (provider *Provider) ConfiguredHeaders(sessionID string) []string {
 	if provider == nil {
 		return nil
+	}
+	if sessionID == "" {
+		sessionID = ProcessSessionID()
 	}
 	return providerconfig.ExpandHeaders(provider.extraHeaders, sessionID)
 }

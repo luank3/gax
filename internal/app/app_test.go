@@ -1149,7 +1149,7 @@ func TestRunAllowsLoginCommandsWhenNoProviderIsAvailable(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(t.TempDir(), "cache"))
 	for _, key := range []string{
 		"GAX_PROVIDER", "GAX_MODEL", "GAX_OPENAI_BASE_URL", "GAX_OPENAI_API_KEY", "OPENAI_API_KEY",
-		"ANTHROPIC_API_KEY", "OPENROUTER_API_KEY", "DEEPSEEK_API_KEY", "OPENCODE_API_KEY", "AGNES_API_KEY",
+		"ANTHROPIC_API_KEY", "OPENROUTER_API_KEY", "DEEPSEEK_API_KEY", "OPENCODE_API_KEY",
 		"GAX_ANTHROPIC_BASE_URL", "GAX_OPENAI_COMPATIBLE_BASE_URL", "GAX_ANTHROPIC_COMPATIBLE_BASE_URL",
 	} {
 		t.Setenv(key, "")
@@ -1236,7 +1236,7 @@ func TestSelectExplicitProviderMatchesConstructionSemantics(t *testing.T) {
 
 	store.SetOverride("provider", stringPtr("missing"))
 	provider, err = selectProvider(store, providers, resolver)
-	want = "unknown provider 'missing' (supported: codex openai anthropic openrouter opencode-zen opencode-go deepseek agnes llamacpp ollama openai-compatible anthropic-compatible)"
+	want = "unknown provider 'missing' (supported: codex openai anthropic openrouter opencode-go deepseek llamacpp ollama openai-compatible anthropic-compatible)"
 	if provider != nil || err == nil || err.Error() != want {
 		t.Fatalf("unknown provider diagnostic = provider=%+v err=%v, want %q", provider, err, want)
 	}

@@ -2,6 +2,8 @@
 
 > Upstream-parity correction (2026-10-11): generic OpenAI-compatible providers fetch `/models` when the picker opens, not as a background metadata probe. Openference parses rich metadata from that explicit listing but has no selected-model probe; Agnes keeps listed IDs with unknown capabilities and pricing.
 
+> Inventory note (2026-10-11): the Agnes AI def was retired, so the generic-listing coverage moved to `openai-compatible`; see `2026-10-11-provider-affinity-and-inventory.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add authenticated model listing and cache provider model IDs from both explicit listings and background metadata probes.

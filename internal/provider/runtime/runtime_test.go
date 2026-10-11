@@ -617,44 +617,33 @@ func TestMissingConfigurationAndCredentialsHaveStableReasons(t *testing.T) {
 	}
 }
 
-func TestAgnesModelListingDoesNotInventModelMetadata(t *testing.T) {
+func TestGenericModelListingDoesNotInventModelMetadata(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/models" || r.Header.Get("Authorization") != "Bearer agnes-list-key" {
-			t.Errorf("unexpected Agnes model list request: method=%s path=%s auth=%q", r.Method, r.URL.Path, r.Header.Get("Authorization"))
+		if r.Method != http.MethodGet || r.URL.Path != "/models" || r.Header.Get("Authorization") != "Bearer test-key" {
+			t.Errorf("unexpected generic model list request: method=%s path=%s auth=%q", r.Method, r.URL.Path, r.Header.Get("Authorization"))
 		}
-		_, _ = io.WriteString(w, `{"data":[{"id":"agnes-2.5-flash"},{"id":"agnes-3.0-pro"}]}`)
+		_, _ = io.WriteString(w, `{"data":[{"id":"gateway-2.5-flash"},{"id":"gateway-3.0-pro"}]}`)
 	}))
 	defer server.Close()
-	store := config.New(config.DefaultSettings())
-	store.SetEnvironment(func(name string) (string, bool) {
-		if name == "AGNES_API_KEY" {
-			return "agnes-list-key", true
-		}
-		return "", false
-	})
-	provider, err := runtime.NewResolver(store, registry.New(store)).Resolve("agnes")
-	if err != nil {
-		t.Fatal(err)
-	}
-	provider.BaseURL = server.URL
+	provider := testOpenAICompatibleProvider(t, server.URL)
 	models, err := provider.ListModels(context.Background(), &transport.Client{HTTP: server.Client()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(models) != 2 {
-		t.Fatalf("Agnes model listing = %+v", models)
+		t.Fatalf("generic model listing = %+v", models)
 	}
 	model := models[0]
-	if model.ID != "agnes-2.5-flash" || model.ContextWindow != 0 || model.MaxOutput != 0 ||
+	if model.ID != "gateway-2.5-flash" || model.ContextWindow != 0 || model.MaxOutput != 0 ||
 		model.ImageInput != catalog.SupportUnknown || model.Tools != catalog.SupportUnknown {
-		t.Fatalf("Agnes listing should retain IDs without invented capabilities: %+v", model)
+		t.Fatalf("generic listing should retain IDs without invented capabilities: %+v", model)
 	}
 	metadata, found := provider.ModelMetadata(model.ID)
 	if !found || metadata.CostInput != -1 || metadata.CostCacheRead != -1 || metadata.CostOutput != -1 {
-		t.Fatalf("Agnes must not invent pricing metadata for a listed model: found=%t metadata=%+v", found, metadata)
+		t.Fatalf("a generic listing must not invent pricing metadata for a listed model: found=%t metadata=%+v", found, metadata)
 	}
 	if provider.CanProbeSelectedModel() {
-		t.Fatal("Agnes should not run a custom selected-model probe")
+		t.Fatal("a generic provider should not run a custom selected-model probe")
 	}
 }
 
@@ -1548,6 +1537,27 @@ func TestMetadataAPICanOverrideTheWireFamilyAndInvalidValuesFallBack(t *testing.
 	}
 	if resolved.MetadataAPI != runtime.MetadataOpenAI || len(resolved.Warnings()) != 1 {
 		t.Fatalf("invalid metadata API should warn and use the wire-family default: %+v warnings=%q", resolved, resolved.Warnings())
+	}
+}
+
+func TestConfiguredHeadersFallBackToProcessSessionIDWithoutAConversation(t *testing.T) {
+	store := config.New(config.DefaultSettings())
+	store.SetEnvironment(nil)
+	provider, err := runtime.NewResolver(store, registry.New(store)).Resolve("opencode-go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"x-opencode-session: " + runtime.ProcessSessionID(), "x-opencode-client: gax"}
+	if got := provider.ConfiguredHeaders(""); !reflect.DeepEqual(got, want) {
+		t.Fatalf("a request without a conversation must carry the process session id: got=%q want=%q", got, want)
+	}
+	if got := provider.MetadataHeaders(""); !reflect.DeepEqual(got, want) {
+		t.Fatalf("metadata requests must carry the process session id too: got=%q want=%q", got, want)
+	}
+	if got := provider.Headers(runtime.WireChat, "conversation-1", false); !reflect.DeepEqual(got, []string{
+		"x-opencode-session: conversation-1", "x-opencode-client: gax",
+	}) {
+		t.Fatalf("a conversation session id must win over the process fallback: %q", got)
 	}
 }
 

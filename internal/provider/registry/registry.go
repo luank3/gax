@@ -78,7 +78,6 @@ var shipped = []Definition{
 		ExtraHeaders: json.RawMessage(`{"X-Title":"gax","HTTP-Referer":"https://github.com/luank3/gax","X-OpenRouter-Categories":"cli-agent","x-session-id":"{session_id}"}`),
 		Hooks:        HookParseModel | HookProbeModel | HookQueryUsage,
 	},
-	{ID: "opencode-zen", API: "catalog", BaseURL: "https://opencode.ai/zen/v1", APIKeyEnv: "OPENCODE_API_KEY", CatalogID: "opencode", MetadataAPI: "openai", ExtraHeaders: openCodeHeaders()},
 	{ID: "opencode-go", API: "catalog", BaseURL: "https://opencode.ai/zen/go/v1", APIKeyEnv: "OPENCODE_API_KEY", CatalogID: "opencode-go", MetadataAPI: "openai", ExtraHeaders: openCodeHeaders(), Hooks: HookQueryUsage},
 	{
 		ID: "deepseek", BaseURL: "https://api.deepseek.com", Pinned: true,
@@ -86,7 +85,6 @@ var shipped = []Definition{
 		ReasoningRoundtrip: "reasoning_content", ReasoningRequired: true,
 		Hooks: HookParseModel | HookQueryUsage,
 	},
-	{ID: "agnes", DisplayName: "Agnes AI", API: "openai-completions", BaseURL: "https://apihub.agnes-ai.com/v1", Pinned: true, APIKeyEnv: "AGNES_API_KEY"},
 	{
 		ID: "llamacpp", DisplayName: "llama.cpp", BaseURL: "http://127.0.0.1:{port}/v1",
 		ReasoningRoundtrip: "reasoning_content", ExtraBody: json.RawMessage(`{"return_progress":true}`),
@@ -103,6 +101,8 @@ var shipped = []Definition{
 	{ID: "mock", Internal: true, NoEfforts: true, Hooks: HookConstruct},
 }
 
+// The OpenCode gateway pins a conversation to one upstream by its session header — Go rejects
+// requests without one — and attributes usage by client.
 func openCodeHeaders() json.RawMessage {
 	return json.RawMessage(`{"x-opencode-session":"{session_id}","x-opencode-client":"gax"}`)
 }

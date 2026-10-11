@@ -39,7 +39,7 @@ Scalar settings resolve in this order: the current run (`--provider`, `--model`,
 and restores the built-in default.
 
 Provider credentials are unprefixed (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`,
-`OPENROUTER_API_KEY`, `OPENCODE_API_KEY`, `AGNES_API_KEY`); every other variable is `GAX_`-prefixed
+`OPENROUTER_API_KEY`, `OPENCODE_API_KEY`); every other variable is `GAX_`-prefixed
 and named in the table below. An `api_key` or `extra_headers` value may be `$VAR`, read from the
 environment at startup, with `$$` escaping a literal `$`.
 

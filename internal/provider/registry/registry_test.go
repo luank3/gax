@@ -12,8 +12,8 @@ func TestShippedProviderOrderDefaultAndAlias(t *testing.T) {
 	registry := providerregistry.New(baseconfig.New(baseconfig.DefaultSettings()))
 	all := registry.All()
 	want := []string{
-		"codex", "openai", "anthropic", "openrouter", "opencode-zen", "opencode-go", "deepseek",
-		"agnes", "llamacpp", "ollama", "openai-compatible", "anthropic-compatible",
+		"codex", "openai", "anthropic", "openrouter", "opencode-go", "deepseek",
+		"llamacpp", "ollama", "openai-compatible", "anthropic-compatible",
 	}
 	got := make([]string, len(all))
 	for index, definition := range all {
@@ -35,10 +35,11 @@ func TestShippedProviderOrderDefaultAndAlias(t *testing.T) {
 	if _, ok := registry.Find("openference"); ok {
 		t.Fatal("Openference should not be a shipped provider")
 	}
-	agnes, ok := registry.Find("agnes")
-	if !ok || agnes.DisplayName != "Agnes AI" || agnes.BaseURL != "https://apihub.agnes-ai.com/v1" ||
-		agnes.APIKeyEnv != "AGNES_API_KEY" || agnes.Hooks&providerregistry.HookParseModel != 0 {
-		t.Fatalf("Agnes shipped definition should use generic model metadata: %+v found=%t", agnes, ok)
+	if _, ok := registry.Find("opencode-zen"); ok {
+		t.Fatal("the retired OpenCode Zen def should not be a shipped provider")
+	}
+	if _, ok := registry.Find("agnes"); ok {
+		t.Fatal("the retired Agnes AI def should not be a shipped provider")
 	}
 	ollama, ok := registry.Find("ollama")
 	wantOllamaHint := "ollama's context window may be too small for the prompt — restart `ollama serve` with a larger OLLAMA_CONTEXT_LENGTH (e.g. 16384), or raise num_ctx on the model"

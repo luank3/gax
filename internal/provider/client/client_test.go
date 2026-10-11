@@ -528,6 +528,42 @@ func TestPrepareResolvesOpenRouterBodyDefaultsFromProviderAndCatalog(t *testing.
 	}
 }
 
+func TestPrepareWithoutASessionKeepsProviderAffinity(t *testing.T) {
+	store := config.New(config.DefaultSettings())
+	store.SetEnvironment(nil)
+	resolver := runtime.NewResolver(store, registry.New(store))
+	text := "hello"
+	requestContext := coreprovider.Context{Items: []conversation.Item{{Kind: conversation.KindUser, Text: &text}}}
+
+	opencode, err := resolver.Resolve("opencode-go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := client.Prepare(opencode, "m", requestContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := headerValue(request.Headers, "x-opencode-session"); got != runtime.ProcessSessionID() {
+		t.Fatalf("OpenCode Go needs a session header even without a recorded conversation: %q", got)
+	}
+
+	openrouter, err := resolver.Resolve("openrouter")
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err = client.Prepare(openrouter, "m", requestContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(request.Body, &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["prompt_cache_key"] != runtime.ProcessSessionID() {
+		t.Fatalf("a request without a conversation should key its cache by the process id: %s", request.Body)
+	}
+}
+
 func TestPrepareClampsUnsupportedEffortToModelCapabilities(t *testing.T) {
 	store := config.New(config.DefaultSettings())
 	store.SetEnvironment(nil)

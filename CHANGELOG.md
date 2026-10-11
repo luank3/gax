@@ -16,8 +16,8 @@ baseline commit `ff45833`.
   per-directory session logs.
 - Streaming provider clients for the OpenAI Responses, OpenAI Chat Completions, and Anthropic
   Messages wires, with retries, idle timeouts, and redacted wire traces.
-- Shipped providers: Codex (ChatGPT login), OpenAI, Anthropic, OpenRouter, OpenCode Zen and Go,
-  DeepSeek, Agnes AI, llama.cpp, Ollama, plus generic OpenAI- and Anthropic-compatible endpoints
+- Shipped providers: Codex (ChatGPT login), OpenAI, Anthropic, OpenRouter, OpenCode Go,
+  DeepSeek, llama.cpp, Ollama, plus generic OpenAI- and Anthropic-compatible endpoints
   and config-defined custom providers.
 - Provider hooks for model metadata, account usage (`/usage`), Codex authentication, and
   DeepSeek's required reasoning replay.
