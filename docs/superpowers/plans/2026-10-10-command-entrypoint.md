@@ -25,6 +25,14 @@ Connect the existing CLI, config, provider, agent, tool, and session packages be
   - [x] Discard staged session selections before task-exit bookkeeping on shutdown, `/new`, and `/resume`.
   - [x] Include final context and exact or catalog-estimated spend in one-shot JSONL result records.
 
+## Maintenance
+
+- [x] Split the 3165-line `internal/app/app.go` into one file per concern — `banner.go`, `help.go`,
+  `history_commands.go`, `json_output.go`, `output.go`, `provider_commands.go`, `repl.go`, and
+  `selection.go` — leaving `Run` and the REPL turn closure in `app.go`. The move is
+  byte-identical per declaration (verified by comparing hashed declaration bodies before and
+  after), so no behavior changed.
+
 ## Source
 
 The porting baseline commit `ff458337f8ba7366d71fad4da0210a53b658678a` (pinned in `internal/version.Value`), including `src/main.c`, `src/cli.c`, `src/oneshot.c`, `src/agent.c`, `src/session.c`, `src/providers/registry.c`, and `docs/sessions.md`.
