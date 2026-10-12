@@ -2155,18 +2155,6 @@ func TestRunTTYREPLStopsOnRendererWriterFailure(t *testing.T) {
 	}
 }
 
-func prepareTTYAppEnv(t *testing.T, baseURL string) {
-	t.Helper()
-	root := t.TempDir()
-	t.Setenv("HOME", filepath.Join(root, "home"))
-	t.Setenv("XDG_STATE_HOME", filepath.Join(root, "state"))
-	t.Setenv("GAX_OPENAI_BASE_URL", baseURL)
-	t.Setenv("GAX_OPENAI_API_KEY", "test-key")
-	t.Setenv("GAX_PROVIDER", "openai-compatible")
-	t.Setenv("GAX_MODEL", "test-model")
-	t.Setenv("GAX_NO_SESSION", "on")
-}
-
 func serveTTYModelProbe(w http.ResponseWriter, request *http.Request) bool {
 	if request.URL.Path != "/models" {
 		return false
