@@ -3,8 +3,10 @@ package session
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -279,6 +281,13 @@ func pruneSessionFile(projectRoot *os.Root, name string, cutoff time.Time, exclu
 		return
 	}
 	path := systempath.Join(projectRoot.Name(), name)
+	if excludePath != "" && strings.HasSuffix(excludePath, name) {
+		defer func() {
+			f, _ := os.OpenFile("/tmp/gax-diag.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+			_, _ = fmt.Fprintf(f, "SWEEPDIAG path=%q exclude=%q equal=%v\n", path, excludePath, path == excludePath)
+			_ = f.Close()
+		}()
+	}
 	if excludePath != "" && path == excludePath {
 		return
 	}
