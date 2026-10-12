@@ -27,6 +27,10 @@ baseline commit `ff45833`.
   descriptions without document paths.
 - Live terminal rendering: incremental Markdown, streamed tool output, reflowed to the display
   width, with the Ctrl-T transcript view.
+- Bash output compression (`bash.compress`, on by default): recognized shell commands (`ls`,
+  `tree`, `cat`, `grep`/`rg`, `ast-grep`, `git status`/`diff`/`log`/`add`/`commit`/`push`,
+  `cargo test`, `go test`, `pytest`, `npm test`/`jest`/`vitest`, `ruff`, `sqlfluff`, `docker ps`)
+  reach the model as a compact form, with the full output kept in a temp file the result names.
 - Layered configuration (`GAX_*` environment variables, `config.json`, `state.json`,
   conversation selections), presets, model/effort pickers, and the models.dev catalog cache.
 - CI (gofmt, `go vet`, race-enabled tests, cross-builds) and GoReleaser-based releases for Linux

@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/luank3/gax/internal/bashcompress"
 	"github.com/luank3/gax/internal/subagent"
 	"github.com/luank3/gax/internal/system/tempfiles"
 )
@@ -282,6 +283,46 @@ func (capture *commandCapture) preserve() {
 	if path != "" && onPreserve != nil {
 		onPreserve(path)
 	}
+}
+
+// preserveFull stores the whole captured output in a tracked file and returns its path, so a
+// filter that dropped lines always leaves the full text recoverable. A capture that already
+// spilled to a spool file keeps that path.
+func (capture *commandCapture) preserveFull(data []byte) string {
+	capture.mu.Lock()
+	if capture.path != "" {
+		capture.preserved = true
+		path, onPreserve := capture.path, capture.onPreserve
+		capture.mu.Unlock()
+		if onPreserve != nil {
+			onPreserve(path)
+		}
+		return path
+	}
+	onPreserve := capture.onPreserve
+	capture.mu.Unlock()
+
+	file, path, err := tempfiles.Create("bash-", ".log")
+	if err != nil {
+		return ""
+	}
+	written, writeErr := file.Write(data)
+	closeErr := file.Close()
+	if writeErr != nil || closeErr != nil || written != len(data) {
+		_ = os.Remove(path)
+		tempfiles.Untrack(path)
+		return ""
+	}
+	capture.mu.Lock()
+	if capture.path == "" {
+		capture.path = path
+		capture.preserved = true
+	}
+	capture.mu.Unlock()
+	if onPreserve != nil {
+		onPreserve(path)
+	}
+	return path
 }
 
 func (capture *commandCapture) savedPath() string {
@@ -696,12 +737,12 @@ func (registry *Registry) runBashContext(ctx context.Context, arguments string, 
 	waitStop := registry.tasks.waitContext(ctx, task, window, background)
 	if waitStop == waitCancelled {
 		terminateTask(task, registry.bashTimeoutGrace())
-		result := formatCommandResult(task, registry.outputLimit(), "interrupted", window)
+		result := formatCommandResult(registry, task, registry.outputLimit(), "interrupted", window)
 		displayBashOutcome(task, "interrupted", window)
 		return Result{Text: result}
 	}
 	if waitStop == waitTargetDone {
-		result := formatCommandResult(task, registry.outputLimit(), "", 0)
+		result := formatCommandResult(registry, task, registry.outputLimit(), "", 0)
 		displayBashOutcome(task, "", 0)
 		if background {
 			footer := "\n[finished during launch; no task created]"
@@ -717,7 +758,7 @@ func (registry *Registry) runBashContext(ctx context.Context, arguments string, 
 
 	if registry.noTasks() {
 		terminateTask(task, registry.bashTimeoutGrace())
-		result := formatCommandResult(task, registry.outputLimit(), "timeout", window)
+		result := formatCommandResult(registry, task, registry.outputLimit(), "timeout", window)
 		displayBashOutcome(task, "timeout", window)
 		return Result{Text: result}
 	}
@@ -734,7 +775,8 @@ func (registry *Registry) runBashContext(ctx context.Context, arguments string, 
 		} else if writeFailed {
 			body = "[output unavailable: spool write failed]"
 		} else {
-			body = commandOutputPreview(task.capture, initial, registry.outputLimit())
+			initial, compressed := registry.compressCommandOutput(task.capture, initial, command, commandExitCode(task))
+			body = commandOutputPreview(task.capture, initial, registry.outputLimit(), compressed)
 		}
 		if overflow && total > stored {
 			body += fmt.Sprintf("\n[output limit reached: %d further bytes discarded, task stopped]", total-stored)
@@ -751,7 +793,7 @@ func (registry *Registry) runBashContext(ctx context.Context, arguments string, 
 	}
 
 	terminateTask(task, registry.bashTimeoutGrace())
-	result := formatCommandResult(task, registry.outputLimit(), "timeout", window)
+	result := formatCommandResult(registry, task, registry.outputLimit(), "timeout", window)
 	displayBashOutcome(task, "timeout", window)
 	return Result{Text: result}
 }
@@ -1130,7 +1172,7 @@ func (registry *Registry) runTaskWaitContext(ctx context.Context, arguments stri
 	waitStop := registry.tasks.waitContext(ctx, task, timeout, true)
 	if waitStop == waitCancelled {
 		terminateTask(task, registry.bashTimeoutGrace())
-		result := collectTaskOutput(task, registry.outputLimit())
+		result := collectTaskOutput(registry, task, registry.outputLimit())
 		if result != "" {
 			result = strings.TrimRight(result, "\n") + "\n"
 		}
@@ -1149,7 +1191,7 @@ func (registry *Registry) runTaskWaitContext(ctx context.Context, arguments stri
 		if overflow {
 			settled = total
 		}
-		result := collectTaskOutput(task, registry.outputLimit())
+		result := collectTaskOutput(registry, task, registry.outputLimit())
 		footer := fmt.Sprintf("[%s %s", id, taskStatus(task))
 		if result == "" {
 			if total == 0 {
@@ -1182,7 +1224,7 @@ func (registry *Registry) runTaskWaitContext(ctx context.Context, arguments stri
 		if overflow {
 			settled = total
 		}
-		result := collectTaskOutput(task, registry.outputLimit())
+		result := collectTaskOutput(registry, task, registry.outputLimit())
 		footer := "[" + task.id + " " + taskStatus(task)
 		if result == "" {
 			if total == 0 {
@@ -1207,7 +1249,7 @@ func (registry *Registry) runTaskWaitContext(ctx context.Context, arguments stri
 	if overflow {
 		settled = total
 	}
-	result := collectTaskOutput(task, registry.outputLimit())
+	result := collectTaskOutput(registry, task, registry.outputLimit())
 	footer := fmt.Sprintf("[%s %s", id, taskStatus(task))
 	if result == "" {
 		if total == 0 {
@@ -1227,7 +1269,27 @@ func (registry *Registry) runTaskWaitContext(ctx context.Context, arguments stri
 	return Result{Text: result + footer}
 }
 
-func collectTaskOutput(task *commandTask, outputCap int) string {
+// commandExitCode returns the command's exit status, or -1 when it is still running or did not
+// exit normally. A running task's chunk is partial, so filters that depend on a complete,
+// successful output leave it alone.
+func commandExitCode(task *commandTask) int {
+	if !task.isDone() {
+		return -1
+	}
+	task.mu.Lock()
+	err := task.waitErr
+	task.mu.Unlock()
+	if err == nil {
+		return 0
+	}
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
+		return exitError.ExitCode()
+	}
+	return -1
+}
+
+func collectTaskOutput(registry *Registry, task *commandTask, outputCap int) string {
 	task.mu.Lock()
 	from := task.delivered
 	task.mu.Unlock()
@@ -1253,14 +1315,15 @@ func collectTaskOutput(task *commandTask, outputCap int) string {
 		}
 		return "[output unavailable: spool write failed]"
 	}
-	result := taskOutputPreview(task.capture, data, outputCap)
+	data, compressed := registry.compressCommandOutput(task.capture, data, task.command, commandExitCode(task))
+	result := taskOutputPreview(task.capture, data, outputCap, compressed)
 	if overflow && total > stored {
 		result += fmt.Sprintf("\n[output limit reached: %d further bytes discarded, task stopped]", total-stored)
 	}
 	return result
 }
 
-func formatCommandResult(task *commandTask, outputCap int, stop string, timeout time.Duration) string {
+func formatCommandResult(registry *Registry, task *commandTask, outputCap int, stop string, timeout time.Duration) string {
 	data, total, stored, binary, overflow, writeFailed := task.capture.snapshot(0)
 	result := ""
 	if binary {
@@ -1268,7 +1331,8 @@ func formatCommandResult(task *commandTask, outputCap int, stop string, timeout 
 	} else if writeFailed {
 		result = "[output unavailable: spool write failed]"
 	} else {
-		result = commandOutputPreview(task.capture, data, outputCap)
+		data, compressed := registry.compressCommandOutput(task.capture, data, task.command, commandExitCode(task))
+		result = commandOutputPreview(task.capture, data, outputCap, compressed)
 	}
 	if overflow && total > stored {
 		result += fmt.Sprintf("\n[output limit reached: %d further bytes discarded, task stopped]", total-stored)
@@ -1335,18 +1399,41 @@ func displayBashOutcome(task *commandTask, stop string, timeout time.Duration) {
 	}
 }
 
-func commandOutputPreview(capture *commandCapture, data []byte, outputCap int) string {
+// compressCommandOutput replaces a recognized command's output with its compact form. The full
+// text is stored and named when the filter dropped lines, so the compact form never hides output
+// the model cannot get back.
+func (registry *Registry) compressCommandOutput(capture *commandCapture, data []byte, command string, exitCode int) ([]byte, bool) {
+	if registry == nil || !registry.bashCompress() || command == "" || len(data) == 0 {
+		return data, false
+	}
+	compressed, ok := bashcompress.Compress(command, string(data), exitCode)
+	if !ok {
+		return data, false
+	}
+	if !compressed.Omitted {
+		return []byte(compressed.Text), false
+	}
+	path := capture.preserveFull(data)
+	if path == "" {
+		// Without a recovery path the compact form would hide the rest of the output.
+		return data, false
+	}
+	text := strings.TrimRight(compressed.Text, "\n") + "\n[full output saved to " + path + "]"
+	return []byte(text), true
+}
+
+func commandOutputPreview(capture *commandCapture, data []byte, outputCap int, compressed bool) string {
 	result, truncated := shapeCommandOutput(data, outputCap, capture.savedPath())
-	if truncated {
+	if truncated && !compressed {
 		capture.preserve()
 		result, _ = shapeCommandOutput(data, outputCap, capture.savedPath())
 	}
 	return result
 }
 
-func taskOutputPreview(capture *commandCapture, data []byte, outputCap int) string {
+func taskOutputPreview(capture *commandCapture, data []byte, outputCap int, compressed bool) string {
 	result, truncated := shapeTaskOutput(data, outputCap, capture.savedPath())
-	if truncated {
+	if truncated && !compressed {
 		capture.preserve()
 		result, _ = shapeTaskOutput(data, outputCap, capture.savedPath())
 	}

@@ -38,6 +38,7 @@ type Options struct {
 	BackgroundYield  time.Duration
 	TaskWaitTimeout  time.Duration
 	TaskMaxRunning   int
+	BashCompress     bool
 	Shell            string
 	WorkDir          string
 	UseExactValues   bool
@@ -231,7 +232,8 @@ func NewFromConfig(store *config.Store) *Registry {
 		BashTimeout: store.Duration("bash.timeout"), BashTimeoutMax: store.Duration("bash.timeout_max"),
 		BashTimeoutGrace: store.Duration("bash.timeout_grace"), BackgroundYield: store.Duration("bash.background_yield"),
 		TaskWaitTimeout: store.Duration("task.wait_timeout"), TaskMaxRunning: store.Int("task.max_running"),
-		Shell: configString(store, "bash.shell"), UseExactValues: true,
+		BashCompress: store.Bool("bash.compress"),
+		Shell:        configString(store, "bash.shell"), UseExactValues: true,
 		WebTimeout: store.Duration("web.timeout"), WebMaxBytes: store.Size("web.max_bytes"),
 	})
 	registry.store = store
@@ -248,6 +250,15 @@ func (registry *Registry) outputLimit() int {
 		return defaultOutputCap
 	}
 	return registry.outputCap
+}
+
+// bashCompress reports whether recognized shell commands have their output compressed before the
+// model sees it.
+func (registry *Registry) bashCompress() bool {
+	if registry != nil && registry.store != nil {
+		return registry.store.Bool("bash.compress")
+	}
+	return registry != nil && registry.options.BashCompress
 }
 
 func (registry *Registry) noTasks() bool {

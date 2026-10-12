@@ -30,6 +30,9 @@ porting trail lives in [`docs/superpowers/plans`](docs/superpowers/plans).
   subscription), OpenRouter, OpenCode Go, DeepSeek, llama.cpp, and Ollama.
 - **Well-behaved Unix tool** — XDG config/state paths, clean stdout in `-p` one-shot mode with
   resume hints on stderr, plain-text JSON config and session files, scriptable `--json` output.
+- **Compact tool output** — recognized shell commands (`ls`, `cat`, `grep`, `git`, test runners,
+  linters, `docker ps`) reach the model as a compressed form, with the full output kept in a temp
+  file the result names. Disable with `bash.compress`.
 
 ## Install
 
@@ -134,7 +137,7 @@ at that tier and restores the built-in default.
 
 Every setting has a `GAX_`-prefixed environment variable (`GAX_PROVIDER`, `GAX_MODEL`,
 `GAX_EFFORT`, `GAX_PRESET`, `GAX_THEME`, `GAX_SHOW_REASONING`, `GAX_NO_SESSION`, `GAX_TRACE`,
-`GAX_TRANSCRIPT`, `GAX_BASH_TIMEOUT`, `GAX_COMPACT_AUTO`, `GAX_CATALOG_URL`, …). Run `/config`
+`GAX_TRANSCRIPT`, `GAX_BASH_TIMEOUT`, `GAX_BASH_COMPRESS`, `GAX_COMPACT_AUTO`, `GAX_CATALOG_URL`, …). Run `/config`
 in the REPL for the complete, ordered list; provider and search keys are unprefixed
 (`OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `BRAVE_API_KEY`, …). Credential values are redacted from
 diagnostics and wire traces.
@@ -201,6 +204,38 @@ skill shadows a built-in of the same name.
 through the Brave Search API when `BRAVE_API_KEY` is set and through DuckDuckGo's HTML endpoint
 otherwise. Both follow `web.timeout` and `web.max_bytes`, and `GAX_NO_WEB=on` (or `no_web` in
 `config.json`) drops them from the toolset.
+
+### Bash output compression
+
+`bash` compacts the output of the commands whose shape it recognizes before the model reads it —
+the idea behind [rtk](https://github.com/rtk-ai/rtk), applied inside the tool instead of as a
+command wrapper. Only a single simple command is eligible: a pipeline, a redirect, a second
+command, or a command substitution keeps the raw bytes, because the output then belongs to
+something else.
+
+| Command | Compact form |
+| --- | --- |
+| `ls` (long listings) | One line per entry, directories first, octal mode and size, noise directories filtered |
+| `tree` | Counts line first, noise subtrees dropped, body capped |
+| `cat` / `head` / `tail` | Large dumps lose comment-only lines and blank runs, capped with a line count |
+| `grep` / `rg` | Long lines truncated, matches grouped by file once the caps bite |
+| `ast-grep` | Grouped by file, per-file and total caps |
+| `git status` | `* branch` header and `XY path` lines grouped by state, in-progress rebase/merge reported |
+| `git diff` | File headers and per-file `+N -M` counts, bounded leading context and hunk sizes |
+| `git log` | `hash subject (age) <author>` plus up to three body lines |
+| `git add` / `commit` / `push` / `pull` / `fetch` / `stash` | One confirmation line (`ok abc1234`, `ok main`, …) |
+| `cargo test`, `go test`, `pytest`, `npm test` / `jest` / `vitest` | Failures first, passing tests collapsed to a count |
+| `ruff check`, `sqlfluff lint` | Grouped by rule and file, violations capped |
+| `docker ps` | `id name (image) status [ports]` |
+
+A filter is used only when its result is smaller than the raw output, and any filter that drops
+lines stores the full output in a temp file the result names
+(`[full output saved to /tmp/gax-…/bash-1.log]`), which is removed when the conversation's tasks
+are reset. Failed commands keep their own text: `cat`/`head`/`tail` are never filtered on a
+non-zero exit, and the structured filters keep the failure sections they parse. The live terminal
+display always streams the raw bytes — only what the model reads is compacted.
+
+`GAX_BASH_COMPRESS=off` (or `bash.compress` in `config.json`) turns the whole thing off.
 
 ## Development
 

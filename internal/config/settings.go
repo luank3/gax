@@ -44,6 +44,7 @@ func DefaultSettings() []Setting {
 		{Key: "bash.timeout_max", EnvVar: "GAX_BASH_TIMEOUT_MAX", Default: "30m", Description: "Ceiling on the model's per-call bash timeout; 0 disables", Kind: KindDuration, Editable: true},
 		{Key: "bash.timeout_grace", EnvVar: "GAX_BASH_TIMEOUT_GRACE", Default: "2s", Description: "Grace window between SIGTERM and SIGKILL for bash commands; 0 skips", Kind: KindDuration, Max: 300000, Editable: true},
 		{Key: "bash.background_yield", EnvVar: "GAX_BASH_BACKGROUND_YIELD", Default: "5s", Description: "Initial output window before an explicitly backgrounded bash command detaches into a task", Kind: KindDuration, Editable: true},
+		{Key: "bash.compress", EnvVar: "GAX_BASH_COMPRESS", Default: "1", Description: "Compress the model-facing output of recognized shell commands (ls, cat, grep, git, test runners, linters, docker ps); the full output is kept in a temp file the result names", Choices: "on|off", Editable: true},
 		{Key: "bash.shell", EnvVar: "GAX_BASH_SHELL", Description: "Shell for the bash tool, a $PATH name or path (default: bash, else sh)"},
 		{Key: "task.wait_timeout", EnvVar: "GAX_TASK_WAIT_TIMEOUT", Default: "10m", Description: "Default task_wait timeout when the model omits one (kill waits default to immediate)", Kind: KindDuration, Editable: true},
 		{Key: "task.max_running", EnvVar: "GAX_TASK_MAX_RUNNING", Default: "32", Description: "Maximum concurrently running background tasks", Kind: KindInt, Min: 1, Max: 64, Editable: true},

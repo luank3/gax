@@ -25,6 +25,7 @@ checkout before deciding.
 | `internal/provider/{client,config}` | Wire dispatch and the `providers.<name>` configuration vocabulary. |
 | `internal/tools` | Built-in tools (`read`, `edit`, `write`, `bash`, `task_wait`, `web_fetch`, `web_search`, `skill`) and background tasks. |
 | `internal/web` | HTTP fetching, HTML-to-text conversion, and the Brave/DuckDuckGo search backends behind the web tools (a gax addition; upstream has none). |
+| `internal/bashcompress` | Compresses recognized shell commands' output for the model (`ls`, `cat`, `grep`, `git`, test runners, linters, `docker ps`) — a gax addition; upstream has none. |
 | `internal/config` | Setting registry, layered resolution, persistence, presets. |
 | `internal/session` | Session logs, resume, fork, prune, prompt history. |
 | `internal/terminal/*` | Input editor, live renderer, Markdown engine, pickers, width, theme, clipboard. |

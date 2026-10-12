@@ -186,8 +186,8 @@ func TestDurationKeepsMillisecondPrecisionBeyondTimeDurationRange(t *testing.T) 
 
 func TestSettingValidationAndDefaultRegistry(t *testing.T) {
 	settings := DefaultSettings()
-	if len(settings) != 68 {
-		t.Fatalf("default registry size changed: got %d, want 68", len(settings))
+	if len(settings) != 69 {
+		t.Fatalf("default registry size changed: got %d, want 69", len(settings))
 	}
 	if settings[0].Key != "preset" || settings[1].Key != "provider" || settings[len(settings)-1].Key != "providers.mock.script" {
 		t.Fatalf("setting registry order changed: first=%q,%q last=%q", settings[0].Key, settings[1].Key, settings[len(settings)-1].Key)
