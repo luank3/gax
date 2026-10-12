@@ -51,10 +51,6 @@ func TestPruneBeforeSweepsAllProjectBucketsAndRespectsLocksAndExclusion(t *testi
 		_ = f.Close()
 	}
 	if _, err := os.Lstat(excludedPath); err != nil {
-		fixture, _ := os.ReadFile("/tmp/gax-fixture.txt")
-		t.Fatalf("DIAGCI excluded missing after sweep: %v\nFIXTURE\n%s", err, fixture)
-	}
-	if _, err := os.Lstat(excludedPath); err != nil {
 		sweep, _ := os.ReadFile("/tmp/gax-sweep.txt")
 		t.Fatalf("DIAGCI excluded missing: %v\nPROJECTA=%q\nEXCLUDED=%q\nSWEEP\n%s", err, projectA, excludedPath, sweep)
 	}
