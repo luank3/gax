@@ -30,8 +30,9 @@ func webSearchDefinition() provider.ToolDefinition {
 	return provider.ToolDefinition{
 		Name: "web_search",
 		Description: "Search the web and return ranked results with titles, URLs, and snippets. Searches through the " +
-			"Brave Search API when BRAVE_API_KEY is set, and through DuckDuckGo's HTML endpoint otherwise. " +
-			"Read a promising result with `web_fetch`.",
+			"backend `web.search_provider` names — you, brave, octen, exa, firecrawl, tinyfish, or duckduckgo — " +
+			"or through You.com (its free profile without a key) when another backend has no key. A backend that " +
+			"cannot answer falls back to DuckDuckGo. Read a promising result with `web_fetch`.",
 		Params: []provider.ToolParam{
 			{Name: "query", Type: "string", Required: true, Description: "Search query."},
 			{Name: "count", Type: "integer", Minimum: 1, Description: "Maximum results to return (default 5, maximum 10)."},
@@ -92,7 +93,10 @@ func (registry *Registry) runWebSearchContext(ctx context.Context, arguments str
 		count = int(value)
 	}
 	report, err := registry.webClient().Search(ctx, query, web.SearchOptions{
-		Count: count, APIKey: registry.webAPIKey(), Limits: registry.webLimits(),
+		Provider: registry.webSearchProvider(),
+		Count:    count,
+		Keys:     registry.webSearchKeys(),
+		Limits:   registry.webLimits(),
 	})
 	if err != nil {
 		return Result{Text: fmt.Sprintf("error searching for %q: %s", strings.TrimSpace(query), err)}
@@ -208,11 +212,36 @@ func (registry *Registry) webLimits() web.Limits {
 	return limits
 }
 
-func (registry *Registry) webAPIKey() string {
+// webSearchKeySetting names the credential setting of one backend.
+func webSearchKeySetting(provider string) string {
+	return "web." + provider + "_api_key"
+}
+
+// webSearchProvider reads web.search_provider: the backend web_search uses, or empty for automatic
+// selection.
+func (registry *Registry) webSearchProvider() string {
 	if registry == nil || registry.store == nil {
 		return ""
 	}
-	return stringValueOrEmpty(registry.store.StringNonempty("web.brave_api_key"))
+	return stringValueOrEmpty(registry.store.StringNonempty("web.search_provider"))
+}
+
+func (registry *Registry) webSearchKeys() web.Keys {
+	var keys web.Keys
+	if registry == nil || registry.store == nil {
+		return keys
+	}
+	key := func(provider string) string {
+		return stringValueOrEmpty(registry.store.StringNonempty(webSearchKeySetting(provider)))
+	}
+	return web.Keys{
+		Brave:     key(web.BackendBrave),
+		You:       key(web.BackendYou),
+		Octen:     key(web.BackendOcten),
+		Exa:       key(web.BackendExa),
+		Firecrawl: key(web.BackendFirecrawl),
+		TinyFish:  key(web.BackendTinyFish),
+	}
 }
 
 func (registry *Registry) noWeb() bool {

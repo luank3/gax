@@ -16,15 +16,26 @@ import (
 
 const webPage = `<html><head><title>Docs</title></head><body><h1>Docs</h1><script>bad()</script><p>Body &amp; text</p></body></html>`
 
-const webSearchPage = `<html><body>
+// webSearchFrontend is the result the keyless You.com backend answers with: two entries, so a
+// limited search can be told from a full one. It stays on one line because the MCP reply is a
+// server-sent event.
+const webSearchFrontend = `{"results":{"web":[` +
+	`{"title":"The <b>complete</b> guide","url":"https://blog.example.com/guide","description":"Take apart the timeout stages."},` +
+	`{"title":"How to set a timeout?","url":"https://stackoverflow.com/q/1","description":"Use a context deadline."}]}}`
+
+// webSearchCrawl is the result page DuckDuckGo serves, which the fallback parses.
+const webSearchCrawl = `<html><body>
 <a rel="nofollow" class="result__a" href="https://blog.example.com/guide">The complete <b>guide</b></a>
 <a class="result__snippet" href="https://blog.example.com/guide">Take apart the <b>timeout</b> stages.</a>
 <a rel="nofollow" class="result__a" href="https://stackoverflow.com/q/1">How to set a timeout?</a>
 <a class="result__snippet" href="https://stackoverflow.com/q/1">Use a context deadline.</a>
 </body></html>`
 
-// newWebTestServer serves the page, search, and Brave endpoints the web tools use, so the tool
-// tests exercise the real rendering without reaching the network.
+// webSearchBrave is the result the Brave Search API answers with.
+const webSearchBrave = `{"web":{"results":[{"title":"Go timeouts","url":"https://blog.example.com/guide","description":"Take apart the stages."}]}}`
+
+// newWebTestServer serves the page, search, and keyless frontend endpoints the web tools use, so
+// the tool tests exercise the real rendering without reaching the network.
 func newWebTestServer(t *testing.T) (*httptest.Server, *web.Client) {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,12 +46,12 @@ func newWebTestServer(t *testing.T) (*httptest.Server, *web.Client) {
 		case "/image":
 			w.Header().Set("Content-Type", "image/png")
 			_, _ = w.Write([]byte{0x89, 'P', 'N', 'G'})
-		case "/search":
-			w.Header().Set("Content-Type", "text/html")
-			_, _ = io.WriteString(w, webSearchPage)
+		case "/free-search":
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = io.WriteString(w, "event: message\ndata: "+`{"jsonrpc":"2.0","id":1,"result":{"structuredContent":`+webSearchFrontend+`}}`+"\n\n")
 		case "/brave":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = io.WriteString(w, `{"web":{"results":[{"title":"Go timeouts","url":"https://blog.example.com/guide","description":"Take apart the stages."}]}}`)
+			_, _ = io.WriteString(w, webSearchBrave)
 		default:
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusNotFound)
@@ -48,7 +59,7 @@ func newWebTestServer(t *testing.T) (*httptest.Server, *web.Client) {
 		}
 	}))
 	t.Cleanup(server.Close)
-	return server, &web.Client{HTTP: server.Client(), HTMLSearchEndpoint: server.URL + "/search", BraveEndpoint: server.URL + "/brave"}
+	return server, &web.Client{HTTP: server.Client(), BraveEndpoint: server.URL + "/brave", YouMCPEndpoint: server.URL + "/free-search"}
 }
 
 func newWebTestRegistry(t *testing.T, client *web.Client, options Options) *Registry {
@@ -173,13 +184,13 @@ func TestWebSearchRendersResults(t *testing.T) {
 	result := registry.Run("web_search", jsonArgs(map[string]any{"query": "golang timeout"}), 1)
 	want := "1. The complete guide\n   https://blog.example.com/guide\n   Take apart the timeout stages.\n\n" +
 		"2. How to set a timeout?\n   https://stackoverflow.com/q/1\n   Use a context deadline.\n\n" +
-		"[2 results · duckduckgo]"
+		"[2 results · you]"
 	if result.Text != want {
 		t.Fatalf("search = %q, want %q", result.Text, want)
 	}
 
 	limited := registry.Run("web_search", jsonArgs(map[string]any{"query": "golang timeout", "count": 1}), 1)
-	if !strings.HasSuffix(limited.Text, "[1 results · duckduckgo]") || strings.Contains(limited.Text, "stackoverflow") {
+	if !strings.HasSuffix(limited.Text, "[1 results · you]") || strings.Contains(limited.Text, "stackoverflow") {
 		t.Fatalf("limited search = %q", limited.Text)
 	}
 
@@ -219,6 +230,100 @@ func TestWebSearchUsesTheConfiguredBraveKey(t *testing.T) {
 		t.Fatalf("search output leaked the key: %q", result.Text)
 	}
 	_ = server
+}
+
+// TestWebSearchProviderSettingPicksTheBackend covers the provider override: an explicit backend
+// answers even when another one holds a key.
+func TestWebSearchProviderSettingPicksTheBackend(t *testing.T) {
+	_, client := newWebTestServer(t)
+	var reached string
+	brave := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		reached = "brave"
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, webSearchBrave)
+	}))
+	defer brave.Close()
+	client.BraveEndpoint = brave.URL
+
+	store := config.New(config.DefaultSettings())
+	store.SetEnvironment(nil)
+	if err := store.LoadConfig([]byte(`{"web.search_provider":"you","web.brave_api_key":"brave-secret"}`)); err != nil {
+		t.Fatal(err)
+	}
+	registry := newWebTestRegistry(t, client, Options{})
+	registry.store = store
+
+	result := registry.Run("web_search", jsonArgs(map[string]any{"query": "golang timeout"}), 1)
+	if !strings.HasSuffix(result.Text, "[2 results · you]") || reached != "" {
+		t.Fatalf("provider override search = %q (brave was reached: %q)", result.Text, reached)
+	}
+}
+
+// TestWebSearchFallsBackToTheDuckDuckGoCrawl covers the fallback through the tool: the keyless
+// default cannot answer, and the crawl still returns results the model can read.
+func TestWebSearchFallsBackToTheDuckDuckGoCrawl(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/crawl":
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = io.WriteString(w, webSearchCrawl)
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"upstream is down"}}`)
+		}
+	}))
+	defer server.Close()
+	client := &web.Client{
+		HTTP:               server.Client(),
+		YouMCPEndpoint:     server.URL + "/free-search",
+		HTMLSearchEndpoint: server.URL + "/crawl",
+	}
+	registry := newWebTestRegistry(t, client, Options{})
+
+	result := registry.Run("web_search", jsonArgs(map[string]any{"query": "golang timeout"}), 1)
+	want := "1. The complete guide\n   https://blog.example.com/guide\n   Take apart the timeout stages.\n\n" +
+		"2. How to set a timeout?\n   https://stackoverflow.com/q/1\n   Use a context deadline.\n\n" +
+		"[2 results · duckduckgo]"
+	if result.Text != want {
+		t.Fatalf("fallback search = %q, want %q", result.Text, want)
+	}
+}
+
+// TestWebSearchKeySettingsMatchTheBackends keeps the credential settings and the backends in step:
+// one web.<provider>_api_key setting per backend, reading that backend's documented environment
+// variable, and a provider setting whose choices are the backends.
+func TestWebSearchKeySettingsMatchTheBackends(t *testing.T) {
+	settings := make(map[string]config.Setting)
+	for _, setting := range config.DefaultSettings() {
+		settings[setting.Key] = setting
+	}
+	providers := make(map[string]bool, len(web.SearchProviders))
+	for _, provider := range web.SearchProviders {
+		providers[provider] = true
+		setting, ok := settings[webSearchKeySetting(provider)]
+		if !ok {
+			t.Fatalf("web.%s_api_key is not a registered setting", provider)
+		}
+		if setting.EnvVar != web.CredentialEnv(provider) || !setting.Secret {
+			t.Fatalf("web.%s_api_key = %+v, want the credential variable %q marked secret",
+				provider, setting, web.CredentialEnv(provider))
+		}
+	}
+	for key := range settings {
+		if name, found := strings.CutPrefix(key, "web."); found {
+			if provider, found := strings.CutSuffix(name, "_api_key"); found && !providers[provider] {
+				t.Fatalf("%s names a backend that does not exist", key)
+			}
+		}
+	}
+	choice, ok := settings["web.search_provider"]
+	if !ok {
+		t.Fatal("web.search_provider is not a registered setting")
+	}
+	if want := "auto|" + strings.Join(web.SearchBackends, "|"); choice.Choices != want {
+		t.Fatalf("web.search_provider choices = %q, want %q", choice.Choices, want)
+	}
 }
 
 func TestWebToolsReportDisabledExecution(t *testing.T) {

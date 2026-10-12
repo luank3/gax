@@ -3,7 +3,9 @@
 package web
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -31,6 +33,12 @@ type Client struct {
 	HTTP               *http.Client
 	UserAgent          string
 	BraveEndpoint      string
+	YouEndpoint        string
+	YouMCPEndpoint     string
+	OctenEndpoint      string
+	ExaEndpoint        string
+	FirecrawlEndpoint  string
+	TinyFishEndpoint   string
 	HTMLSearchEndpoint string
 }
 
@@ -43,6 +51,12 @@ func NewClient() *Client {
 		HTTP:               &http.Client{},
 		UserAgent:          "gax/" + version.Value + " (+https://github.com/luank3/gax)",
 		BraveEndpoint:      "https://api.search.brave.com/res/v1/web/search",
+		YouEndpoint:        "https://ydc-index.io/v1/search",
+		YouMCPEndpoint:     "https://api.you.com/mcp?profile=free",
+		OctenEndpoint:      "https://api.octen.ai/search",
+		ExaEndpoint:        "https://api.exa.ai/search",
+		FirecrawlEndpoint:  "https://api.firecrawl.dev/v2/search",
+		TinyFishEndpoint:   "https://api.search.tinyfish.ai",
 		HTMLSearchEndpoint: "https://html.duckduckgo.com/html/",
 	}
 }
@@ -160,10 +174,28 @@ func (client *Client) userAgent() string {
 // get performs a request with the client identity and the given headers, which may override it,
 // and returns the body plus the status.
 func (client *Client) get(ctx context.Context, endpoint string, headers []string, limits Limits) ([]byte, int, error) {
+	return client.send(ctx, http.MethodGet, endpoint, nil, headers, limits)
+}
+
+// postJSON sends an encoded body as application/json, with the same identity and header rules as
+// get.
+func (client *Client) postJSON(ctx context.Context, endpoint string, payload any, headers []string, limits Limits) ([]byte, int, error) {
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to encode the request: %w", err)
+	}
+	return client.send(ctx, http.MethodPost, endpoint, encoded, append([]string{"Content-Type: application/json"}, headers...), limits)
+}
+
+func (client *Client) send(ctx context.Context, method, endpoint string, body []byte, headers []string, limits Limits) ([]byte, int, error) {
 	limits = limits.resolved()
 	requestContext, cancel := context.WithTimeout(ctx, limits.Timeout)
 	defer cancel()
-	request, err := http.NewRequestWithContext(requestContext, http.MethodGet, endpoint, nil)
+	var reader io.Reader
+	if body != nil {
+		reader = bytes.NewReader(body)
+	}
+	request, err := http.NewRequestWithContext(requestContext, method, endpoint, reader)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -186,11 +218,11 @@ func (client *Client) get(ctx context.Context, endpoint string, headers []string
 		return nil, 0, requestError(requestContext, err, limits.Timeout)
 	}
 	defer func() { _ = response.Body.Close() }()
-	body, _, err := readLimited(response.Body, limits.MaxBytes)
+	received, _, err := readLimited(response.Body, limits.MaxBytes)
 	if err != nil {
 		return nil, response.StatusCode, requestError(requestContext, err, limits.Timeout)
 	}
-	return body, response.StatusCode, nil
+	return received, response.StatusCode, nil
 }
 
 // requestError names the deadline and cancellation cases the model can act on, instead of the

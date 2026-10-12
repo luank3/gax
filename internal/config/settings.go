@@ -49,7 +49,13 @@ func DefaultSettings() []Setting {
 		{Key: "task.wait_timeout", EnvVar: "GAX_TASK_WAIT_TIMEOUT", Default: "10m", Description: "Default task_wait timeout when the model omits one (kill waits default to immediate)", Kind: KindDuration, Editable: true},
 		{Key: "task.max_running", EnvVar: "GAX_TASK_MAX_RUNNING", Default: "32", Description: "Maximum concurrently running background tasks", Kind: KindInt, Min: 1, Max: 64, Editable: true},
 
-		{Key: "web.brave_api_key", EnvVar: "BRAVE_API_KEY", Description: "Brave Search API key for the web_search tool; unset falls back to DuckDuckGo", Secret: true},
+		{Key: "web.search_provider", EnvVar: "GAX_WEB_SEARCH_PROVIDER", Default: "auto", Description: "Web search backend: auto prefers You.com (its key, else its free profile), then the first other configured key; DuckDuckGo answers only as the fallback", Choices: "auto|you|brave|octen|exa|firecrawl|tinyfish|duckduckgo", Editable: true},
+		{Key: "web.brave_api_key", EnvVar: "BRAVE_API_KEY", Description: "Brave Search API key for the web_search tool", Secret: true},
+		{Key: "web.you_api_key", EnvVar: "YDC_API_KEY", Description: "You.com API key for the web_search tool; unset searches through its keyless free MCP profile", Secret: true},
+		{Key: "web.octen_api_key", EnvVar: "OCTEN_API_KEY", Description: "Octen API key for the web_search tool", Secret: true},
+		{Key: "web.exa_api_key", EnvVar: "EXA_API_KEY", Description: "Exa API key for the web_search tool", Secret: true},
+		{Key: "web.firecrawl_api_key", EnvVar: "FIRECRAWL_API_KEY", Description: "Firecrawl API key for the web_search tool; its keyless tier needs no key but is rate-limited per IP", Secret: true},
+		{Key: "web.tinyfish_api_key", EnvVar: "TINYFISH_API_KEY", Description: "TinyFish API key for the web_search tool", Secret: true},
 		{Key: "web.timeout", EnvVar: "GAX_WEB_TIMEOUT", Default: "30s", Description: "Timeout for one web_fetch or web_search request", Kind: KindDuration, Editable: true},
 		{Key: "web.max_bytes", EnvVar: "GAX_WEB_MAX_BYTES", Default: "2M", Description: "Maximum response bytes the web tools download", Kind: KindSize, Editable: true},
 
