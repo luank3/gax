@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -50,19 +49,6 @@ func TestPruneBeforeSweepsAllProjectBucketsAndRespectsLocksAndExclusion(t *testi
 		f, _ := os.Create("/tmp/gax-exclude.txt")
 		_, _ = fmt.Fprintf(f, "excluded=%s\nrecent=%s\nold=%s\nlocked=%s\nprojectA=%s\n", excludedPath, recentPath, oldPath, lockedPath, projectA)
 		_ = f.Close()
-	}
-	if _, err := os.Lstat(excludedPath); err != nil {
-		var tree []string
-		root := filepath.Dir(filepath.Dir(filepath.Dir(excludedPath)))
-		_ = filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
-			if walkErr != nil {
-				return nil
-			}
-			tree = append(tree, strings.TrimPrefix(path, root)+" mtime="+info.ModTime().UTC().String())
-			return nil
-		})
-		diag, _ := os.ReadFile("/tmp/gax-exclude.txt")
-		t.Fatalf("DIAGCI excluded not a file: %v\nCWD %q\nTREE %s\nFILE %s", err, projectA, strings.Join(tree, "\n"), diag)
 	}
 	if _, err := os.Lstat(excludedPath); err != nil {
 		fixture, _ := os.ReadFile("/tmp/gax-fixture.txt")
