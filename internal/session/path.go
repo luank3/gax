@@ -34,9 +34,22 @@ func statePath(relative string) (string, error) {
 	return path, nil
 }
 
+// canonicalCWD resolves the symlinks in a working directory before it is hashed, so one project
+// keeps one bucket. macOS hands out /var/folders/... while os.Getwd reports /private/var/... for
+// the same tree, and without this a resumed session would look for a bucket the writer never used.
+func canonicalCWD(cwd string) string {
+	resolved, err := filepath.EvalSymlinks(cwd)
+	if err != nil {
+		return cwd
+	}
+	return resolved
+}
+
 func EncodeCWD(cwd string) string {
 	if cwd == "" {
 		cwd = "unknown"
+	} else {
+		cwd = canonicalCWD(cwd)
 	}
 	hash := uint64(1469598103934665603)
 	for i := 0; i < len(cwd); i++ {
