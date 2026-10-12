@@ -57,6 +57,24 @@ working directory; two test helpers move or are corrected.
 - [x] CI green on `ubuntu-latest` and `macos-latest` with the four cross-builds
       (`38240131727`).
 
+### 5. The Ctrl-D flake in the notification test
+
+- [x] Reproduce deterministically: a harness repeating the same sequence hung once in 125
+      iterations, and the goroutine dump showed the app blocked in its 100 ms input poll over an
+      empty queue while the test waited for exit.
+- [x] Root cause: during a turn the Escape watcher owns stdin, and `stopWatch` restores the saved
+      mode and issues `TCIFLUSH` so keystrokes typed during the turn cannot become an accidental
+      prompt (`internal/terminal/input/interrupt_linux.go:83`). The test wrote Ctrl-D as soon as it
+      saw the bell, inside the window where a stop still flushes, so the quit key vanished. Every
+      sibling test waits for the repainted editor first; this one did not.
+- [x] Fix: wait for `waitPTYEditorReadyCount(…, 2, …)` before writing Ctrl-D, and assert the bell
+      after the run exits rather than gating on the arrival order of "\a" and the repaint.
+- [x] Fix the failure-path race the hang exposed: the deferred close of the PTY master raced the
+      capture reader's `Read`. The slave now closes first — that is what makes a reader already
+      inside `read(2)` return — and the master close no longer blocks on the reader.
+- [x] Verify: 40/40 runs of the test pass under `-race`, and 200/200 of the reproduction harness
+      pass with the gate in place, where the ungated sequence hung.
+
 ## Record
 
 - `TestPruneTreeKeepsExcludedSessionUnderRelativeRoot` has to close both sessions before sweeping.
@@ -66,7 +84,8 @@ working directory; two test helpers move or are corrected.
   single canonicalization covers session logs, prompt history, and the sessions root listing.
 - The macOS test job had never reached the test suite: `make vet` stopped it. These darwin failures
   were latent from the start rather than a regression, and fixing `vet` is what exposed them.
-- One flake is still open: `TestRunTTYREPLNotifiesWhenTurnCompletes` waits three seconds for the
-  REPL to exit after Ctrl-D. It passed 25 of 25 runs in isolation but failed during a fully parallel
-  `-race` run, where the failure path also closes the PTY while the reader goroutine is in
-  `queryTerminalSize`. Both occurrences were under load, so it is unverified rather than fixed.
+- The Ctrl-D window is real for a user too, but it is the product's deliberate behaviour: the
+  watcher discards input typed while a turn runs so it cannot arrive as a prompt. Only the test's
+  assumption that a byte written at the bell reaches the editor was wrong.
+- Closing the master does not wake a reader already inside `read(2)`, so a cleanup that waits on the
+  reader deadlocks exactly on the path a failing test takes; the slave close is what unblocks it.

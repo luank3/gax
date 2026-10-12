@@ -1359,10 +1359,10 @@ func TestRunTTYREPLNotifiesWhenTurnCompletes(t *testing.T) {
 	t.Setenv("GAX_NOTIFY", "bel")
 
 	master, slave := openTestPTY(t)
-	defer master.Close()
-	defer slave.Close()
 	capture := &ptyCapture{}
 	go capture.read(master)
+	defer slave.Close() // closing the slave is what makes the capture reader return
+	defer closePTYCapture(master)
 	finished := make(chan int, 1)
 	go func() { finished <- Run(nil, slave, true, slave, io.Discard) }()
 	waitPTYOutput(t, capture, "> ", 2*time.Second)
@@ -1370,12 +1370,20 @@ func TestRunTTYREPLNotifiesWhenTurnCompletes(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitPTYOutput(t, capture, "ready", 5*time.Second)
-	waitPTYOutput(t, capture, "\a", 3*time.Second)
-	_, _ = master.Write([]byte{0x04})
+	// The turn's Escape watcher owns stdin until it stops, and stopping it flushes queued input so
+	// keystrokes typed during the turn cannot become an accidental prompt. Wait for the repainted
+	// editor before quitting, or the Ctrl-D can be flushed away and the REPL never exits.
+	waitPTYEditorReadyCount(t, capture, 2, 5*time.Second)
+	if _, err := master.Write([]byte{0x04}); err != nil {
+		t.Fatal(err)
+	}
 	select {
 	case code := <-finished:
 		if code != 0 {
 			t.Fatalf("TTY notification exit code = %d; output: %q", code, capture.string())
+		}
+		if !strings.Contains(capture.string(), "\a") {
+			t.Fatalf("the turn did not ring the terminal bell: %q", capture.string())
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatalf("TTY notification run did not exit; output: %q", capture.string())
@@ -2220,6 +2228,13 @@ func (capture *ptyCapture) string() string {
 	capture.mu.Lock()
 	defer capture.mu.Unlock()
 	return capture.output.String()
+}
+
+// closePTYCapture ends the capture reader. The slave must be closed first (by the caller's later
+// defer): that is what makes a reader already inside read(2) return, since closing the master does
+// not interrupt it.
+func closePTYCapture(master *os.File) {
+	_ = master.Close()
 }
 
 func waitPTYOutput(t *testing.T, capture *ptyCapture, text string, timeout time.Duration) {
