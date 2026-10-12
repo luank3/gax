@@ -30,6 +30,19 @@ func TestPruneBeforeSweepsAllProjectBucketsAndRespectsLocksAndExclusion(t *testi
 		setPruneTestMtime(t, path, oldTime)
 	}
 
+	{
+		f, _ := os.Create("/tmp/gax-fixture.txt")
+		dir, _ := Directory(projectA)
+		_, _ = fmt.Fprintf(f, "DIR=%s\nEXCLUDED=%s\nRECENT=%s\nOLD=%s\nLOCKED=%s\n", dir, excludedPath, recentPath, oldPath, lockedPath)
+		entries, _ := os.ReadDir(dir)
+		for _, e := range entries {
+			info, _ := e.Info()
+			_, _ = fmt.Fprintf(f, "ENTRY %s mtime=%s\n", e.Name(), info.ModTime().UTC())
+		}
+		_, _ = fmt.Fprintf(f, "EXCLUDED_EXISTS=%v\n", func() bool { _, err := os.Lstat(excludedPath); return err == nil }())
+		_ = f.Close()
+	}
+
 	if err := PruneBefore(cutoff, excludedPath); err != nil {
 		t.Fatal(err)
 	}
@@ -50,6 +63,10 @@ func TestPruneBeforeSweepsAllProjectBucketsAndRespectsLocksAndExclusion(t *testi
 		})
 		diag, _ := os.ReadFile("/tmp/gax-exclude.txt")
 		t.Fatalf("DIAGCI excluded not a file: %v\nCWD %q\nTREE %s\nFILE %s", err, projectA, strings.Join(tree, "\n"), diag)
+	}
+	if _, err := os.Lstat(excludedPath); err != nil {
+		fixture, _ := os.ReadFile("/tmp/gax-fixture.txt")
+		t.Fatalf("DIAGCI excluded missing after sweep: %v\nFIXTURE\n%s", err, fixture)
 	}
 	assertPruneTestMissing(t, oldPath)
 	assertPruneTestMissing(t, otherPath)
