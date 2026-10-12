@@ -20,6 +20,7 @@ Connect the existing CLI, config, provider, agent, tool, and session packages be
   - [x] Resolve dotted preset names literally across state and config tiers, including save metadata.
   - [x] Replay Chat Completions reasoning only under a configured, provider-default, or catalog-selected field; do not infer a request field from response-member names stored in the transcript.
   - [x] Match upstream slash-name completion and `@file` completion; `/provider`, `/model`, and `/effort` reject arguments and open their TTY pickers without arguments.
+    - Divergence (recorded 2026-10-12): gax still applies a supplied argument (`TestRunREPLSelectsSelectionByArgument` in `internal/app/app_test.go`), which the superseding note in `2026-10-10-repl-provider-selection.md` says official master `ff45833` removed. Decide whether to keep it as a documented extension or restore upstream parity; see `docs/superpowers/specs/README.md`.
   - [x] Match Ollama's context guidance, with no default reasoning replay member.
   - [x] Carry OpenRouter pricing, context tiers, and tool support from model listings into usage estimates and picker rows.
   - [x] Probe selected OpenRouter, Anthropic, Codex, and llama.cpp metadata in the background; keep Openference's metadata in its explicit `/models` listing; use Codex's versioned catalog.

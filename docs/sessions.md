@@ -73,7 +73,9 @@ reported, and reported zeros are preserved:
 
 ### Undo, fork, and compaction
 
-`/undo` and `/fork` truncate or copy the log at an item boundary, so a session file always
+`/undo` appends an `undo` record and rewinds the log's write cursor, so the file stays append-only
+while the next turn overwrites the reverted tail; sessions loaded from that point replay only the
+kept history. `/fork` copies the kept prefix into a new session file, so a session file always
 contains a contiguous history. `/compact` appends a `turn_boundary` item, a `user` item with
 `origin: "compact_seed"` holding the summary, and a `turn_usage` item with
 `origin: "compaction"`. The transcript view (Ctrl-T) renders the same stream for inspection.
