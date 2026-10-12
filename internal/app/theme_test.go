@@ -1,7 +1,9 @@
 package app
 
 import (
+	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/luank3/gax/internal/config"
@@ -56,14 +58,19 @@ func TestConfigureTerminalThemeKeepsRedirectedWarningsPlain(t *testing.T) {
 	t.Cleanup(func() { terminaltheme.Configure(previous.Name(), previous.TintName()) })
 	store := config.New(config.DefaultSettings())
 	store.SetEnvironment(func(string) (string, bool) { return "", false })
-	store.SetOverride("theme", stringPtr("parity-invalid-theme"))
+	// A repeated bad value is warned about once per process, so each run needs its own name.
+	badTheme := fmt.Sprintf("parity-invalid-theme-%d", themeWarningSequence.Add(1))
+	store.SetOverride("theme", stringPtr(badTheme))
 
 	var output strings.Builder
 	configureTerminalTheme(store, &output)
-	if !strings.Contains(output.String(), "gax: unknown theme 'parity-invalid-theme'") {
+	if !strings.Contains(output.String(), "gax: unknown theme '"+badTheme+"'") {
 		t.Fatalf("theme warning = %q", output.String())
 	}
 	if strings.ContainsRune(output.String(), '\x1b') {
 		t.Fatalf("redirected theme warning contains terminal styling: %q", output.String())
 	}
 }
+
+// themeWarningSequence keeps this file's bad values distinct across -count runs.
+var themeWarningSequence atomic.Int64

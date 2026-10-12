@@ -1,7 +1,9 @@
 package theme
 
 import (
+	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -103,5 +105,40 @@ func TestAutoThemeAndInvalidValues(t *testing.T) {
 	if fallback.Name() != "dark" || fallback.TintName() != "teal" || len(warnings) != 2 ||
 		!strings.Contains(warnings[0], "unknown theme") || !strings.Contains(warnings[1], "unknown tint") {
 		t.Fatalf("invalid values selected %q/%q with warnings %v", fallback.Name(), fallback.TintName(), warnings)
+	}
+}
+
+// Configure warns once per offending value for the life of the process, so each run of this test
+// needs values that no earlier run has used.
+var warningDedupeSequence atomic.Int64
+
+func uniqueBadValue(kind string) string {
+	return fmt.Sprintf("missing-%s-%d", kind, warningDedupeSequence.Add(1))
+}
+
+func TestConfigureSuppressesRepeatedWarningsForTheSameValue(t *testing.T) {
+	previous := Current()
+	t.Cleanup(func() { Configure(previous.Name(), previous.TintName()) })
+
+	name := uniqueBadValue("theme")
+	if warnings := Configure(name, "teal"); len(warnings) != 1 || !strings.Contains(warnings[0], "unknown theme") {
+		t.Fatalf("first Configure(%q) warnings = %v, want one unknown-theme warning", name, warnings)
+	}
+	if warnings := Configure(name, "teal"); len(warnings) != 0 {
+		t.Fatalf("repeated Configure(%q) warnings = %v, want none", name, warnings)
+	}
+	if warnings := Configure(uniqueBadValue("theme"), "teal"); len(warnings) != 1 {
+		t.Fatalf("a different bad theme must warn again: %v", warnings)
+	}
+
+	tint := uniqueBadValue("tint")
+	if warnings := Configure("dark", tint); len(warnings) != 1 || !strings.Contains(warnings[0], "unknown tint") {
+		t.Fatalf("first bad-tint warnings = %v, want one unknown-tint warning", warnings)
+	}
+	if warnings := Configure("dark", tint); len(warnings) != 0 {
+		t.Fatalf("repeated bad tint warnings = %v, want none", warnings)
+	}
+	if warnings := Configure("dark", uniqueBadValue("tint")); len(warnings) != 1 {
+		t.Fatalf("a different bad tint must warn again: %v", warnings)
 	}
 }
