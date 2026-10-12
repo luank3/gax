@@ -7,8 +7,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.1.0] - 2026-10-12
 
-Initial Go reimplementation of [hax](https://github.com/OleksandrChekhovskyi/hax), tracking the
-baseline commit `ff45833`.
+Initial release: a Go reimplementation of [hax](https://github.com/OleksandrChekhovskyi/hax),
+tracking the baseline commit `ff45833`.
 
 ### Added
 

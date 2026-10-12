@@ -1,10 +1,6 @@
 MIT License
 
 Copyright (c) 2026 luank3
-
-gax is a Go port of hax (https://github.com/OleksandrChekhovskyi/hax), and reuses its behavior,
-naming, and diagnostics. The upstream notice follows.
-
 Copyright (c) 2026 Oleksandr Chekhovskyi
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
