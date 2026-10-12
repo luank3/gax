@@ -2069,6 +2069,11 @@ func TestRunREPLConsumesSlashCommands(t *testing.T) {
 		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"reply\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
 	}))
 	defer server.Close()
+	// /model persists its selection to state.json, so the state tier has to stay in the sandbox.
+	t.Setenv("HOME", filepath.Join(t.TempDir(), "home"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "config"))
+	t.Setenv("XDG_STATE_HOME", filepath.Join(t.TempDir(), "state"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(t.TempDir(), "cache"))
 	t.Setenv("GAX_OPENAI_BASE_URL", server.URL)
 	t.Setenv("GAX_OPENAI_API_KEY", "test-key")
 	t.Setenv("GAX_NO_SESSION", "on")
