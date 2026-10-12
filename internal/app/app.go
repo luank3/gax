@@ -843,7 +843,10 @@ func Run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 	if !liveTTY {
 		stdout = newLineOutputWriter(stdout, 2)
 	}
-	replCode := runREPL(ctx, stdin, stdinTTY, promptHistoryPersist, stdout, stderr, store, tools, state, runREPLTurn, &pendingInput, func(parsed slash.Parsed) bool {
+	argumentChoices := func(name string) []string {
+		return slashArgumentChoices(name, providers, provider, model, store)
+	}
+	replCode := runREPL(ctx, stdin, stdinTTY, promptHistoryPersist, stdout, stderr, store, tools, state, runREPLTurn, &pendingInput, argumentChoices, func(parsed slash.Parsed) bool {
 		defer syncTranscriptLog()
 		defer configureTerminalTheme(store, stderr)
 		if parsed.Outcome == slash.Handled && parsed.Command != nil && parsed.Command.Name == "preset" {

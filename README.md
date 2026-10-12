@@ -104,7 +104,7 @@ Typed at the start of a REPL line; `/help` lists them in this order.
 | `/resume` | Resume a past conversation. |
 | `/undo [turns back]` | Revert the conversation to before an earlier message. |
 | `/fork [turns back]` | Branch a new session before an earlier message. |
-| `/provider`, `/model`, `/effort` | Switch provider, then model and effort. |
+| `/provider [id]`, `/model [id]`, `/effort [level]` | Switch provider, then model and effort. |
 | `/preset [name]`, `/preset-save <name> [tint]` | Switch to, or save, a config-defined preset. |
 | `/config [key [value]]` | View or change settings. |
 | `/compact [focus]` | Summarize the conversation to free up context. |
@@ -114,6 +114,12 @@ Typed at the start of a REPL line; `/help` lists them in this order.
 | `/usage` | Show provider account usage (Codex, DeepSeek, OpenRouter, OpenCode Go). |
 | `/login [provider]`, `/logout [provider]` | Manage a gax-owned provider login. |
 | `/help` | Show help. |
+
+Without an argument, `/provider`, `/model`, and `/effort` open pickers that continue to the
+settings that depend on them; with an argument they switch directly. Tab completes command names
+and the values a command's first argument enumerates — provider ids, effort levels a model takes,
+preset names, and the model ids from the provider's last model listing, so open the `/model` picker
+once where the listing is unavailable.
 
 Useful keys: Ctrl-R recalls earlier prompts for this directory, Ctrl-T opens the transcript
 view, Ctrl-C interrupts the running turn, Ctrl-D exits.

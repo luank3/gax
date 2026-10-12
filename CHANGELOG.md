@@ -33,5 +33,8 @@ baseline commit `ff45833`.
   reach the model as a compact form, with the full output kept in a temp file the result names.
 - Layered configuration (`GAX_*` environment variables, `config.json`, `state.json`,
   conversation selections), presets, model/effort pickers, and the models.dev catalog cache.
+- Shell-like Tab completion of `/` command names and of the arguments `/provider`, `/model`,
+  `/effort`, `/preset`, `/new`, and `/clear` enumerate, with a dim placeholder after a command
+  name that takes one.
 - CI (gofmt, `go vet`, race-enabled tests, cross-builds) and GoReleaser-based releases for Linux
   and macOS on amd64 and arm64.

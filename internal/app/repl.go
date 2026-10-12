@@ -25,9 +25,10 @@ import (
 
 func runREPL(ctx context.Context, stdin io.Reader, inputTTY, persistPromptHistory bool, stdout, stderr io.Writer,
 	store *config.Store, tools *coretools.Registry, state *agent.Session, run func(string) replOutput, pendingInput *string,
-	handleCommand func(slash.Parsed) bool) int {
+	argumentChoices slash.ArgumentChoices, handleCommand func(slash.Parsed) bool) int {
 	if terminalinput.TTYPair(stdin, stdout, inputTTY) {
-		return runTTYREPL(ctx, stdin.(*os.File), persistPromptHistory, stdout, stderr, store, tools, state, run, pendingInput, handleCommand)
+		return runTTYREPL(ctx, stdin.(*os.File), persistPromptHistory, stdout, stderr, store, tools, state, run,
+			pendingInput, argumentChoices, handleCommand)
 	}
 	scanner := bufio.NewScanner(stdin)
 	scanner.Buffer(make([]byte, 4096), 16*1024*1024)
@@ -89,7 +90,7 @@ func ttyPrompt(haveUTF8 bool) string {
 
 func runTTYREPL(ctx context.Context, stdin *os.File, persistPromptHistory bool, stdout, stderr io.Writer,
 	store *config.Store, tools *coretools.Registry, state *agent.Session, run func(string) replOutput, pendingInput *string,
-	handleCommand func(slash.Parsed) bool) int {
+	argumentChoices slash.ArgumentChoices, handleCommand func(slash.Parsed) bool) int {
 	core := terminalinput.NewCore()
 	cwd, _ := os.Getwd()
 	historyPath, _ := session.PromptHistoryPath(cwd)
@@ -99,20 +100,7 @@ func runTTYREPL(ctx context.Context, stdin *os.File, persistPromptHistory bool, 
 			0x0f: historyModalKey(state, func() bool { return store.Bool("show_reasoning") }, tools, store, stdout, stderr), // Ctrl-O
 			0x14: transcriptModalKey(state, stdout, stderr),                                                                 // Ctrl-T
 		},
-		Completers: []terminalinput.Completer{{
-			Match:    slash.MatchName,
-			Complete: slash.CompleteName,
-			Candidates: func(token string) (string, bool) {
-				if token == "" {
-					return "  see /help", true
-				}
-				candidates, ok := slash.NameCandidates(token)
-				if !ok {
-					return "", false
-				}
-				return "  " + candidates, true
-			},
-		}, {
+		Completers: []terminalinput.Completer{slashCompleter(argumentChoices), {
 			Match: filemention.Match,
 			Complete: func(token string) (string, bool) {
 				if !filemention.Available() {

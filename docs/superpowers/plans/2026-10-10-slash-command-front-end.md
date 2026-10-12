@@ -1,6 +1,13 @@
 # Slash Command Front-End Implementation Plan
 
-> Upstream-parity correction (2026-10-11): this is a historical implementation plan. The argument-completion extension described in the original plan was based on a fork snapshot and has been removed. Official master `ff458337f8ba7366d71fad4da0210a53b658678a` completes slash command names only (plus `@file` in the editor); `/provider`, `/model`, and `/effort` take no arguments and open pickers.
+> Upstream-parity correction (2026-10-12): the 2026-10-11 note below was wrong about upstream. The
+> argument-completion extension was removed as "based on a fork snapshot", but `ff45833` is a commit
+> on the fork's branch, not upstream master, and its ancestry predates upstream's own
+> argument-taking commits. Upstream master (`2834c2c`) takes arguments for `/provider`, `/model`,
+> and `/effort` and completes their values with Tab; `2026-10-12-slash-argument-completion.md` ports
+> that behavior and supersedes the note.
+>
+> Superseded note (2026-10-11): this is a historical implementation plan. The argument-completion extension described in the original plan was based on a fork snapshot and has been removed. Official master `ff458337f8ba7366d71fad4da0210a53b658678a` completes slash command names only (plus `@file` in the editor); `/provider`, `/model`, and `/effort` take no arguments and open pickers.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

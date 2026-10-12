@@ -97,14 +97,9 @@ func TestEditorAllowsEmptySubmitOnlyWhenEnabled(t *testing.T) {
 
 func TestEditorCompletesSlashNameAndShowsCandidatesOnRepeatedTab(t *testing.T) {
 	completer := input.Completer{
-		Match:    slash.MatchName,
-		Complete: slash.CompleteName,
-		Candidates: func(token string) (string, bool) {
-			if token == "" {
-				return "  see /help", true
-			}
-			return slash.NameCandidates(token)
-		},
+		Match:      slash.Match,
+		Complete:   func(text string) (string, bool) { return slash.Complete(text, nil) },
+		Candidates: func(text string) (string, bool) { return slash.ListCandidates(text, nil) },
 	}
 	var screen bytes.Buffer
 	editor := input.Editor{
@@ -130,21 +125,62 @@ func TestEditorCompletesSlashNameAndShowsCandidatesOnRepeatedTab(t *testing.T) {
 	}
 }
 
-func TestEditorRendersSlashHintAndClearsGhostBeforeSubmit(t *testing.T) {
+func TestEditorCompletesSlashArgumentValues(t *testing.T) {
+	choices := func(name string) []string {
+		if name == "provider" {
+			return []string{"mock", "openai"}
+		}
+		return nil
+	}
+	completer := input.Completer{
+		Match:      slash.Match,
+		Complete:   func(text string) (string, bool) { return slash.Complete(text, choices) },
+		Candidates: func(text string) (string, bool) { return slash.ListCandidates(text, choices) },
+	}
 	var screen bytes.Buffer
 	editor := input.Editor{
-		Core: input.NewCore(), Reader: &scriptedBytes{values: []byte("/new\r")}, Writer: &screen,
-		Hint: slash.Hint,
+		Core: input.NewCore(), Reader: &scriptedBytes{values: []byte("/provider \t\t\r")}, Writer: &screen,
+		Completers: []input.Completer{completer},
 	}
 	line, submitted, err := editor.ReadLine()
-	if err != nil || !submitted || line != "/new" {
-		t.Fatalf("ReadLine() = %q, %t, %v; want command line", line, submitted, err)
+	if err != nil || !submitted || line != "/provider " {
+		t.Fatalf("ReadLine() = %q, %t, %v; want unchanged argument", line, submitted, err)
 	}
-	if !strings.Contains(screen.String(), " [preset]") {
-		t.Fatalf("slash hint was not rendered: %q", screen.String())
+	if !strings.Contains(screen.String(), "  mock openai") {
+		t.Fatalf("repeated Tab did not list argument values: %q", screen.String())
 	}
-	if !strings.Contains(screen.String(), "\x1b[K\r\n") {
-		t.Fatalf("ghost text was not erased before leaving the editor: %q", screen.String())
+
+	var uniqueScreen bytes.Buffer
+	uniqueEditor := input.Editor{
+		Core: input.NewCore(), Reader: &scriptedBytes{values: []byte("/provider mo\t\r")}, Writer: &uniqueScreen,
+		Completers: []input.Completer{completer},
+	}
+	line, submitted, err = uniqueEditor.ReadLine()
+	if err != nil || !submitted || line != "/provider mock " {
+		t.Fatalf("unique ReadLine() = %q, %t, %v; want completed argument", line, submitted, err)
+	}
+}
+
+func TestEditorRendersSlashHintAndClearsGhostBeforeSubmit(t *testing.T) {
+	for _, test := range []struct{ line, hint string }{
+		{line: "/new\r", hint: " [preset]"},
+		{line: "/provider\r", hint: " [id]"},
+	} {
+		var screen bytes.Buffer
+		editor := input.Editor{
+			Core: input.NewCore(), Reader: &scriptedBytes{values: []byte(test.line)}, Writer: &screen,
+			Hint: slash.Hint,
+		}
+		line, submitted, err := editor.ReadLine()
+		if err != nil || !submitted || line != strings.TrimSuffix(test.line, "\r") {
+			t.Fatalf("ReadLine() = %q, %t, %v; want command line", line, submitted, err)
+		}
+		if !strings.Contains(screen.String(), test.hint) {
+			t.Fatalf("slash hint was not rendered for %q: %q", test.line, screen.String())
+		}
+		if !strings.Contains(screen.String(), "\x1b[K\r\n") {
+			t.Fatalf("ghost text was not erased before leaving the editor: %q", screen.String())
+		}
 	}
 }
 

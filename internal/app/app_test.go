@@ -1139,15 +1139,41 @@ func TestRunREPLSelectionErrorsUseUpstreamDisplayChannel(t *testing.T) {
 		line string
 		want string
 	}{
-		{line: "/provider openai", want: "/provider takes no arguments."},
-		{line: "/provider missing", want: "/provider takes no arguments."},
-		{line: "/model target-model", want: "/model takes no arguments."},
-		{line: "/effort high", want: "/effort takes no arguments."},
+		{line: "/provider openai", want: "openai is unavailable — OPENAI_API_KEY not set"},
+		{line: "/provider missing", want: "unknown provider 'missing' — /provider lists them"},
+		{line: "/effort bogus", want: "test-model doesn't take effort 'bogus'"},
 		{line: "/preset missing", want: "unknown preset 'missing' (define a presets.missing block in config.json)"},
 		{line: "/config unknown", want: "unknown setting 'unknown' — /config lists them"},
 		{line: "/resume missing", want: "/resume takes no arguments."},
 		{line: "/preset-save bad:name", want: "'bad:name' can't be a preset name"},
 		{line: "/preset-save valid nope", want: "unknown tint 'nope' (expected teal|violet|rose|sage)"},
+	} {
+		t.Run(test.line, func(t *testing.T) {
+			var stdout, stderr strings.Builder
+			code := Run([]string{"--provider=openai-compatible", "--model=test-model"},
+				strings.NewReader(test.line+"\n"), false, &stdout, &stderr)
+			if code != 0 || !strings.Contains(stdout.String(), test.want) || stderr.Len() != 0 {
+				t.Fatalf("slash command %q: code=%d stdout=%q stderr=%q", test.line, code, stdout.String(), stderr.String())
+			}
+		})
+	}
+}
+
+func TestRunREPLSelectsSelectionByArgument(t *testing.T) {
+	t.Setenv("HOME", filepath.Join(t.TempDir(), "home"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "config"))
+	t.Setenv("XDG_STATE_HOME", filepath.Join(t.TempDir(), "state"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(t.TempDir(), "cache"))
+	t.Setenv("GAX_OPENAI_BASE_URL", "https://example.invalid/v1")
+	t.Setenv("GAX_OPENAI_API_KEY", "test-key")
+	t.Setenv("GAX_NO_SESSION", "on")
+	for _, test := range []struct {
+		line string
+		want string
+	}{
+		{line: "/model target-model", want: "switched to openai-compatible · target-model"},
+		{line: "/effort high", want: "switched to openai-compatible · test-model · high"},
+		{line: "/provider openai-compatible", want: "already using openai-compatible — /model switches its model"},
 	} {
 		t.Run(test.line, func(t *testing.T) {
 			var stdout, stderr strings.Builder
@@ -2047,7 +2073,8 @@ func TestRunREPLConsumesSlashCommands(t *testing.T) {
 		strings.NewReader("/help\n/nonesuch\n/model fast\n/resume\nhello\n"), false, &stdout, &stderr)
 	if code != 0 || requests.Load() != 1 || !strings.Contains(stdout.String(), "commands") ||
 		!strings.Contains(stdout.String(), "/new") || !strings.Contains(stdout.String(), "start a fresh conversation [preset]") ||
-		!strings.Contains(stdout.String(), "/model takes no arguments") || !strings.Contains(stdout.String(), "reply\n") {
+		!strings.Contains(stdout.String(), "switch provider, then model and effort [id]") ||
+		!strings.Contains(stdout.String(), "switched to openai-compatible · fast") || !strings.Contains(stdout.String(), "reply\n") {
 		t.Fatalf("REPL slash dispatch: code=%d requests=%d stdout=%q stderr=%q", code, requests.Load(), stdout.String(), stderr.String())
 	}
 	if !strings.Contains(stdout.String(), "unknown command: /nonesuch") || stderr.Len() != 0 {
