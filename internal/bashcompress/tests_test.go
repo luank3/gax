@@ -67,6 +67,129 @@ failures:
 test result: FAILED. 13 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
 `
 
+func TestFilterCargoTestKeepsFailureLocations(t *testing.T) {
+	output := "running 3 tests\n" +
+		"test utils::test_edge_case ... FAILED\n\n" +
+		"failures:\n\n" +
+		"---- utils::test_edge_case stdout ----\n" +
+		"thread 'utils::test_edge_case' panicked at src/utils.rs:18:5:\n" +
+		"assertion `left == right` failed\n" +
+		"  left: 1,\n" +
+		" right: 2,\n" +
+		"note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n" +
+		"thread backtrace line 1\nthread backtrace line 2\nthread backtrace line 3\n" +
+		"thread backtrace line 4\nthread backtrace line 5\n\n" +
+		"failures:\n    utils::test_edge_case\n\n" +
+		"test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s\n"
+	result, ok := Compress("cargo test", output, 101)
+	if !ok {
+		t.Fatal("a failing cargo test was not compacted")
+	}
+	if !strings.Contains(result.Text, "1. utils::test_edge_case") {
+		t.Fatalf("cargo test lost the failing test's name: %q", result.Text)
+	}
+	if !strings.Contains(result.Text, "panicked at src/utils.rs:18:5") {
+		t.Fatalf("cargo test lost the panic location: %q", result.Text)
+	}
+	if !strings.Contains(result.Text, "left: 1") || !strings.Contains(result.Text, "right: 2") {
+		t.Fatalf("cargo test lost the compared values: %q", result.Text)
+	}
+	if !strings.Contains(result.Text, "… (") || !strings.Contains(result.Text, "more lines)") {
+		t.Fatalf("cargo test did not say which lines it dropped: %q", result.Text)
+	}
+}
+
+func TestFilterCargoTestLeavesCompileErrorsAlone(t *testing.T) {
+	compileFailure := "   Compiling gax v0.1.0\nerror[E0308]: mismatched types\n --> src/main.rs:5:9\n  |\n5 |     let x: u32 = \"s\";\n  |            ^^^ expected `u32`, found `&str`\n\nerror: could not compile `gax` (bin \"gax\") due to 1 previous error\n"
+	if _, ok := Compress("cargo test", compileFailure, 101); ok {
+		t.Fatal("a compile failure was compacted")
+	}
+	if _, ok := Compress("cargo build", compileFailure, 101); ok {
+		t.Fatal("cargo build was compacted")
+	}
+}
+
+func TestFilterGoTestLeavesBuildErrorsAlone(t *testing.T) {
+	buildFailure := "# example.com/x\n" +
+		"./main.go:5:9: undefined: nope\n" +
+		"./main.go:6:2: too many arguments in call to helper\n" +
+		"    have (number)\n    want ()\n" +
+		"FAIL\texample.com/x [build failed]\n"
+	if result, ok := Compress("go build ./...", buildFailure, 1); ok {
+		t.Fatalf("go build was compacted: %q", result.Text)
+	}
+	// `go test` output is compressed, but the compiler error is what the model needs: it must
+	// survive whichever form is smaller.
+	result, ok := Compress("go test ./...", buildFailure, 1)
+	if ok {
+		if !strings.Contains(result.Text, "undefined: nope") || !strings.Contains(result.Text, "build failed") {
+			t.Fatalf("a go test build failure lost its compiler error: %q", result.Text)
+		}
+		return
+	}
+	if !strings.Contains(buildFailure, "undefined: nope") {
+		t.Fatal("the raw build failure lost its compiler error")
+	}
+}
+
+func TestFilterGoTestSaysWhatTheFailureBudgetDropped(t *testing.T) {
+	var builder strings.Builder
+	builder.WriteString("--- FAIL: TestMany (0.00s)\n")
+	for index := 0; index < 12; index++ {
+		fmt.Fprintf(&builder, "    many_test.go:%d: got %d, want 0\n", 100+index, index)
+	}
+	builder.WriteString("FAIL\nFAIL\texample.com/many\t0.01s\n")
+	result, ok := Compress("go test ./...", builder.String(), 1)
+	if !ok {
+		t.Fatal("a failing go test was not compacted")
+	}
+	if !strings.Contains(result.Text, "many_test.go:105: got 5, want 0") {
+		t.Fatalf("go test lost a location line: %q", result.Text)
+	}
+	if !strings.Contains(result.Text, "… (6 more lines)") {
+		t.Fatalf("go test did not say how many detail lines it dropped: %q", result.Text)
+	}
+}
+
+func TestFilterPytestKeepsTracebackFrames(t *testing.T) {
+	output := strings.Join([]string{
+		"=================================== FAILURES ===================================",
+		"_____________________________ test_deep _______________________________________",
+		"",
+		"    def test_deep():",
+		"        helper()",
+		`>       raise ValueError("boom")`,
+		"E       ValueError: boom",
+		"",
+		"/tmp/tests/helper.py:12: ValueError",
+		"=========================== short test summary info ============================",
+		"FAILED tests/test_deep.py::test_deep - ValueError: boom",
+		"============================== 1 failed in 0.05s ===============================",
+	}, "\n")
+	result, ok := Compress("pytest", output, 1)
+	if !ok {
+		t.Fatal("a failing pytest run was not compacted")
+	}
+	if !strings.Contains(result.Text, "helper.py:12: ValueError") {
+		t.Fatalf("pytest lost the file:line of the failure: %q", result.Text)
+	}
+	if !strings.Contains(result.Text, "E       ValueError: boom") {
+		t.Fatalf("pytest lost the exception line: %q", result.Text)
+	}
+}
+
+func TestFilterSearchSaysWhatItTruncated(t *testing.T) {
+	long := strings.Repeat("x", 200)
+	output := "internal/app/app.go:10:func run() {\ninternal/app/app.go:11:" + long + "\n"
+	result, ok := Compress("grep -rn run .", output, 0)
+	if !ok {
+		t.Fatal("grep output was not compressed")
+	}
+	if !strings.Contains(result.Text, "[1 long lines truncated]") {
+		t.Fatalf("grep did not say how many lines it truncated: %q", result.Text)
+	}
+}
+
 func TestFilterCargoTestKeepsFailures(t *testing.T) {
 	result, ok := Compress("cargo test", cargoTestFailFixture, 101)
 	if !ok {

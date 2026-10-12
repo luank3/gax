@@ -22,7 +22,7 @@ func TestBashDefinitionsExposeTaskFields(t *testing.T) {
 		t.Fatalf("shell tool definitions = %q, %q", definitions[3].Name, definitions[4].Name)
 	}
 	noTasks := New(Options{NoTasks: true}).Definitions()
-	if len(noTasks) != 7 || noTasks[3].Name != "bash" || len(noTasks[3].Params) != 2 {
+	if len(noTasks) != 7 || noTasks[3].Name != "bash" || len(noTasks[3].Params) != 3 {
 		t.Fatalf("no-tasks tool definitions = %#v", noTasks)
 	}
 }

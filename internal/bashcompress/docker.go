@@ -73,21 +73,21 @@ func filterDocker(invocation Invocation, output string, exitCode int) (Result, b
 		}
 		containers = append(containers, fmt.Sprintf("  %s %s (%s) %s%s", id, name, image, value("STATUS"), suffix))
 	}
-	omitted := false
 	total := len(containers)
 	if len(containers) > capList {
 		containers = containers[:capList]
-		omitted = true
 	}
 	var text strings.Builder
 	fmt.Fprintf(&text, "[docker] %d containers:\n", total)
 	for _, container := range containers {
 		text.WriteString(container + "\n")
 	}
-	if omitted {
-		fmt.Fprintf(&text, "  … +%d more\n", total-capList)
+	if total > len(containers) {
+		fmt.Fprintf(&text, "  … +%d more\n", total-len(containers))
 	}
-	return Result{Text: trimTrailingBlankLines(text.String()), Omitted: omitted}, true
+	// The COMMAND and CREATED columns are not in the compact form, so the raw table is named as
+	// the recovery path even when no container was capped.
+	return Result{Text: trimTrailingBlankLines(text.String()), Omitted: true}, true
 }
 
 // dockerCells splits a `docker ps` row into its cells at runs of two or more spaces, which is how

@@ -143,8 +143,9 @@ func TestFilterLsKeepsNoiseDirectoriesWithAll(t *testing.T) {
 	if strings.Contains(result.Text, "dat") || strings.Contains(result.Text, "Oct 11") {
 		t.Fatalf("ls -la kept owner or date columns: %q", result.Text)
 	}
-	if result.Omitted {
-		t.Fatalf("ls -la dropped nothing but reported omissions: %q", result.Text)
+	// The dropped columns are what make the compact form lossy.
+	if !result.Omitted {
+		t.Fatal("ls -la drops the owner, group, and date columns but did not report omissions")
 	}
 }
 

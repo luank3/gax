@@ -234,14 +234,27 @@ something else.
 | `ruff check`, `sqlfluff lint` | Grouped by rule and file, violations capped |
 | `docker ps` | `id name (image) status [ports]` |
 
-A filter is used only when its result is smaller than the raw output, and any filter that drops
-lines stores the full output in a temp file the result names
+A filter is used only when its result is smaller than the raw output. **Nothing is dropped
+silently:** a compact form that leaves lines out says so (`… +12 more`, `[3 long lines truncated]`,
+`… (4 more lines)`, `... (2 deletions truncated)`, `… (28 older commits not shown; pass -n to see
+more)`) and the full output is stored in a temp file the result names
 (`[full output saved to /tmp/gax-…/bash-1.log]`), which is removed when the conversation's tasks
-are reset. Failed commands keep their own text: `cat`/`head`/`tail` are never filtered on a
-non-zero exit, and the structured filters keep the failure sections they parse. The live terminal
-display always streams the raw bytes — only what the model reads is compacted.
+are reset. If that file cannot be written, the filter's result is discarded and the raw output is
+returned instead.
 
-`GAX_BASH_COMPRESS=off` (or `bash.compress` in `config.json`) turns the whole thing off.
+Three escape hatches, for when the compact form is not enough:
+
+- `raw: true` on a `bash` call returns that command's output verbatim, now and when a detached
+  task is later collected.
+- The named `[full output saved to …]` file holds the complete output, including everything a cap
+  or a summary left out.
+- `GAX_BASH_COMPRESS=off` (or `bash.compress` in `config.json`) turns the whole thing off.
+
+Test and compiler output is treated as the case that must survive intact. Failing tests keep their
+`file:line` references, stack frames, panic locations, and assertion text; passing tests collapse
+to a count. `go build`, `cargo build`, and a `go test` or `cargo test` run that fails to *compile*
+are never filtered at all — the compiler's diagnostics reach the model byte for byte. The live
+terminal display always streams raw bytes too; only what the model reads is compacted.
 
 ## Development
 

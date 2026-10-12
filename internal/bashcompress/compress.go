@@ -11,6 +11,15 @@ const (
 	capInventory = 50 // inventories: exhaustive lookups
 )
 
+const (
+	// detailLineWidth is the width one failure detail line is truncated to: wider than a search
+	// result's, because a stack frame's file:line and the compared values both have to fit.
+	detailLineWidth = 200
+	// failureDetailBudget bounds the detail lines one failure contributes. Passing tests collapse
+	// to a count; a failure keeps its locations, its outcome, and the line after each location.
+	failureDetailBudget = 6
+)
+
 // Result is a compact form of a command's output.
 type Result struct {
 	Text string
@@ -136,7 +145,100 @@ func trimTrailingBlankLines(text string) string {
 	return strings.TrimRight(text, "\n")
 }
 
-// splitLines splits output into lines without a trailing empty element.// splitLines splits output into lines without a trailing empty element.
+// locationLine reports whether a line carries a `file.ext:line` reference, in any of the shapes
+// test runners and compilers emit: `x_test.go:12:`, `panicked at src/utils.rs:18:`,
+// `--> src/main.rs:5:9`, `File "/tmp/test_y.py", line 12`, `at /app/x.test.ts:12:5`.
+func locationLine(line string) bool {
+	for index := 0; index+1 < len(line); index++ {
+		if line[index] != '.' || !isExtensionStart(line[index+1]) {
+			continue
+		}
+		end := index + 1
+		for end < len(line) && isWordByte(line[end]) {
+			end++
+		}
+		for end < len(line) && (line[end] == ':' || line[end] == ',') {
+			if line[end] == ',' {
+				// Python's `", line 12"` form.
+				rest := strings.TrimSpace(line[end+1:])
+				if !strings.HasPrefix(rest, "line ") {
+					break
+				}
+				rest = strings.TrimPrefix(rest, "line ")
+				digits := 0
+				for digits < len(rest) && rest[digits] >= '0' && rest[digits] <= '9' {
+					digits++
+				}
+				if digits > 0 {
+					return true
+				}
+				break
+			}
+			end++
+			digits := 0
+			for end+digits < len(line) && line[end+digits] >= '0' && line[end+digits] <= '9' {
+				digits++
+			}
+			if digits > 0 {
+				return true
+			}
+			break
+		}
+	}
+	return false
+}
+
+// isExtensionStart reports whether a byte can start a file extension.
+func isExtensionStart(character byte) bool {
+	return character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z'
+}
+
+// isWordByte reports whether a byte can appear in a file extension or name.
+func isWordByte(character byte) bool {
+	return isExtensionStart(character) || character >= '0' && character <= '9' || character == '_' || character == '-'
+}
+
+// failureDetailLine reports whether a line carries a failure's answer: an assertion outcome, a
+// panic, an exception, or the values a test compared.
+func failureDetailLine(line string) bool {
+	lower := strings.ToLower(line)
+	for _, marker := range []string{"panic:", "error", "expected", "got", "want", "actual",
+		"assert", "mismatch", "unexpected", "failed", "exception", "traceback"} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// selectFailureLines keeps the lines of one failure block that must survive compression: file:line
+// references, the line after each, and the lines that state what went wrong. It returns the kept
+// lines and how many relevant lines the budget held back, so the caller can say what it dropped.
+func selectFailureLines(lines []string, skip func(string) bool, budget, width int) ([]string, int) {
+	kept := make([]string, 0, budget)
+	dropped := 0
+	keepNext := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || skip != nil && skip(trimmed) {
+			keepNext = false
+			continue
+		}
+		location := locationLine(trimmed)
+		if !location && !keepNext && !failureDetailLine(trimmed) {
+			continue
+		}
+		keepNext = location
+		if len(kept) >= budget {
+			dropped++
+			continue
+		}
+		kept = append(kept, truncateLine(trimmed, width))
+	}
+	return kept, dropped
+}
+
+// splitLines splits output into lines without a trailing empty element.
 func splitLines(output string) []string {
 	lines := strings.Split(output, "\n")
 	if len(lines) > 0 && lines[len(lines)-1] == "" {

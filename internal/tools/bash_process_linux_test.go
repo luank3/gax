@@ -18,7 +18,7 @@ func TestBashProcessStartsInItsOwnSession(t *testing.T) {
 	registry := New(Options{})
 	defer registry.Close()
 
-	task, err := registry.startCommand("exec sleep 30", nil)
+	task, err := registry.startCommand("exec sleep 30", nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestBashProcessDiesWhenItsParentIsKilled(t *testing.T) {
 	const markerEnv = "GAX_BASH_PARENT_DEATH_MARKER"
 	if marker := os.Getenv(markerEnv); marker != "" {
 		registry := New(Options{})
-		task, err := registry.startCommand("exec sleep 30", nil)
+		task, err := registry.startCommand("exec sleep 30", nil, false)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(2)

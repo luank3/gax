@@ -180,6 +180,43 @@ shared caps in `src/core/truncate.rs`.
 - The filter set is closed: `internal/bashcompress` has no configuration beyond on/off, and a
   command whose output shape a filter does not recognize always keeps its raw bytes.
 
+### Escape hatches and failure integrity (2026-10-12, follow-up)
+
+Compression is lossy, so three ways out exist and every drop is announced:
+
+- `raw: true` on a `bash` call returns the command's output verbatim, now and when a detached task
+  is collected. It is a tool parameter (both definition variants) rather than a setting, so the
+  model can reach for it on one call without changing the session's configuration; the flag travels
+  with the task (`commandTask.rawOutput`), which is what keeps a later `task_wait` from re-filtering.
+- A filter that drops lines sets `Result.Omitted`, and `commandCapture.preserveFull` then stores the
+  complete capture (the spool file when the capture spilled, the in-memory bytes otherwise) and the
+  result ends with `[full output saved to <path>]`. `preserveFull` snapshots the capture rather than
+  the caller's slice, so a task collected in pieces still gets a file with all of its output. If no
+  file can be written, the compact form is discarded and the raw bytes are returned: **a lossy
+  filter never runs without a way back.**
+- `bash.compress=off` / `GAX_BASH_COMPRESS=off` disables the whole pass.
+
+Every filter that drops anything also says what, in its own text: `... (N more, M filtered)` (ls),
+`... +N more entries` / `... (N noise entries dropped)` (tree), `[N of M lines; comments and blank
+lines trimmed]` (cat), `[N long lines truncated]` / `+N more in <file>` (grep, rg), `… N more match
+line(s) in <file>` (ast-grep), `… +N more` (git status groups, ruff, sqlfluff, docker ps),
+`... (N deletions, M additions truncated)` / `... (more changes truncated)` (git diff),
+`… (N older commits not shown; pass -n to see more)` / `[+N lines omitted]` (git log),
+`… +N more failures` / `… (N more lines)` (cargo test, go test, pytest),
+`… N passing test lines collapsed` (jest/vitest), `... +N more files` (ruff, sqlfluff). The git
+confirmation lines drop progress output by design, so each reports `Omitted` and names the file.
+
+Test, stack-trace, and compiler output is the case that must survive, so the failure selectors are
+location-first: `selectFailureLines` keeps any line carrying a `file.ext:line` reference (Go
+`x_test.go:12:`, Rust `panicked at src/utils.rs:18:5:`, Python `File "…", line 12` and
+`/tmp/helper.py:12:`, JS `at /app/x.test.ts:12:5`), the line after each such reference, and lines
+stating an assertion outcome — at 200 columns rather than the 100 a search result gets, six lines
+per failure, with a `… (N more lines)` note for the rest. cargo's blocks are kept verbatim instead
+of keyword-filtered, because libtest prints the panic location and the compared `left:`/`right:`
+values first and neither carries a marker of its own. `go build`, `cargo build`, and any
+`go test`/`cargo test` invocation that fails to compile are not filtered at all: their diagnostics
+reach the model byte for byte.
+
 ## Upstream divergence
 
 hax has no output compressor: the bash tool returns captured bytes shaped only by the output cap and

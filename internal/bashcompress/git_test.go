@@ -189,8 +189,11 @@ func TestFilterGitLogHonorsALimit(t *testing.T) {
 	if !ok {
 		t.Fatal("a limited git log was not compacted")
 	}
-	if got := len(splitLines(result.Text)); got != 2 {
-		t.Fatalf("git log -n 2 printed %d commits: %q", got, result.Text)
+	if got := len(splitLines(result.Text)); got != 3 {
+		t.Fatalf("git log -n 2 printed %d lines: %q", got, result.Text)
+	}
+	if !strings.Contains(result.Text, "… (28 older commits not shown") {
+		t.Fatalf("git log did not say what its limit dropped: %q", result.Text)
 	}
 	if !result.Omitted {
 		t.Fatal("dropped commits were not reported")
@@ -209,6 +212,8 @@ func TestFilterGitConfirmations(t *testing.T) {
 		output  string
 		want    string
 	}{
+		// Every confirmation replaces progress output, so each one reports itself as lossy.
+
 		{"git commit -m x", "[main abc1234def] message\n 1 file changed, 1 insertion(+)\n", "ok abc1234"},
 		{"git commit -m x", "main abc1234def message\n", "ok"},
 		{"git push", "To github.com:o/r.git\n   abc1234..def5678  main -> main\n", "ok main"},
@@ -227,6 +232,9 @@ func TestFilterGitConfirmations(t *testing.T) {
 		}
 		if result.Text != testCase.want {
 			t.Errorf("%q = %q, want %q", testCase.command, result.Text, testCase.want)
+		}
+		if !result.Omitted {
+			t.Errorf("%q dropped the command's own progress output without reporting it", testCase.command)
 		}
 	}
 }

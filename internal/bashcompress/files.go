@@ -99,12 +99,10 @@ func filterLs(invocation Invocation, output string, _ int) (Result, bool) {
 		}
 		return Result{Text: "(empty)", Omitted: true}, true
 	}
-	omitted := false
 	truncated := 0
 	if len(shown) > capInventory {
 		truncated = len(shown) - capInventory
 		shown = shown[:capInventory]
-		omitted = true
 	}
 	text := strings.Join(shown, "\n")
 	switch {
@@ -115,7 +113,10 @@ func filterLs(invocation Invocation, output string, _ int) (Result, bool) {
 	case filtered > 0:
 		text += fmt.Sprintf("\n... (%d filtered)", filtered)
 	}
-	return Result{Text: text, Omitted: omitted || filtered > 0}, true
+	// The compact form keeps the mode, the name, and the size; the owner, group, link count, and
+	// timestamp columns are not in it, so the raw listing is named as the recovery path even when
+	// no entry was capped or filtered.
+	return Result{Text: text, Omitted: true}, true
 }
 
 // parseLsLine parses one `ls -l` line into its type, size, mode, and name.
@@ -633,10 +634,14 @@ func filterSearch(invocation Invocation, output string, _ int) (Result, bool) {
 			// Nothing changed: report no filter so the raw bytes stay authoritative.
 			return Result{}, false
 		}
-		return Result{Text: text, Omitted: truncated > 0}, true
+		text += fmt.Sprintf("\n[%d long lines truncated]", truncated)
+		return Result{Text: text, Omitted: true}, true
 	}
 	grouped := fmt.Sprintf("%d matches in %d files:\n\n%s", len(matches), len(files), body.String())
 	grouped = trimTrailingBlankLines(grouped)
+	if truncated > 0 {
+		grouped += fmt.Sprintf("\n[%d long lines truncated]", truncated)
+	}
 	if len(grouped) >= len(plain) && truncated == 0 {
 		return Result{}, false
 	}

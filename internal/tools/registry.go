@@ -878,13 +878,14 @@ func builtInDefinitions(noTasks, noWeb, noSkills bool) []provider.ToolDefinition
 }
 
 func bashDefinition(noTasks bool) provider.ToolDefinition {
-	common := "Run a shell command via bash -c (POSIX sh -c where bash is unavailable). Returns combined stdout+stderr plus exit code. Prefer the native read/edit/write tools for ordinary file reads and edits.\n\nRules:\n- Each call starts in the working directory listed under `# Environment`; `cd` does not persist across calls.\n- Follow the command preferences under `# Environment` when present.\n"
+	common := "Run a shell command via bash -c (POSIX sh -c where bash is unavailable). Returns combined stdout+stderr plus exit code. Prefer the native read/edit/write tools for ordinary file reads and edits.\n\nRules:\n- Each call starts in the working directory listed under `# Environment`; `cd` does not persist across calls.\n- Follow the command preferences under `# Environment` when present.\n- The output of recognized commands (ls, tree, cat, grep/rg, ast-grep, git, test runners, linters, docker ps) is compacted before you read it. A compact form says what it dropped and names a file holding the complete output; pass `raw: true` for the command's output verbatim.\n"
 	if noTasks {
 		return provider.ToolDefinition{
 			Name: "bash", Description: common + "- Default timeout is 120s; pass `timeout_seconds` for slow commands (test suites, builds). The harness enforces a hard ceiling.",
 			Params: []provider.ToolParam{
 				{Name: "command", Type: "string", Required: true, Description: "Shell command to run."},
 				{Name: "timeout_seconds", Type: "integer", Minimum: 1, Description: "Optional override of the default timeout. Use a higher value for slow builds or test suites; the harness clamps to a configured maximum."},
+				{Name: "raw", Type: "boolean", Description: "Return the command's output verbatim instead of its compact form. Use it when the compact form dropped a line you need."},
 			},
 		}
 	}
@@ -895,6 +896,7 @@ func bashDefinition(noTasks bool) provider.ToolDefinition {
 			{Name: "timeout_seconds", Type: "integer", Minimum: 1, Description: "Optional override of the default timeout; rarely needed — on expiry the command detaches into a background task instead of dying. The harness clamps to a configured maximum."},
 			{Name: "background", Type: "boolean", Description: "Run as a background task; usually leave unset if you would wait immediately. Returns after a brief initial-output window while the command keeps running; `timeout_seconds` is ignored. A command that finishes within the window returns synchronously and creates no task."},
 			{Name: "name", Type: "string", Description: "Optional short task name used instead of the automatic id if the command detaches (letters/digits/-/_, max 32 chars, e.g. \"tests\")."},
+			{Name: "raw", Type: "boolean", Description: "Return the command's output verbatim instead of its compact form, now and when a detached task is collected. Use it when the compact form dropped a line you need."},
 		},
 	}
 }

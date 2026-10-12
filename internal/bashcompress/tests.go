@@ -112,7 +112,15 @@ func filterCargo(invocation Invocation, output string, _ int) (Result, bool) {
 		shown = shown[:capWarnings]
 	}
 	for index, failure := range shown {
-		fmt.Fprintf(&body, "%d. %s\n", index+1, truncateLine(strings.Join(strings.Fields(failure), " "), 200))
+		lines := strings.Split(failure, "\n")
+		fmt.Fprintf(&body, "%d. %s\n", index+1, cargoFailureName(lines))
+		kept, dropped := cargoFailureDetail(lines)
+		for _, line := range kept {
+			fmt.Fprintf(&body, "     %s\n", line)
+		}
+		if dropped > 0 {
+			fmt.Fprintf(&body, "     … (%d more lines)\n", dropped)
+		}
 	}
 	if len(failures) > capWarnings {
 		fmt.Fprintf(&body, "\n… +%d more failures\n", len(failures)-capWarnings)
@@ -121,6 +129,43 @@ func filterCargo(invocation Invocation, output string, _ int) (Result, bool) {
 		body.WriteString(line + "\n")
 	}
 	return Result{Text: trimTrailingBlankLines(body.String()), Omitted: true}, true
+}
+
+// cargoFailureName names a failure block from its `---- test stdout ----` header, falling back to
+// its first line.
+func cargoFailureName(lines []string) string {
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "---- ") {
+			name := strings.TrimPrefix(trimmed, "---- ")
+			return strings.TrimSuffix(strings.TrimSuffix(name, " stdout ----"), " stderr ----")
+		}
+	}
+	if len(lines) > 0 {
+		return truncateLine(strings.TrimSpace(lines[0]), 120)
+	}
+	return "failure"
+}
+
+// cargoFailureDetail keeps a failure block's head: libtest prints the panic location, the failed
+// assertion, and the compared values first, and anything after that is a backtrace or a note. The
+// block is kept verbatim rather than filtered, because a `left:`/`right:` line has no marker of
+// its own, and the count says how much of it the budget held back.
+func cargoFailureDetail(lines []string) ([]string, int) {
+	kept := make([]string, 0, failureDetailBudget)
+	dropped := 0
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "---- ") {
+			continue
+		}
+		if len(kept) >= failureDetailBudget {
+			dropped++
+			continue
+		}
+		kept = append(kept, truncateLine(trimmed, detailLineWidth))
+	}
+	return kept, dropped
 }
 
 // parseCargoSummary parses `test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered
@@ -467,61 +512,31 @@ func formatGoSummary(packages map[string]*goPackage, order []string) (string, bo
 			continue
 		}
 		fmt.Fprintf(&body, "\n%s (%d passed, %d failed)\n", compactPackageName(name), pkg.pass, pkg.fail)
+		seen := make(map[string]bool, len(pkg.failedTests))
 		for _, test := range pkg.failedTests {
+			if seen[test] {
+				// A subtest failure repeats its parent's name; the output is already printed.
+				continue
+			}
+			seen[test] = true
 			fmt.Fprintf(&body, "  [FAIL] %s\n", test)
-			for _, line := range selectGoFailureLines(pkg.failedOutput[test]) {
-				fmt.Fprintf(&body, "     %s\n", truncateLine(line, 100))
+			kept, dropped := selectFailureLines(pkg.failedOutput[test], goFailureHeader, failureDetailBudget, detailLineWidth)
+			for _, line := range kept {
+				fmt.Fprintf(&body, "     %s\n", line)
+			}
+			if dropped > 0 {
+				fmt.Fprintf(&body, "     … (%d more lines)\n", dropped)
 			}
 		}
 	}
 	return trimTrailingBlankLines(body.String()), true
 }
 
-// selectGoFailureLines keeps the assertion lines of a failed test, up to five.
-func selectGoFailureLines(lines []string) []string {
-	relevant := make([]string, 0, 5)
-	keepNext := false
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "=== RUN") ||
-			strings.HasPrefix(trimmed, "--- FAIL") || strings.HasPrefix(trimmed, "--- PASS") {
-			keepNext = false
-			continue
-		}
-		location := isGoLocationLine(trimmed)
-		if location || isGoFailureLine(trimmed) || keepNext {
-			relevant = append(relevant, trimmed)
-			keepNext = location
-		} else {
-			keepNext = false
-		}
-		if len(relevant) >= 5 {
-			break
-		}
-	}
-	return relevant
-}
-
-// isGoLocationLine reports whether a line is a `file.go:12:` location.
-func isGoLocationLine(line string) bool {
-	index := strings.Index(line, ".go:")
-	if index < 0 {
-		return false
-	}
-	rest := line[index+len(".go:"):]
-	return rest != "" && rest[0] >= '0' && rest[0] <= '9'
-}
-
-// isGoFailureLine reports whether a line carries an assertion's answer.
-func isGoFailureLine(line string) bool {
-	lower := strings.ToLower(line)
-	for _, marker := range []string{"panic:", "error:", " error:", "expected", "got", "want",
-		"actual", "assert", "mismatch", "unexpected", "failed"} {
-		if strings.Contains(lower, marker) {
-			return true
-		}
-	}
-	return false
+// goFailureHeader drops the lines the summary already carries.
+func goFailureHeader(line string) bool {
+	return strings.HasPrefix(line, "=== RUN") || strings.HasPrefix(line, "--- FAIL") ||
+		strings.HasPrefix(line, "--- PASS") || strings.HasPrefix(line, "=== PAUSE") ||
+		strings.HasPrefix(line, "=== CONT")
 }
 
 // compactPackageName keeps a package's last path component, as rtk does.
@@ -576,8 +591,12 @@ func filterPytest(invocation Invocation, output string, _ int) (Result, bool) {
 		}
 		for index, failure := range shown {
 			fmt.Fprintf(&text, "%d. [FAIL] %s\n", index+1, failure.name)
-			for _, line := range failure.lines {
-				fmt.Fprintf(&text, "     %s\n", truncateLine(line, 100))
+			kept, dropped := selectFailureLines(failure.lines, nil, failureDetailBudget, detailLineWidth)
+			for _, line := range kept {
+				fmt.Fprintf(&text, "     %s\n", line)
+			}
+			if dropped > 0 {
+				fmt.Fprintf(&text, "     … (%d more lines)\n", dropped)
 			}
 			if index < len(shown)-1 {
 				text.WriteString("\n")
@@ -594,6 +613,11 @@ func filterPytest(invocation Invocation, output string, _ int) (Result, bool) {
 type pytestCounts struct {
 	passed, failed, skipped, xfailed, xpassed, errors int
 }
+
+// pytestFailureLines keeps every line of a failure section: the selector decides what to show.
+// Sections are capped by collecting a generous window rather than by filtering here, so a
+// traceback's frames reach the selector.
+const pytestFailureLines = 400
 
 // pytestFailure is one failure section.
 type pytestFailure struct {
@@ -736,7 +760,7 @@ func parsePytestFailures(output string) []pytestFailure {
 		if !inSection {
 			continue
 		}
-		if isPytestRelevant(trimmed) && len(current.lines) < 3 {
+		if len(current.lines) < pytestFailureLines {
 			current.lines = append(current.lines, trimmed)
 		}
 	}
@@ -754,20 +778,6 @@ func compactNonEmpty(message string) []string {
 		return nil
 	}
 	return []string{message}
-}
-
-// isPytestRelevant reports whether a failure section line carries the assertion's answer.
-func isPytestRelevant(line string) bool {
-	lower := strings.ToLower(line)
-	if strings.HasPrefix(line, ">") || strings.HasPrefix(line, "E ") || strings.HasPrefix(line, "E\t") {
-		return true
-	}
-	for _, marker := range []string{"assert", "error", ".py:"} {
-		if strings.Contains(lower, marker) {
-			return true
-		}
-	}
-	return false
 }
 
 // ---------------------------------------------------------------------------
@@ -880,16 +890,13 @@ func secondPositional(invocation Invocation) string {
 func collapseNodeTests(lines []string) ([]string, int) {
 	kept := make([]string, 0, len(lines))
 	collapsed := 0
-	inFailure := false
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		switch {
 		case isNodeSummaryLine(trimmed):
 			kept = append(kept, line)
-			inFailure = false
 		case strings.HasPrefix(trimmed, "FAIL"), strings.HasPrefix(trimmed, "●"), strings.HasPrefix(trimmed, "✕"):
 			kept = append(kept, line)
-			inFailure = true
 		case strings.HasPrefix(trimmed, "PASS"):
 			collapsed++
 		case strings.HasPrefix(trimmed, "✓"), strings.HasPrefix(trimmed, "√"):
@@ -897,10 +904,6 @@ func collapseNodeTests(lines []string) ([]string, int) {
 		case strings.HasPrefix(trimmed, "at "), strings.HasPrefix(trimmed, "Expected"), strings.HasPrefix(trimmed, "Received"):
 			kept = append(kept, line)
 		default:
-			if inFailure {
-				kept = append(kept, line)
-				continue
-			}
 			kept = append(kept, line)
 		}
 	}

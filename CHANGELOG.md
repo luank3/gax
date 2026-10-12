@@ -30,7 +30,8 @@ baseline commit `ff45833`.
 - Bash output compression (`bash.compress`, on by default): recognized shell commands (`ls`,
   `tree`, `cat`, `grep`/`rg`, `ast-grep`, `git status`/`diff`/`log`/`add`/`commit`/`push`,
   `cargo test`, `go test`, `pytest`, `npm test`/`jest`/`vitest`, `ruff`, `sqlfluff`, `docker ps`)
-  reach the model as a compact form, with the full output kept in a temp file the result names.
+  reach the model as a compact form that says what it dropped, with the full output kept in a temp
+  file the result names; `raw: true` on a `bash` call returns the output verbatim.
 - Layered configuration (`GAX_*` environment variables, `config.json`, `state.json`,
   conversation selections), presets, model/effort pickers, and the models.dev catalog cache.
 - Shell-like Tab completion of `/` command names and of the arguments `/provider`, `/model`,

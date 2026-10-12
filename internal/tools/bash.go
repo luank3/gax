@@ -287,8 +287,10 @@ func (capture *commandCapture) preserve() {
 
 // preserveFull stores the whole captured output in a tracked file and returns its path, so a
 // filter that dropped lines always leaves the full text recoverable. A capture that already
-// spilled to a spool file keeps that path.
-func (capture *commandCapture) preserveFull(data []byte) string {
+// spilled to a spool file keeps that path, which holds the complete output; otherwise the capture's
+// in-memory bytes are written out. Callers that saw only a slice of the output (a task collection)
+// still get a file with all of it.
+func (capture *commandCapture) preserveFull() string {
 	capture.mu.Lock()
 	if capture.path != "" {
 		capture.preserved = true
@@ -302,6 +304,7 @@ func (capture *commandCapture) preserveFull(data []byte) string {
 	onPreserve := capture.onPreserve
 	capture.mu.Unlock()
 
+	data, _, _, _, _, _ := capture.snapshot(0)
 	file, path, err := tempfiles.Create("bash-", ".log")
 	if err != nil {
 		return ""
@@ -387,7 +390,15 @@ type commandTask struct {
 	waitObserved  bool
 	manager       *taskManager
 	orphansKilled bool
+	rawOutput     bool
 	cleanOnce     sync.Once
+}
+
+// rawOutputRequested reports whether the model asked for this command's output verbatim.
+func (task *commandTask) rawOutputRequested() bool {
+	task.mu.Lock()
+	defer task.mu.Unlock()
+	return task.rawOutput
 }
 
 func (task *commandTask) isDone() bool {
@@ -686,6 +697,14 @@ func (registry *Registry) runBashContext(ctx context.Context, arguments string, 
 		return Result{Text: "background tasks are disabled; run the command synchronously"}
 	}
 
+	rawOutput, hasRaw, rawError := object.boolValue("raw")
+	if rawError != "" {
+		return Result{Text: rawError}
+	}
+	if !hasRaw {
+		rawOutput = false
+	}
+
 	name := ""
 	nameRaw, namePresent := object["name"]
 	if namePresent && !registry.noTasks() && string(nameRaw) != "null" {
@@ -725,7 +744,7 @@ func (registry *Registry) runBashContext(ctx context.Context, arguments string, 
 		timeout = timeoutMax
 	}
 
-	task, err := registry.startCommand(command, display)
+	task, err := registry.startCommand(command, display, rawOutput)
 	if err != nil {
 		return Result{Text: "bash: " + err.Error()}
 	}
@@ -775,7 +794,7 @@ func (registry *Registry) runBashContext(ctx context.Context, arguments string, 
 		} else if writeFailed {
 			body = "[output unavailable: spool write failed]"
 		} else {
-			initial, compressed := registry.compressCommandOutput(task.capture, initial, command, commandExitCode(task))
+			initial, compressed := registry.compressCommandOutput(task.capture, initial, command, commandExitCode(task), task.rawOutputRequested())
 			body = commandOutputPreview(task.capture, initial, registry.outputLimit(), compressed)
 		}
 		if overflow && total > stored {
@@ -798,7 +817,7 @@ func (registry *Registry) runBashContext(ctx context.Context, arguments string, 
 	return Result{Text: result}
 }
 
-func (registry *Registry) startCommand(command string, display DisplaySink) (*commandTask, error) {
+func (registry *Registry) startCommand(command string, display DisplaySink, rawOutput bool) (*commandTask, error) {
 	shell, err := registry.resolveShell()
 	if err != nil {
 		return nil, err
@@ -826,7 +845,10 @@ func (registry *Registry) startCommand(command string, display DisplaySink) (*co
 		return nil, err
 	}
 	_ = writer.Close()
-	task := &commandTask{command: command, cmd: cmd, capture: capture, started: time.Now(), done: make(chan struct{}), manager: registry.tasks}
+	task := &commandTask{
+		command: command, cmd: cmd, capture: capture, started: time.Now(), done: make(chan struct{}),
+		manager: registry.tasks, rawOutput: rawOutput,
+	}
 	registry.trackChild(task)
 	capture.setOverflowHandler(func() { killTaskGroup(task, syscall.SIGKILL) })
 	go func() {
@@ -1315,7 +1337,7 @@ func collectTaskOutput(registry *Registry, task *commandTask, outputCap int) str
 		}
 		return "[output unavailable: spool write failed]"
 	}
-	data, compressed := registry.compressCommandOutput(task.capture, data, task.command, commandExitCode(task))
+	data, compressed := registry.compressCommandOutput(task.capture, data, task.command, commandExitCode(task), task.rawOutputRequested())
 	result := taskOutputPreview(task.capture, data, outputCap, compressed)
 	if overflow && total > stored {
 		result += fmt.Sprintf("\n[output limit reached: %d further bytes discarded, task stopped]", total-stored)
@@ -1331,7 +1353,7 @@ func formatCommandResult(registry *Registry, task *commandTask, outputCap int, s
 	} else if writeFailed {
 		result = "[output unavailable: spool write failed]"
 	} else {
-		data, compressed := registry.compressCommandOutput(task.capture, data, task.command, commandExitCode(task))
+		data, compressed := registry.compressCommandOutput(task.capture, data, task.command, commandExitCode(task), task.rawOutputRequested())
 		result = commandOutputPreview(task.capture, data, outputCap, compressed)
 	}
 	if overflow && total > stored {
@@ -1402,8 +1424,8 @@ func displayBashOutcome(task *commandTask, stop string, timeout time.Duration) {
 // compressCommandOutput replaces a recognized command's output with its compact form. The full
 // text is stored and named when the filter dropped lines, so the compact form never hides output
 // the model cannot get back.
-func (registry *Registry) compressCommandOutput(capture *commandCapture, data []byte, command string, exitCode int) ([]byte, bool) {
-	if registry == nil || !registry.bashCompress() || command == "" || len(data) == 0 {
+func (registry *Registry) compressCommandOutput(capture *commandCapture, data []byte, command string, exitCode int, rawOutput bool) ([]byte, bool) {
+	if registry == nil || !registry.bashCompress() || rawOutput || command == "" || len(data) == 0 {
 		return data, false
 	}
 	compressed, ok := bashcompress.Compress(command, string(data), exitCode)
@@ -1413,7 +1435,7 @@ func (registry *Registry) compressCommandOutput(capture *commandCapture, data []
 	if !compressed.Omitted {
 		return []byte(compressed.Text), false
 	}
-	path := capture.preserveFull(data)
+	path := capture.preserveFull()
 	if path == "" {
 		// Without a recovery path the compact form would hide the rest of the output.
 		return data, false

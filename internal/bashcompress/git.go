@@ -524,8 +524,10 @@ func filterGitLog(invocation Invocation, output string) (Result, bool) {
 		return Result{}, false
 	}
 	omitted := false
+	hidden := 0
 	if len(commits) > limit {
 		omitted = true
+		hidden = len(commits) - limit
 		commits = commits[:limit]
 	}
 	entries := make([]string, 0, len(commits))
@@ -556,6 +558,9 @@ func filterGitLog(invocation Invocation, output string) (Result, bool) {
 			}
 		}
 		entries = append(entries, entry)
+	}
+	if hidden > 0 {
+		entries = append(entries, fmt.Sprintf("… (%d older commits not shown; pass -n to see more)", hidden))
 	}
 	return Result{Text: strings.Join(entries, "\n"), Omitted: omitted}, true
 }
@@ -635,25 +640,37 @@ func filterGitConfirmation(subcommand, output string, exitCode int) (Result, boo
 	switch subcommand {
 	case "add":
 		if strings.TrimSpace(output) == "" {
-			return Result{Text: "ok"}, true
+			// Nothing to replace: an empty output is already the smallest form.
+			return Result{}, false
 		}
 		return Result{}, false
 	case "commit":
 		if strings.TrimSpace(output) == "" {
 			return Result{Text: "ok"}, true
 		}
-		return Result{Text: commitConfirmation(output)}, true
+		// The commit summary replaces a header line plus a diffstat, so the full text is named
+		// as the recovery path.
+		return Result{Text: commitConfirmation(output), Omitted: true}, true
 	case "push":
-		return pushConfirmation(output)
+		return dropped(pushConfirmation(output))
 	case "pull":
-		return pullConfirmation(output)
+		return dropped(pullConfirmation(output))
 	case "fetch":
-		return fetchConfirmation(output)
+		return dropped(fetchConfirmation(output))
 	case "stash":
-		return stashConfirmation(output)
+		return dropped(stashConfirmation(output))
 	default:
 		return Result{}, false
 	}
+}
+
+// dropped marks a confirmation as lossy: it replaces progress output the raw command printed, so
+// the caller keeps the full output recoverable.
+func dropped(result Result, ok bool) (Result, bool) {
+	if ok {
+		result.Omitted = true
+	}
+	return result, ok
 }
 
 // commitConfirmation reduces `git commit` output to `ok <hash>` (rtk's parse_commit_output).

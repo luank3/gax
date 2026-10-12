@@ -162,6 +162,87 @@ func TestBashCompressionLeavesTheLiveDisplayRaw(t *testing.T) {
 	}
 }
 
+func TestBashRawArgumentReturnsVerbatimOutput(t *testing.T) {
+	registry := compressRegistry(t)
+	defer registry.Close()
+	dir := compressFixture(t)
+	result := registry.Run("bash", jsonArgs(map[string]any{"command": "ls -l " + dir, "raw": true}), 1)
+	if !strings.Contains(result.Text, "drwx") {
+		t.Fatalf("raw:true did not return the command's own output: %q", result.Text)
+	}
+	if strings.Contains(result.Text, "[full output saved to") {
+		t.Fatalf("raw:true still ran the compressor: %q", result.Text)
+	}
+	if _, err := parseArguments(jsonArgs(map[string]any{"command": "ls", "raw": "maybe"})); err != "" {
+		t.Fatalf("raw:t\"maybe\" was refused as malformed JSON instead of a type error")
+	}
+	mismatch := registry.Run("bash", jsonArgs(map[string]any{"command": "ls", "raw": "maybe"}), 1)
+	if !strings.Contains(mismatch.Text, "must be a boolean") {
+		t.Fatalf("a non-boolean raw argument was accepted: %q", mismatch.Text)
+	}
+}
+
+func TestBashRawArgumentAppliesToACollectedTask(t *testing.T) {
+	store := config.New(config.DefaultSettings())
+	store.SetEnvironment(nil)
+	if err := store.LoadConfig([]byte(`{"bash.background_yield":"10ms","task.wait_timeout":"5s"}`)); err != nil {
+		t.Fatal(err)
+	}
+	registry := NewFromConfig(store)
+	defer registry.Close()
+	launch := registry.Run("bash", jsonArgs(map[string]any{
+		"command": "go test github.com/luank3/gax/internal/bashcompress", "background": true,
+		"raw": true, "name": "tests",
+	}), 1)
+	if !strings.Contains(launch.Text, "detached as task") {
+		t.Fatalf("the command did not detach: %q", launch.Text)
+	}
+	waited := registry.Run("task_wait", jsonArgs(map[string]any{"id": "tests", "timeout_seconds": 60}), 1)
+	if strings.Contains(waited.Text, "Go test:") {
+		t.Fatalf("a raw task's collected output was compressed: %q", waited.Text)
+	}
+	if !strings.Contains(waited.Text, "ok  ") && !strings.Contains(waited.Text, "(cached)") {
+		t.Fatalf("a raw task lost its own output: %q", waited.Text)
+	}
+}
+
+func TestBashCompressionNamesTheFullOutputOfACollectedTask(t *testing.T) {
+	store := config.New(config.DefaultSettings())
+	store.SetEnvironment(nil)
+	if err := store.LoadConfig([]byte(`{"bash.background_yield":"10ms","task.wait_timeout":"60s"}`)); err != nil {
+		t.Fatal(err)
+	}
+	registry := NewFromConfig(store)
+	defer registry.Close()
+	launch := registry.Run("bash", jsonArgs(map[string]any{
+		"command": "go test github.com/luank3/gax/internal/bashcompress", "background": true, "name": "tests",
+	}), 1)
+	if !strings.Contains(launch.Text, "detached as task") {
+		t.Fatalf("the command did not detach: %q", launch.Text)
+	}
+	waited := registry.Run("task_wait", jsonArgs(map[string]any{"id": "tests", "timeout_seconds": 60}), 1)
+	if !strings.Contains(waited.Text, "Go test: 1 passed in 1 packages") {
+		t.Fatalf("a collected task was not compressed: %q", waited.Text)
+	}
+	marker := strings.Index(waited.Text, "[full output saved to ")
+	if marker < 0 {
+		t.Fatalf("a collected task did not name its full output: %q", waited.Text)
+	}
+	start := marker + len("[full output saved to ")
+	end := strings.IndexByte(waited.Text[start:], ']')
+	if end < 0 {
+		t.Fatalf("the recovery note did not close: %q", waited.Text)
+	}
+	path := waited.Text[start : start+end]
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("the task's full output is unavailable: %v", err)
+	}
+	if !strings.Contains(string(content), "bashcompress") {
+		t.Fatalf("the task's saved output is not the command's own: %q", string(content)[:min(len(content), 128)])
+	}
+}
+
 func TestBashCompressionLeavesFailuresAlone(t *testing.T) {
 	registry := compressRegistry(t)
 	defer registry.Close()
