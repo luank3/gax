@@ -97,7 +97,7 @@ func TestRunTurnCapsAttemptDetailsAndFoldsOverflowUsage(t *testing.T) {
 
 	turn := agent.RunTurn(context.Background(), agent.TurnOptions{Stream: stream})
 	if len(turn.Attempts) != 8 {
-		t.Fatalf("attempt detail count = %d, want upstream cap of 8", len(turn.Attempts))
+		t.Fatalf("attempt detail count = %d, want the cap of 8", len(turn.Attempts))
 	}
 	for index := 0; index < 7; index++ {
 		if turn.Attempts[index].Usage == nil || *turn.Attempts[index].Usage.InputTokens != 1 {
@@ -586,7 +586,7 @@ func TestRunLoopObservesEveryToolCallBeforeDispatchingAny(t *testing.T) {
 	}
 }
 
-// Upstream repairs a provider failure with turn_keep_text, which drops every non-assistant item,
+// A provider failure is repaired by keeping only the assistant text, which drops every other item,
 // so the observed repair range never holds a tool call and no skipped result is synthesized.
 func TestRunLoopProviderFailureDropsUnrunCallBeforeObservation(t *testing.T) {
 	state := agent.NewSession()

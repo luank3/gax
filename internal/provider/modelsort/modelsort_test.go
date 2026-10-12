@@ -40,7 +40,7 @@ func TestCompareIDsVersionSnapshotVariantOrder(t *testing.T) {
 	}
 }
 
-func TestSortIDsUpstreamFixtures(t *testing.T) {
+func TestSortIDsFixtures(t *testing.T) {
 	tests := []struct {
 		name string
 		got  []string

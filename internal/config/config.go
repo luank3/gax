@@ -49,7 +49,7 @@ type orderedObject struct {
 	values map[string]json.RawMessage
 }
 
-// Store is foreground-owned, like upstream's process-wide config object. Its load operations and
+// Store is foreground-owned, like a process-wide config object. Its load operations and
 // setters replace tiers; getters resolve them in the documented precedence order.
 type Store struct {
 	settings               map[string]Setting
@@ -486,7 +486,7 @@ func parseNonnegativeInt(value *string) *int64 {
 	if value == nil {
 		return nil
 	}
-	// Match strtol followed by the upstream C int bounds check: leading C whitespace is
+	// Match strtol followed by the C int bounds check: leading C whitespace is
 	// accepted, but trailing whitespace or any other suffix is rejected.
 	text := trimStrtolLeadingWhitespace(*value)
 	parsed, err := strconv.ParseInt(text, 10, 32)
@@ -632,7 +632,7 @@ func (store *Store) Duration(key string) time.Duration {
 	return time.Duration(milliseconds) * time.Millisecond
 }
 
-// DurationMS returns the resolved nonnegative duration in upstream's native millisecond unit.
+// DurationMS returns the resolved nonnegative duration in the native millisecond unit.
 // Duration exposes the same setting as a Go duration and saturates only when nanoseconds cannot
 // represent its millisecond value.
 func (store *Store) DurationMS(key string) int64 {

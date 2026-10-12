@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 )
 
-// sniffClipboardImage recognizes the formats accepted by upstream and reports whether their
+// sniffClipboardImage recognizes the accepted formats and reports whether their
 // framing contains a complete image. It intentionally does not decode pixels or verify checksums.
 func sniffClipboardImage(data []byte) (string, bool) {
 	switch {

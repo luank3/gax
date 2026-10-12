@@ -21,7 +21,7 @@ type toolPreviewRow struct {
 	color   string
 }
 
-// toolPreviewRenderer mirrors the settled-row behavior of the upstream tool renderer. It keeps the
+// toolPreviewRenderer mirrors the settled-row behavior of the tool renderer. It keeps the
 // newest row open so later output can settle it and finalization can replace its gutter.
 type toolPreviewRenderer struct {
 	mode   coretools.ToolPreviewMode
@@ -225,7 +225,7 @@ func (renderer *toolPreviewRenderer) consumeUTF8(data []byte, final bool) {
 			runeValue = utf8.RuneError
 		}
 		if runeValue == '\r' {
-			// The upstream control stripper drops carriage returns before UTF-8 decoding.
+			// The control stripper drops carriage returns before UTF-8 decoding.
 			offset += size
 			continue
 		}

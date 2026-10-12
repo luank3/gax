@@ -2,7 +2,7 @@ package skill
 
 import "testing"
 
-func TestFrontmatterScalarLineMatchesUpstream(t *testing.T) {
+func TestFrontmatterScalarLineMatchesDocumentedWording(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string

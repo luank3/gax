@@ -27,8 +27,8 @@
 - **Rule:** `forEachBashSegment` splits on `&&`, `||`, `;`, newline, and carriage return as
   statements and on `|` as a pipe, and a `bashFilter` counts only after a producer in its statement.
 - **Source:** `internal/tools/bash_classify.go:78` (`forEachBashSegment`).
-- **Assertion:** `TestIsExplorationBashUpstreamFixtures` in
-  `internal/tools/bash_classify_upstream_test.go:6`.
+- **Assertion:** `TestIsExplorationBashRecordedFixtures` in
+  `internal/tools/bash_classify_recorded_test.go:6`.
 - **Rejected:** Classifying the whole line as one segment; `cat foo | tee out.txt` must not qualify.
 
 ---

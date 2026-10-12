@@ -124,14 +124,15 @@ session-log or branch files. Non-goal: `internal/slash` grammar and `internal/ap
   (`internal/app/tasks_command.go:23`) has no case: the table covers only `bogus` and `kill`.
 - Resolved 2026-10-12: the note at
   `docs/superpowers/plans/2026-10-10-slash-command-front-end.md:10` that said `/provider`, `/model`,
-  and `/effort` take no arguments was wrong about upstream and now carries a correction; taking one
-  is parity, which `TestRunREPLConsumesSlashCommands` (`internal/app/app_test.go:2064`) asserts.
+  and `/effort` take no arguments was wrong and now carries a correction; taking one is the
+  recorded behavior, which `TestRunREPLConsumesSlashCommands` (`internal/app/app_test.go:2064`)
+  asserts.
 
 ## Review
 
 - `internal/app/session_summary.go:36`: `printSessionSummary` passes `styled=true` even when
   redirected, so `/session` emits dim escapes on piped output;
-  `TestSessionSummaryPreservesUpstreamRowStylingWhenRedirected` (`internal/app/app_test.go:1977`).
+  `TestSessionSummaryPreservesRowStylingWhenRedirected` (`internal/app/app_test.go:1977`).
 - `internal/app/history_commands.go:54`: the `inputTTY` hint branch is unreachable from Run, since
   `pickHistoryCommand` (`internal/app/app.go:945`) consumes a bare argument or cancels first.
 - `internal/app/session_summary.go:51` and `:365` call `WaitModelMetadata(..., nil)`, so `/session`

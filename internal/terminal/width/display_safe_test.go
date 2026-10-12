@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestFlattenForDisplayMatchesUpstreamSafetyRules(t *testing.T) {
+func TestFlattenForDisplayMatchesSafetyRules(t *testing.T) {
 	if got, want := FlattenForDisplay("  alpha\t\n beta\x01  gamma  "), "alpha beta gamma"; got != want {
 		t.Fatalf("FlattenForDisplay() = %q, want %q", got, want)
 	}

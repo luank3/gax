@@ -41,7 +41,7 @@ wrapped strings, match indexes, SGR-styled rows. Non-goal: repainting and termio
   `|`, `/`, `,`, `;`, `&`, `=` mark only when the dropped slack is at most `maxCells/2` capped at
   16, and fits `...` inside the last permitted row's budget.
 - **Source:** `internal/terminal/width/reflow.go:12` (`ReflowForDisplay`), break rule in `:94`.
-- **Assertion:** `TestReflowForDisplayMatchesUpstreamFixtures` in
+- **Assertion:** `TestReflowForDisplayMatchesFixtures` in
   `internal/terminal/width/reflow_test.go:8`; `:19` pins the reserve and `:20` the `...` row.
 - **Rejected:** Appending `...` past the cell budget; `internal/terminal/width/reflow.go:50` keeps
   3 cells free and `internal/terminal/width/reflow_test.go:16` requires 7 glyphs plus `...`.

@@ -1,5 +1,5 @@
 // Package web implements the fetching, HTML-to-text conversion, and search backends behind gax's
-// web tools. Upstream hax ships no web tools, so this is a deliberate gax addition.
+// web tools. The ported tool set has no web tools, so this is a deliberate gax addition.
 package web
 
 import (

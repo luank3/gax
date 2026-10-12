@@ -58,7 +58,7 @@ func Detect(environment []string, probe func([]string) string) State {
 
 // InitializeProcess detects the process locale and publishes a fallback LC_CTYPE to the process
 // environment when no nonempty LC_ALL masks it. It returns true when no usable UTF-8 locale was
-// found, allowing the caller to issue the upstream-compatible warning once at startup.
+// found, allowing the caller to issue the compatibility warning once at startup.
 func InitializeProcess() (unavailable bool) {
 	initializeMu.Lock()
 	defer initializeMu.Unlock()

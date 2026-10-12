@@ -1127,7 +1127,7 @@ func TestRunLoginAndLogoutCommandArgumentHandling(t *testing.T) {
 	}
 }
 
-func TestRunREPLSelectionErrorsUseUpstreamDisplayChannel(t *testing.T) {
+func TestRunREPLSelectionErrorsUseDisplayChannel(t *testing.T) {
 	t.Setenv("HOME", filepath.Join(t.TempDir(), "home"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "config"))
 	t.Setenv("XDG_STATE_HOME", filepath.Join(t.TempDir(), "state"))
@@ -1321,7 +1321,7 @@ func TestSelectExplicitCodexReportsMissingLoginDirectly(t *testing.T) {
 	}
 }
 
-func TestLlamaDiscoveryFailureUsesUpstreamDiagnostic(t *testing.T) {
+func TestLlamaDiscoveryFailureUsesRecordedDiagnostic(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
@@ -1341,7 +1341,7 @@ func TestLlamaDiscoveryFailureUsesUpstreamDiagnostic(t *testing.T) {
 	}
 }
 
-func TestRunUnknownPresetUsesUpstreamDiagnostic(t *testing.T) {
+func TestRunUnknownPresetUsesRecordedDiagnostic(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	var stdout, stderr strings.Builder
 	code := Run([]string{"--preset=missing"}, strings.NewReader(""), false, &stdout, &stderr)
@@ -1351,7 +1351,7 @@ func TestRunUnknownPresetUsesUpstreamDiagnostic(t *testing.T) {
 	}
 }
 
-func TestRunMissingResumeUsesUpstreamDiagnostic(t *testing.T) {
+func TestRunMissingResumeUsesRecordedDiagnostic(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	var stdout, stderr strings.Builder
 	code := Run([]string{"--resume=missing"}, strings.NewReader(""), false, &stdout, &stderr)
@@ -1361,7 +1361,7 @@ func TestRunMissingResumeUsesUpstreamDiagnostic(t *testing.T) {
 	}
 }
 
-func TestRunInteractiveEOFLeavesUpstreamTrailingSeparator(t *testing.T) {
+func TestRunInteractiveEOFLeavesTrailingSeparator(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("GAX_THEME", "off")
 	t.Setenv("GAX_NO_SESSION", "on")
@@ -1399,7 +1399,7 @@ func TestRunEmptyREPLEOFDoesNotCreateResumableSession(t *testing.T) {
 	}
 }
 
-func TestRunREPLEOFPrintsUpstreamResumeHint(t *testing.T) {
+func TestRunREPLEOFPrintsResumeHint(t *testing.T) {
 	original, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -1974,7 +1974,7 @@ func TestSessionSummaryWrapsRowsAtConfiguredDisplayWidth(t *testing.T) {
 	}
 }
 
-func TestSessionSummaryPreservesUpstreamRowStylingWhenRedirected(t *testing.T) {
+func TestSessionSummaryPreservesRowStylingWhenRedirected(t *testing.T) {
 	store := config.New(config.DefaultSettings())
 	store.SetEnvironment(func(string) (string, bool) { return "", false })
 
@@ -1982,7 +1982,7 @@ func TestSessionSummaryPreservesUpstreamRowStylingWhenRedirected(t *testing.T) {
 	printSessionSummary(&redirected, nil, nil, nil, nil, store)
 	if !strings.Contains(redirected.String(), "  \x1b[2msession\x1b[0m") ||
 		!strings.Contains(redirected.String(), "\x1b[2mnot recorded\x1b[0m") {
-		t.Fatalf("redirected session summary did not preserve upstream dim styling: %q", redirected.String())
+		t.Fatalf("redirected session summary did not preserve dim styling: %q", redirected.String())
 	}
 
 	var plain strings.Builder
@@ -2037,7 +2037,7 @@ func TestSlashHelpStylesRowsEvenWhenRedirected(t *testing.T) {
 		"\x1b[1mshortcuts\x1b[0m",
 	} {
 		if !strings.Contains(redirected.String(), want) {
-			t.Errorf("redirected slash help omits upstream style %q: %q", want, redirected.String())
+			t.Errorf("redirected slash help omits style %q: %q", want, redirected.String())
 		}
 	}
 }
@@ -2091,7 +2091,7 @@ func TestRunREPLConsumesSlashCommands(t *testing.T) {
 	}
 }
 
-func TestRunREPLModelListingFailureUsesUpstreamDisplayChannel(t *testing.T) {
+func TestRunREPLModelListingFailureUsesDisplayChannel(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
@@ -2148,7 +2148,7 @@ func TestRunREPLHistoryEmptyNotesUseStdout(t *testing.T) {
 	}
 }
 
-func TestRunREPLBlockSeparatorsMatchUpstream(t *testing.T) {
+func TestRunREPLBlockSeparatorsMatchRecordedOutput(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("GAX_NO_SESSION", "on")
 	var stdout, stderr strings.Builder
@@ -2158,7 +2158,7 @@ func TestRunREPLBlockSeparatorsMatchUpstream(t *testing.T) {
 	}
 }
 
-func TestRunREPLResumePickerSeparatorMatchesUpstream(t *testing.T) {
+func TestRunREPLResumePickerSeparatorMatchesRecordedOutput(t *testing.T) {
 	t.Setenv("HOME", filepath.Join(t.TempDir(), "home"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "config"))
 	t.Setenv("XDG_STATE_HOME", filepath.Join(t.TempDir(), "state"))
@@ -2174,7 +2174,7 @@ func TestRunREPLResumePickerSeparatorMatchesUpstream(t *testing.T) {
 	}
 }
 
-func TestRunREPLNewBannerSpacingMatchesUpstream(t *testing.T) {
+func TestRunREPLNewBannerSpacingMatchesRecordedOutput(t *testing.T) {
 	t.Setenv("HOME", filepath.Join(t.TempDir(), "home"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "config"))
 	t.Setenv("XDG_STATE_HOME", filepath.Join(t.TempDir(), "state"))
@@ -2191,7 +2191,7 @@ func TestRunREPLNewBannerSpacingMatchesUpstream(t *testing.T) {
 	}
 }
 
-func TestRunCompactWithoutHistoryUsesUpstreamStyle(t *testing.T) {
+func TestRunCompactWithoutHistoryUsesRecordedStyle(t *testing.T) {
 	t.Setenv("HOME", filepath.Join(t.TempDir(), "home"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "config"))
 	t.Setenv("XDG_STATE_HOME", filepath.Join(t.TempDir(), "state"))
@@ -2415,7 +2415,7 @@ func TestRunREPLPresetUsesProviderDefaultAndDisplaysPresetErrors(t *testing.T) {
 	}
 }
 
-func TestRunREPLPresetDiscoveryFailureUsesUpstreamDiagnostic(t *testing.T) {
+func TestRunREPLPresetDiscoveryFailureUsesRecordedDiagnostic(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
@@ -2444,7 +2444,7 @@ func TestRunREPLPresetDiscoveryFailureUsesUpstreamDiagnostic(t *testing.T) {
 	}
 }
 
-func TestLoadPresetCoercesBooleanAndNumberScalarsLikeUpstream(t *testing.T) {
+func TestLoadPresetCoercesBooleanAndNumberScalars(t *testing.T) {
 	store := config.New(config.DefaultSettings())
 	if err := store.LoadConfig([]byte(`{"presets":{"legacy":{"provider":true,"model":1.23456789,"effort":false}}}`)); err != nil {
 		t.Fatal(err)
@@ -2458,7 +2458,7 @@ func TestLoadPresetCoercesBooleanAndNumberScalarsLikeUpstream(t *testing.T) {
 	}
 }
 
-func TestLoadPresetTreatsNonObjectDefinitionAsUnknownLikeUpstream(t *testing.T) {
+func TestLoadPresetTreatsNonObjectDefinitionAsUnknown(t *testing.T) {
 	store := config.New(config.DefaultSettings())
 	if err := store.LoadConfig([]byte(`{"presets":{"draft":"unfinished"}}`)); err != nil {
 		t.Fatal(err)

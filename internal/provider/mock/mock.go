@@ -32,7 +32,7 @@ type Provider struct {
 	nextTurn         int
 }
 
-// New captures the configured path, matching the upstream provider constructor.
+// New captures the configured path, matching the provider constructor.
 func New(scriptPath *string) *Provider {
 	provider := &Provider{diagnosticWriter: os.Stderr}
 	if scriptPath != nil {

@@ -350,7 +350,7 @@ func Run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 	ctx, cancelSignals := context.WithCancel(context.Background())
 	stopSignalEscalation := watchTerminationEscalation(cancelSignals, tools.KillChildren, func() {
 		// The REPL hides the cursor for the duration of a turn; a fatal signal ends the process
-		// without unwinding it, so the cursor is restored here (upstream restore_terminal).
+		// without unwinding it, so the cursor is restored here (the restore path).
 		if liveTTY {
 			showCursor(stdout)
 		}
@@ -640,7 +640,7 @@ func Run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 				state.Effort = provider.ResolveEffort(*model, store.String("effort"))
 			}
 		}
-		// Match the upstream run clock: startup metadata work is complete before timing begins.
+		// Match the run clock: startup metadata work is complete before timing begins.
 		started := time.Now()
 		if options.OneShot {
 			oneShotStarted = started
@@ -1199,7 +1199,7 @@ type toolHeaderRenderer interface {
 }
 
 // toolHeaders decides when a live tool header is written. The loop announces a whole batch of
-// calls before dispatching any of them, matching upstream loop_observe_tools, while the renderer
+// calls before dispatching any of them, while the renderer
 // shows one tool at a time: starting a second call's header before the first call's result takes
 // over its preview renderer and drops the first call's streamed output. A header is therefore
 // written when that call's dispatch begins, for every call the batch announced.

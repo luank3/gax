@@ -155,7 +155,7 @@ func TestRenderTreatsSoftBoundaryAsWhitespaceForEmphasis(t *testing.T) {
 	}
 }
 
-func TestRenderDoubleUnderscoreRetainsUpstreamSingleUnderscoreBehavior(t *testing.T) {
+func TestRenderDoubleUnderscoreRetainsSingleUnderscoreBehavior(t *testing.T) {
 	if got, want := Render("__bold__", 0, true), ansiItalic+ansiItalicOff+"bold__"; got != want {
 		t.Fatalf("styled double-underscore text = %q, want %q", got, want)
 	}
@@ -279,7 +279,7 @@ func TestRenderSoftJoinsProseAndPreservesHardBreaks(t *testing.T) {
 	if got := Render("foo  \n  bar", 0, false); got != "foo  \n  bar" {
 		t.Fatalf("hard break continuation indent = %q, want preserved indentation", got)
 	}
-	// Upstream keeps the carriage return as a text byte and replaces only the newline, so a CRLF
+	// A carriage return is kept as a text byte and only the newline is replaced, so a CRLF
 	// soft break reads "foo\r bar"; the wrapper drops the CR when wrapping is on.
 	if got := Render("foo\r\nbar", 0, false); got != "foo\r bar" {
 		t.Fatalf("CRLF soft break = %q, want %q", got, "foo\r bar")
@@ -362,7 +362,7 @@ func TestRenderWrapsAtDisplayWidth(t *testing.T) {
 	}
 }
 
-func TestRenderRetroWrapsWithUpstreamCursorControl(t *testing.T) {
+func TestRenderRetroWrapsWithCursorControl(t *testing.T) {
 	if got, want := Render("hello world", 7, false), "hello w\x1b[2D\x1b[K\nworld"; got != want {
 		t.Fatalf("plain retro-wrap = %q, want %q", got, want)
 	}
@@ -372,7 +372,7 @@ func TestRenderRetroWrapsWithUpstreamCursorControl(t *testing.T) {
 	}
 }
 
-func TestRenderMatchesUpstreamCursorWrapFixtures(t *testing.T) {
+func TestRenderMatchesCursorWrapFixtures(t *testing.T) {
 	cases := []struct {
 		input  string
 		width  int
@@ -673,7 +673,7 @@ func TestRenderLeavesOversizedTableHeaderLiteral(t *testing.T) {
 	header := "| " + strings.Repeat("H", 65536) + " |\n"
 	input := header + "|---|\n| x |\n"
 	if got := Render(input, 0, false); got != input {
-		t.Fatalf("Render() formatted a header beyond the upstream table byte cap")
+		t.Fatalf("Render() formatted a header beyond the table byte cap")
 	}
 }
 
@@ -694,7 +694,7 @@ func TestRenderLeavesTablesBeyondRowCapLiteral(t *testing.T) {
 	}
 	value := input.String()
 	if got := Render(value, 0, false); got != value {
-		t.Fatal("Render() formatted a table after its collected row span exceeded the upstream cap")
+		t.Fatal("Render() formatted a table after its collected row span exceeded the cap")
 	}
 }
 
@@ -705,8 +705,8 @@ func TestRenderLeavesOversizedUnterminatedTableRowLiteral(t *testing.T) {
 	}
 }
 
-// TestRenderKeepsDeferredTailInsideOpenRun pins the end-of-input rule against the upstream renderer
-// (checked byte-for-byte with a driver linked against ~/dev/hax): a tail that stayed ambiguous
+// TestRenderKeepsDeferredTailInsideOpenRun pins the end-of-input rule against the reference driver
+// (checked byte-for-byte): a tail that stayed ambiguous
 // during streaming is emitted literally, inside whatever inline run is still open, and that run
 // closes after it, which is what markdown.c's newline handler and md_flush do.
 func TestRenderKeepsDeferredTailInsideOpenRun(t *testing.T) {
@@ -724,7 +724,7 @@ func TestRenderKeepsDeferredTailInsideOpenRun(t *testing.T) {
 	}
 	for _, fixture := range fixtures {
 		if got := Render(fixture.input, fixture.width, true); got != fixture.want {
-			t.Errorf("Render(%q, %d) = %q\n  upstream =%q", fixture.input, fixture.width, got, fixture.want)
+			t.Errorf("Render(%q, %d) = %q\n  reference =%q", fixture.input, fixture.width, got, fixture.want)
 		}
 	}
 }

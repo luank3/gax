@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestReflowForDisplayMatchesUpstreamFixtures(t *testing.T) {
+func TestReflowForDisplayMatchesFixtures(t *testing.T) {
 	tests := []struct {
 		name, input                 string
 		first, other, rows, reserve int

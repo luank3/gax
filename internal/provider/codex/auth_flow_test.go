@@ -244,7 +244,7 @@ func TestAuthorizationCodeExchangeUsesRFC3986FormEscaping(t *testing.T) {
 	}
 }
 
-func TestPKCEPairMatchesUpstreamVerifierAndStateLengths(t *testing.T) {
+func TestPKCEPairMatchesVerifierAndStateLengths(t *testing.T) {
 	verifier, challenge, err := pkcePair()
 	if err != nil {
 		t.Fatal(err)

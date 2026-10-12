@@ -53,7 +53,7 @@ func TestOpenURLHandsTheURLToThePlatformOpener(t *testing.T) {
 	t.Fatal("detached opener did not receive the URL")
 }
 
-func TestPlatformCommandMatchesUpstream(t *testing.T) {
+func TestPlatformCommandMatchesRecordedPlatform(t *testing.T) {
 	for _, test := range []struct {
 		goos    string
 		command string

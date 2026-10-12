@@ -73,7 +73,7 @@
 - **Rule:** `Join` trims boundary slashes only, keeps inner components such as
   `missing/../target` intact, and yields `/foo` for an empty base.
 - **Source:** `internal/system/path/path.go:11` (`Join`).
-- **Assertion:** `TestJoinMatchesUpstreamPathRules` in `internal/system/path/path_test.go:9`.
+- **Assertion:** `TestJoinMatchesPathRules` in `internal/system/path/path_test.go:9`.
 - **Rejected:** `filepath.Join`; it collapses `missing/../target`, returns `foo` rather than `/foo`
   for an empty base, and drops the trailing slash the table expects for `Join("/tmp", "")`.
 

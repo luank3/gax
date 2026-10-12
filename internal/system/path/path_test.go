@@ -6,7 +6,7 @@ import (
 	systempath "github.com/luank3/gax/internal/system/path"
 )
 
-func TestJoinMatchesUpstreamPathRules(t *testing.T) {
+func TestJoinMatchesPathRules(t *testing.T) {
 	for _, test := range []struct {
 		base, suffix, want string
 	}{
@@ -29,7 +29,7 @@ func TestJoinMatchesUpstreamPathRules(t *testing.T) {
 	}
 }
 
-func TestExpandHomeMatchesUpstreamPathRules(t *testing.T) {
+func TestExpandHomeMatchesPathRules(t *testing.T) {
 	for _, test := range []struct {
 		path, home, want string
 	}{
@@ -50,7 +50,7 @@ func TestExpandHomeMatchesUpstreamPathRules(t *testing.T) {
 	}
 }
 
-func TestCollapseHomeMatchesUpstreamPathRules(t *testing.T) {
+func TestCollapseHomeMatchesPathRules(t *testing.T) {
 	for _, test := range []struct {
 		path, home, want string
 	}{
@@ -71,7 +71,7 @@ func TestCollapseHomeMatchesUpstreamPathRules(t *testing.T) {
 	}
 }
 
-func TestRelativizeMatchesUpstreamBoundaries(t *testing.T) {
+func TestRelativizeMatchesBoundaries(t *testing.T) {
 	for _, test := range []struct {
 		path, cwd, want string
 		ok              bool
@@ -129,7 +129,7 @@ func TestDirMatchesPOSIXParentRulesWithoutCleaning(t *testing.T) {
 	}
 }
 
-func TestXDGGaxPathPreservesUpstreamFormatting(t *testing.T) {
+func TestXDGGaxPathPreservesFormatting(t *testing.T) {
 	for _, test := range []struct {
 		base, home, homeRelative, relative, want string
 		ok                                       bool

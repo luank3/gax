@@ -1,9 +1,9 @@
-// These command shapes are ported from the upstream bash-classification fixtures.
+// These command shapes are the recorded bash-classification fixtures.
 package tools
 
 import "testing"
 
-func TestIsExplorationBashUpstreamFixtures(t *testing.T) {
+func TestIsExplorationBashRecordedFixtures(t *testing.T) {
 	tests := []struct {
 		command string
 		want    bool

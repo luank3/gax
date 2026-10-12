@@ -29,7 +29,7 @@ Non-goal: terminal rendering, which the terminal specs own.
   and an unknown one is `unrecognized option '--<spelling>'`.
 - **Source:** `internal/cli/cli.go:268`
 - **Assertion:** `TestParseSupportsUniqueLongOptionPrefixes` in `internal/cli/cli_test.go:192`
-- **Rejected:** exact-match-only lookup; upstream getopt_long accepts prefixes.
+- **Rejected:** exact-match-only lookup; the documented behavior accepts prefixes.
 
 ---
 

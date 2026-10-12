@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-func TestCharmapMatchesUpstreamUTF8Check(t *testing.T) {
+func TestCharmapMatchesUTF8Check(t *testing.T) {
 	if !isUTF8Charmap("UTF-8") {
-		t.Fatal("the upstream UTF-8 codeset spelling was not accepted")
+		t.Fatal("the UTF-8 codeset spelling was not accepted")
 	}
 	for _, charmap := range []string{"UTF8", "utf-8", " UTF-8 ", "ANSI_X3.4-1968"} {
 		if isUTF8Charmap(charmap) {

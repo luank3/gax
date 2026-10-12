@@ -139,7 +139,7 @@ func (state *inlineState) renderWindow(emit func(string) error, input string, fi
 
 		if input[index] == '_' && index+1 < len(input) && input[index+1] == '_' {
 			if canOpenEmphasis(state.leftByte(input, index), input[index+1]) {
-				// The upstream parser processes each underscore independently: the first
+				// The parser processes each underscore independently: the first
 				// opens italic and the adjacent second underscore closes it immediately.
 				if state.styled {
 					if err := emit(ansiItalic + ansiItalicOff); err != nil {

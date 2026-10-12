@@ -2,7 +2,7 @@ package subagent
 
 import "testing"
 
-func TestNextChildDepthMatchesUpstreamStamp(t *testing.T) {
+func TestNextChildDepthMatchesRecordedStamp(t *testing.T) {
 	for _, test := range []struct {
 		value string
 		want  int

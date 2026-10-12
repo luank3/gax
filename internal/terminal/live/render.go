@@ -780,7 +780,7 @@ func (renderer *Renderer) ToolOutput(data []byte) error {
 	firstOutput := renderer.toolOutputBytes == 0
 	renderer.toolOutputBytes += len(data)
 	if renderer.toolPreview != nil {
-		// Upstream selects diff rendering only for a completed, non-streamed result. A stream may
+		// Diff rendering is selected only for a completed, non-streamed result. A stream may
 		// contain ordinary file content beginning with diff-looking prefixes.
 		if firstOutput {
 			renderer.toolPreview.style = coretools.OutputPlain
@@ -881,7 +881,7 @@ func (renderer *Renderer) Tick(now time.Time) error {
 		return nil
 	}
 	// The show grace delays a first appearance only. A label that replaces a visible one repaints
-	// over it on the next tick, as upstream's spinner_set_label redraws without erasing.
+	// over it on the next tick: a label change redraws the row without erasing.
 	if !renderer.statusVisible && now.Before(showAt) {
 		return nil
 	}
@@ -894,7 +894,7 @@ func (renderer *Renderer) Tick(now time.Time) error {
 		return nil
 	}
 	// One frame per write, with the row's tail erased after the paint instead of before it:
-	// erasing first leaves a blank row on screen for every frame (upstream draw_label_row_locked
+	// erasing first leaves a blank row on screen for every frame (the row painter
 	// followed by finish_row_repaint).
 	var row strings.Builder
 	// The statusLineNewlines recorded here is the count clearStatus restores, so it has to
@@ -905,14 +905,14 @@ func (renderer *Renderer) Tick(now time.Time) error {
 		renderer.statusLineNewlines = renderer.lineNewlines
 		if renderer.collapsedLineOpen {
 			// Park the indicator below the open read row: the extra row is the gap the cleared
-			// indicator leaves behind (upstream spinner_park).
+			// indicator leaves behind (the parked indicator).
 			row.WriteString("\n\n")
 			renderer.statusParkedRows = 2
 			renderer.statusParkedColumn = renderer.collapsedCells
 		} else if renderer.outputStarted && renderer.lineNewlines == 0 {
 			// The paint's own newline ends the row it covers, and the erase returns to that row:
 			// without counting it the next block separator lands one row too low, leaving a second
-			// blank line before the row that follows. Upstream writes the indicator outside disp,
+			// blank line before the row that follows. The indicator is written outside the display sink,
 			// so its count still sees the answer's own newlines.
 			row.WriteByte('\n')
 			renderer.statusLineNewlines = 1
@@ -1047,7 +1047,7 @@ func (renderer *Renderer) setStatus(label string) {
 		return
 	}
 	// A label that replaces a visible one is painted over it by the next tick, never erased
-	// first: upstream's spinner_set_label redraws the row and the erase follows the paint.
+	// first: the label repaint redraws the row and the erase follows the paint.
 	renderer.statusLabel = label
 	renderer.statusStarted = time.Now()
 }

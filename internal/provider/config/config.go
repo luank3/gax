@@ -64,7 +64,7 @@ var reservedBodyFields = [...]string{
 type WarningHandler func(message string)
 
 // Config reads provider values from a shared config store. It is foreground-owned, matching the
-// configuration store and upstream provider constructor.
+// configuration store and provider constructor.
 type Config struct {
 	store   *baseconfig.Store
 	warning WarningHandler
@@ -128,7 +128,7 @@ func (config *Config) String(prefix, leaf string) *string {
 }
 
 // APIKey resolves an inline key, optional $ENV indirection, and the provider definition's
-// environment fallback in upstream order. It never includes a credential in a diagnostic.
+// environment fallback in the documented order. It never includes a credential in a diagnostic.
 func (config *Config) APIKey(prefix, fallbackEnv string) string {
 	if value := config.String(prefix, "api_key"); value != nil && *value != "" {
 		if resolved, ok := config.resolveEnvEscape(*value); ok && resolved != "" {

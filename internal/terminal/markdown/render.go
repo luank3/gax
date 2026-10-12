@@ -10,8 +10,8 @@ import (
 const (
 	inlineLineBoundary = '\x00'
 	// inlineLiteralTail marks bytes the parser resolved as literal at end of input: the walker
-	// copies them verbatim, which keeps them inside whatever run is still open, as upstream's
-	// newline handler does before md_flush closes it.
+	// copies them verbatim, which keeps them inside whatever run is still open before the flush
+	// closes it.
 	inlineLiteralTail = '\x01'
 	// emDash is the three-byte clause dash the renderer spaces against its neighbours.
 	emDash           = "\u2014"
@@ -376,7 +376,7 @@ func parseTable(lines []string, start int, finalHasNewline bool) ([][]string, []
 		if bufferedBytes+len(lines[index])+1 > maxTableBytes {
 			if index == len(lines)-1 && !finalHasNewline {
 				// An oversized unterminated tail is still part of the active table
-				// attempt; the upstream streaming parser bails the whole attempt
+				// attempt; the streaming parser bails the whole attempt
 				// through its lossless literal path.
 				return nil, nil, index, true
 			}

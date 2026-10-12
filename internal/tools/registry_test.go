@@ -298,7 +298,7 @@ func TestExecuteRelativizesFileToolPathsInsideWorkingDirectory(t *testing.T) {
 	}
 }
 
-func TestToolPresentationResolvesUpstreamBuiltInMetadata(t *testing.T) {
+func TestToolPresentationResolvesBuiltInMetadata(t *testing.T) {
 	registry := New(Options{})
 	cases := []struct {
 		name        string
@@ -377,7 +377,7 @@ func TestToolPresentationDistinguishesEmptyAndRawArguments(t *testing.T) {
 	}
 }
 
-func TestCollapseDisplayPathMatchesUpstreamRules(t *testing.T) {
+func TestCollapseDisplayPathMatchesRules(t *testing.T) {
 	tests := []struct {
 		path string
 		want string

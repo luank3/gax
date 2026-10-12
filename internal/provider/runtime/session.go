@@ -13,7 +13,7 @@ var (
 
 // ProcessSessionID returns this process's stable request-affinity id, used whenever a request
 // belongs to no conversation: recording is off (--no-session, GAX_NO_SESSION), or the caller is
-// a metadata/usage request that has no conversation to begin with. Upstream resolves the same
+// a metadata/usage request that has no conversation to begin with. The ported behavior resolves the same
 // fallback in provider_process_session_id(): the OpenCode gateway rejects requests without a
 // session header, so the "{session_id}" placeholder must never expand to an empty value.
 func ProcessSessionID() string {

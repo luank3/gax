@@ -8,7 +8,7 @@ import (
 )
 
 // Find returns name as an executable path, or an empty string when it is not an executable
-// regular file. PATH lookup intentionally ignores relative entries, as the upstream implementation does.
+// regular file. PATH lookup intentionally ignores relative entries, as the documented behavior does.
 func Find(name string) string {
 	if name == "" {
 		return ""

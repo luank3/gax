@@ -238,7 +238,7 @@ func RunLoop(ctx context.Context, options LoopOptions) LoopResult {
 }
 
 // observeTools reports every streamed tool call in the given range before any of them is
-// dispatched, so a frontend renders each assembled call before execution begins. Upstream also
+// dispatched, so a frontend renders each assembled call before execution begins. The ported behavior also
 // observes the repair range of a failed or cancelled turn, where the calls never ran.
 func observeTools(options LoopOptions, from, to int) {
 	if options.ToolSeen == nil {

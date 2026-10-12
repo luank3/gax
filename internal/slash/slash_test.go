@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestCommandsMatchUpstreamOrder(t *testing.T) {
+func TestCommandsMatchRegistryOrder(t *testing.T) {
 	commands := Commands()
 	if command := commandByName(commands, "provider"); command == nil || command.Summary != "switch provider, then model and effort" {
 		t.Fatalf("provider command metadata = %+v", command)

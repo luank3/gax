@@ -148,6 +148,6 @@ func TestStartDetachedReturnsBeforeTheCommandExits(t *testing.T) {
 func requirePOSIXShell(t *testing.T) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		t.Skip("upstream process helpers use POSIX commands")
+		t.Skip("process helpers use POSIX commands")
 	}
 }

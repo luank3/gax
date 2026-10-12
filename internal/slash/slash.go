@@ -15,16 +15,16 @@ const (
 	BadUsage
 )
 
-// Command describes one user-visible command. Registry order is the upstream /help and
+// Command describes one user-visible command. Registry order is the /help and
 // completion order. Usage is empty for commands that do not take arguments.
 type Command struct {
 	Name    string
 	Alias   string
 	Summary string
 	Usage   string
-	// ArgumentChoices marks the commands whose first argument enumerates fixed values, as upstream's
-	// `argument_choices` hook does. Their argument word belongs to this completer; every other
-	// argument word stays with the completers that follow, such as @file mentions.
+	// ArgumentChoices marks the commands whose first argument enumerates fixed values. Their
+	// argument word belongs to this completer; every other argument word stays with the completers
+	// that follow, such as @file mentions.
 	ArgumentChoices bool
 }
 
@@ -154,7 +154,7 @@ func Match(buffer string, cursor int) (start, end int, ok bool) {
 
 // Complete returns the replacement for the command text, which is the prompt after its slash up to
 // the cursor. A unique match is returned with a trailing space; ambiguous matches return only their
-// shared prefix, matching the upstream shell-like completion.
+// shared prefix, matching the shell-like completion.
 func Complete(text string, choices ArgumentChoices) (string, bool) {
 	candidates, word := commandChoices(text, choices)
 	extended, ok := extendCandidates(candidates, word)

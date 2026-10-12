@@ -17,7 +17,7 @@ import (
 	"github.com/luank3/gax/internal/system/spawn"
 )
 
-// selectionCapacity includes the trailing NUL slot used by upstream's fixed-size record buffer.
+// selectionCapacity includes the trailing NUL slot used by the fixed-size record buffer.
 const selectionCapacity = 4096
 
 const candidateCommand = "git ls-files -z --cached --others --exclude-standard 2>/dev/null" +
@@ -165,7 +165,7 @@ func Pick(queryText string) (string, bool, error) {
 	return selected, true, nil
 }
 
-// firstSelectionRecord mirrors upstream's fixed record buffer while accepting EOF after a record.
+// firstSelectionRecord mirrors the fixed record buffer while accepting EOF after a record.
 func firstSelectionRecord(output []byte) ([]byte, bool) {
 	if nul := bytes.IndexByte(output, 0); nul >= 0 {
 		if nul >= selectionCapacity {

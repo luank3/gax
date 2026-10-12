@@ -117,7 +117,7 @@ func TestMissingScriptEmitsError(t *testing.T) {
 	}
 }
 
-func TestScriptWarningsMatchUpstreamDiagnostics(t *testing.T) {
+func TestScriptWarningsMatchDocumentedDiagnostics(t *testing.T) {
 	path := writeScript(t, "mystery directive\ntool\nend-turn\n")
 	provider := New(&path)
 	var diagnostics bytes.Buffer

@@ -21,7 +21,7 @@ const (
 )
 
 // FetchOptions makes cache and transport dependencies replaceable for embedders and tests.
-// Empty values select the upstream-compatible defaults.
+// Empty values select the compatible defaults.
 type FetchOptions struct {
 	Client    *transport.Client
 	CachePath string
@@ -63,7 +63,7 @@ func (catalog *Catalog) Prefetch() { catalog.PrefetchWithOptions(FetchOptions{})
 
 // PrefetchWithOptions loads the last cached snapshot and starts an asynchronous refresh only
 // when it is older than catalog.refresh. The first call consumes the one-shot attempt even when
-// fetching is disabled or no cache path is available, matching the process-level upstream API.
+// fetching is disabled or no cache path is available, matching the process-level API.
 func (catalog *Catalog) PrefetchWithOptions(options FetchOptions) {
 	if catalog == nil {
 		return

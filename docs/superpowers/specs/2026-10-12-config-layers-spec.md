@@ -95,8 +95,8 @@ results, or write errors. Non-goal: provider field vocabulary and credentials, o
   parse.
 - **Source:** `internal/config/config.go:485` (`parseNonnegativeInt`),
   `internal/config/config.go:573` (`scaled`), `internal/config/config.go:653` (`parseDuration`)
-- **Assertion:** `TestTypedParsingUsesBoundsAndUpstreamUnits`,
-  `TestIntParsingMatchesUpstreamStrtolAndCIntBounds`, and
+- **Assertion:** `TestTypedParsingUsesBoundsAndDocumentedUnits`,
+  `TestIntParsingMatchesStrtolAndCIntBounds`, and
   `TestDurationKeepsMillisecondPrecisionBeyondTimeDurationRange` in
   `internal/config/config_test.go` at lines 121, 142, and 173.
 - **Rejected:** `strconv.Atoi` after `strings.TrimSpace`; it accepts `6 `, which the table test
@@ -109,7 +109,7 @@ results, or write errors. Non-goal: provider field vocabulary and credentials, o
   indirect test is `TestUnknownLeadingWordWarnsOnceForInvalidPresetDefinitions` in
   `internal/app/app_test.go:97`.
 - `PresetJSON` and `PresetExists` (`internal/config/config.go:318`, `:342`) have no direct test;
-  `TestLoadPresetCoercesBooleanAndNumberScalarsLikeUpstream` in `internal/app/app_test.go:2447`
+  `TestLoadPresetCoercesBooleanAndNumberScalars` in `internal/app/app_test.go:2447`
   reaches `PresetJSON` through `loadPreset`.
 - The state half of the failed-load rule is unasserted: `internal/config/config_test.go:116` checks
   only that malformed JSON errors, never that the state tier is then empty.

@@ -36,7 +36,7 @@ func WriterColumns(writer io.Writer) (int, bool) {
 	return int(size.columns), true
 }
 
-// TerminalColumns returns stdout's physical width, or the upstream 100-column fallback.
+// TerminalColumns returns stdout's physical width, or the 100-column fallback.
 func TerminalColumns() int {
 	if columns, ok := WriterColumns(os.Stdout); ok {
 		return columns

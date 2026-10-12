@@ -158,7 +158,7 @@ func (roundTripper proxyCAAwareRoundTripper) RoundTrip(request *http.Request) (*
 	return roundTripper.transport.RoundTrip(request)
 }
 
-// configuredRootCAs resolves the CA environment overrides used by upstream's transport. A nil
+// configuredRootCAs resolves the CA environment overrides used by the ported transport. A nil
 // pool leaves Go's native system trust in place; a non-nil empty pool preserves an invalid or
 // unreadable explicit override as a trust failure instead of silently falling back to other roots.
 func configuredRootCAs() *x509.CertPool {

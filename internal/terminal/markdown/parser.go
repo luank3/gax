@@ -16,7 +16,7 @@ import (
 // Two holds make that possible. Prose streams as it arrives, because the inline walker settles
 // everything except its ambiguous tail. A line's *boundary* — whether the paragraph continues, and
 // therefore whether the line is trimmed and what separator follows — waits for the next line's
-// first bytes, which is the deferral upstream's newline handler performs.
+// first bytes, which is the deferral the newline handler performs.
 type parser struct {
 	width  int
 	styled bool
@@ -249,8 +249,8 @@ func (p *parser) stepBlock(final bool) bool {
 		if headingMarkerPresent(line, info) {
 			p.startHeading(line, info, complete)
 		} else {
-			// The scanner reports a heading for hashes followed by a newline, but upstream's
-			// dispatcher requires a space, so such a line stays prose.
+			// The scanner reports a heading for hashes followed by a newline, but the dispatcher
+			// requires a space, so such a line stays prose.
 			p.startProse(line, 0, complete)
 		}
 	case LineThematic:
@@ -280,7 +280,7 @@ func (p *parser) stepBlock(final bool) bool {
 }
 
 // headingMarkerPresent reports whether the byte after a heading's hashes is a space, which the
-// upstream dispatcher requires even though its scanner also accepts a newline.
+// dispatcher requires even though the scanner also accepts a newline.
 func headingMarkerPresent(line string, info LineInfo) bool {
 	index := info.IndentLength + info.MarkerLength
 	return index < len(line) && line[index] == ' '
@@ -298,7 +298,7 @@ func (p *parser) stepFinalLine(line string, info LineInfo) bool {
 	shortFence := streaming.Kind == LineIncomplete
 
 	if allBackticks && (bareFence || shortFence) {
-		// A fence candidate without content is still ambiguous at EOF upstream, so it falls back
+		// A fence candidate without content is still ambiguous at end of input, so it falls back
 		// literally instead of opening inline code.
 		p.closeProseForBlock()
 		p.emitLiteralEOFLine(line, streaming.IndentLength > 0)
@@ -379,8 +379,8 @@ func (p *parser) stepProse(final bool) bool {
 	}
 	// A list item's continuation follows the batch's item loop instead, which only stops at a
 	// blank line, a block, or a line that could still open a fence.
-	// A line whose classification is not settled is not joined to the paragraph yet: upstream
-	// defers it, and at end of input emits it literally instead of inline-parsing it. Waiting for
+	// A line whose classification is not settled is not joined to the paragraph yet: it is
+	// deferred, and at end of input emitted literally instead of inline-parsed. Waiting for
 	// one more byte decides whether it is the document's last line. A line that is still only
 	// whitespace waits for the same reason.
 	streaming := ScanLine(next, false)
@@ -443,8 +443,8 @@ func (p *parser) stepProse(final bool) bool {
 }
 
 // stepFinalProseLine resolves the end-of-input cases where the line following prose decides it: a
-// whitespace-only line, a backtick-only fence candidate, and a short ambiguous prefix the upstream
-// newline handler copies without inline parsing.
+// whitespace-only line, a backtick-only fence candidate, and a short ambiguous prefix the newline
+// handler copies without inline parsing.
 func (p *parser) stepFinalProseLine(next string, complete bool) bool {
 	streaming := ScanLine(next, false)
 	candidate := next[streaming.IndentLength:]
@@ -471,7 +471,7 @@ func (p *parser) stepFinalProseLine(next string, complete bool) bool {
 		return true
 	}
 	if allBackticks && bareFence {
-		// A fence candidate without content is still ambiguous at EOF upstream, so it falls back
+		// A fence candidate without content is still ambiguous at end of input, so it falls back
 		// literally instead of opening inline code.
 		p.pending = ""
 		p.closeProseForBlock()
@@ -488,8 +488,8 @@ func (p *parser) stepFinalProseLine(next string, complete bool) bool {
 		return true
 	}
 	if streaming.Kind == LineIncomplete {
-		// A short ambiguous prefix after prose is soft-joined by the upstream newline handler,
-		// which copies its final tail without inline parsing.
+		// A short ambiguous prefix after prose is soft-joined by the newline handler, which
+		// copies its final tail without inline parsing.
 		p.pending = ""
 		p.closeProseRawTail(next)
 		return true
@@ -510,10 +510,10 @@ func (p *parser) feedProseLine() {
 // following line continues: the line itself as the join trims it, the boundary sentinel, and the
 // separator that replaces the newline.
 func paragraphBoundary(line, next string) (body, separator, nextTrimmed string) {
-	// Upstream never rewrites a line: it emits the bytes as they arrive and decides only what
+	// The parser never rewrites a line: it emits the bytes as they arrive and decides only what
 	// replaces the newline. A carriage return is therefore a text byte that also ends the trailing
 	// space run, and a hard break is a newline on its own rather than a re-emission of the spaces.
-	// A carriage return does not end the run: upstream keeps counting the spaces before it.
+	// A carriage return does not end the run: the parser keeps counting the spaces before it.
 	withoutCR := strings.TrimSuffix(line, "\r")
 	trailingSpaces := len(withoutCR) - len(strings.TrimRight(withoutCR, " "))
 	var out strings.Builder
@@ -598,7 +598,7 @@ func (p *parser) closeProseRawTail(last string) {
 		p.feedInline(p.line[p.fed:], false)
 	}
 	p.fed = len(p.line)
-	// The raw-tail join writes its separator, then the tail as literal bytes: upstream's newline
+	// The raw-tail join writes its separator, then the tail as literal bytes: the newline handler's
 	// handler emits them while the run they sit inside is still open, and md_flush closes that run
 	// afterwards.
 	withoutCR := strings.TrimSuffix(p.line, "\r")
@@ -715,7 +715,7 @@ func (p *parser) stepTable(final bool) bool {
 	line, rest, complete := splitFirstLine(p.pending)
 	if !complete && !final {
 		p.sawNewline = false
-		// An oversized partial row is already lossless as literal text, and upstream bails the
+		// An oversized partial row is already lossless as literal text, and the parser bails the
 		// whole attempt through its literal path rather than retaining it.
 		if p.tableBytes+len(line) > maxTableBytes {
 			p.tableLines = append(p.tableLines, line)
@@ -734,7 +734,7 @@ func (p *parser) stepTable(final bool) bool {
 	qualifies = strings.Contains(line, "|") && len(row) > 0
 	if qualifies && p.tableBytes+len(line)+1 > maxTableBytes {
 		if last {
-			// An oversized unterminated tail is still part of the active table attempt; upstream
+			// An oversized unterminated tail is still part of the active table attempt; the parser
 			// bails the whole attempt through its lossless literal path.
 			p.tableLines = append(p.tableLines, line)
 			p.tableVerbatim = true
@@ -776,7 +776,7 @@ func (p *parser) finalizeTable(finalHasNewline bool) {
 	p.startBlock()
 	rows, alignments, _, _ := parseTable(p.tableLines, 0, finalHasNewline)
 	if p.tableVerbatim || rows == nil {
-		// Upstream keeps a collected table verbatim when its body shape or row count exceeds the
+		// A collected table is kept verbatim when its body shape or row count exceeds the
 		// bounded formatter's assumptions.
 		for index := 0; index < len(p.tableLines); index++ {
 			p.raw(wrapStyled(p.tableLines[index], p.width, 0))
@@ -845,7 +845,7 @@ func (p *parser) startBlockquote(line string, info LineInfo, complete bool) {
 // document's last line.
 func (p *parser) startHeading(line string, info LineInfo, complete bool) {
 	p.startBlock()
-	// Upstream consumes the hashes and the single space that follows them, keeps any further
+	// The parser consumes the hashes and the single space that follows them, keeps any further
 	// indentation, expands tabs, and does not strip a closing hash run.
 	heading := line[info.IndentLength+info.MarkerLength:]
 	if heading != "" && heading[0] == ' ' {

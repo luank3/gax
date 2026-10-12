@@ -65,7 +65,7 @@ func (err *OptionError) Diagnostic(program string) string {
 func CheckSubagentDepth(value string) error { return subagent.CheckDepth(value) }
 
 // Parse interprets arguments without the program name. The preset callback recognizes a bare
-// first word as the upstream preset shortcut; option parsing otherwise remains independent of
+// first word as the preset shortcut; option parsing otherwise remains independent of
 // config loading and process exit behavior.
 func Parse(args []string, presetExists func(string) bool) (Options, error) {
 	return parse(args, presetExists, nil)

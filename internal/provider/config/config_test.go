@@ -197,7 +197,7 @@ func TestNullHeaderValueIsIgnoredRatherThanRemovingDefault(t *testing.T) {
 	}
 }
 
-func TestProviderConfigurationWarningsMatchUpstream(t *testing.T) {
+func TestProviderConfigurationWarningsMatchDocumentedMessages(t *testing.T) {
 	store := baseconfig.New(baseconfig.DefaultSettings())
 	store.SetEnvironment(nil)
 	if err := store.LoadConfig([]byte(`{"providers":{"demo":{"cache_ttl":"2h","extra_body":{"model":"reserved","n":2},"extra_headers":{"Bad Name":"x","X-Number":7,"X-Unset":"$NOT_SET","X-Evil":"bad\r\ninjected"}}}}`)); err != nil {
@@ -222,7 +222,7 @@ func TestProviderConfigurationWarningsMatchUpstream(t *testing.T) {
 		"providers.demo.extra_headers: header 'X-Evil' needs a control-character-free value — ignoring it",
 	}
 	if !reflect.DeepEqual(warnings, want) {
-		t.Fatalf("provider warnings = %q, want upstream diagnostics %q", warnings, want)
+		t.Fatalf("provider warnings = %q, want the documented diagnostics %q", warnings, want)
 	}
 	if err := store.LoadConfig([]byte(`{"providers":{"bad":{"extra_body":[]}}}`)); err != nil {
 		t.Fatal(err)

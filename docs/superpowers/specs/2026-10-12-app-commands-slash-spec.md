@@ -10,10 +10,10 @@ and `internal/terminal/picker`. Inputs: a prompt line, a cursor offset, the live
 ## Invariants
 
 ### One registry owns order, names, and usage
-- **Rule:** Keep `commandRegistry` in upstream order and expose it only through `Commands()`, which
+- **Rule:** Keep `commandRegistry` in registry order and expose it only through `Commands()`, which
   returns a copy, since that order drives `/help` rows and completion candidates.
 - **Source:** `internal/slash/slash.go:39`: `commandRegistry`; copy in `Commands` at :61.
-- **Assertion:** `TestCommandsMatchUpstreamOrder` in `internal/slash/slash_test.go:8`: names, two
+- **Assertion:** `TestCommandsMatchRegistryOrder` in `internal/slash/slash_test.go:8`: names, two
   summaries, aliases, and order against a literal list.
 - **Rejected:** Sorting the registry for display; the test compares `new/clear, resume, undo, ...`.
 
@@ -35,7 +35,7 @@ and `internal/terminal/picker`. Inputs: a prompt line, a cursor offset, the live
   `internal/app/history_commands.go:18` at :23 and :25.
 - **Assertion:** `TestRunREPLConsumesSlashCommands` in `internal/app/app_test.go:2064` sees one
   provider request for `/help`, `/nonesuch`, `/model fast`, `/resume`; `BadUsage` appears in
-  `TestRunREPLSelectionErrorsUseUpstreamDisplayChannel` (`internal/app/app_test.go:1130`).
+  `TestRunREPLSelectionErrorsUseDisplayChannel` (`internal/app/app_test.go:1130`).
 - **Rejected:** Passing unknown commands to the model; the typo would cost a turn.
 
 ---

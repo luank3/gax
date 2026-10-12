@@ -407,7 +407,7 @@ func (provider *Provider) ListedModelIDs() []string {
 }
 
 // Close cancels and joins the provider's background model probe. A closed provider cannot start
-// another probe, matching upstream provider destruction and metadata release.
+// another probe, matching provider destruction and metadata release.
 func (provider *Provider) Close() {
 	if provider == nil || provider.probe == nil {
 		return
@@ -466,7 +466,7 @@ func (provider *Provider) ProbeAvailability(ctx context.Context, httpClient *tra
 }
 
 // PrefetchModelMetadata starts the shared catalog refresh only for providers with a catalog
-// identity, matching the upstream model metadata lifecycle.
+// identity, matching the model metadata lifecycle.
 func (provider *Provider) PrefetchModelMetadata() {
 	if provider == nil || provider.modelCatalog == nil || provider.CatalogID == nil {
 		return
@@ -1499,8 +1499,8 @@ func (provider *Provider) Headers(wire Wire, sessionID string, streaming bool) [
 		if provider.authAccountID != "" {
 			headers = append(headers, "chatgpt-account-id: "+provider.authAccountID)
 		}
-		// Upstream's codex_auth_headers pins a streamed request to the session the official CLI
-		// sends and flags the experimental Responses dialect; everything else gets a plain Accept.
+		// A streamed Codex request is pinned to the session the official CLI sends and flagged
+		// as the experimental Responses dialect; everything else gets a plain Accept.
 		// gax streams every Codex model request over the Responses wire and leaves the SSE headers
 		// to the transport, so that wire is the streamed case here.
 		if streaming || wire == WireResponses {

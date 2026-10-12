@@ -22,7 +22,7 @@ func slashCompleter(choices slash.ArgumentChoices) terminalinput.Completer {
 }
 
 // slashArgumentChoices lists the values Tab offers for an enumerating command's first argument,
-// following upstream's per-command choice hooks. Every value is already in memory: a Tab cannot wait
+// following the per-command choice hooks. Every value is already in memory: a Tab cannot wait
 // on the network or a model listing.
 func slashArgumentChoices(name string, providers *registry.Registry, provider *runtime.Provider,
 	model *string, store *config.Store) []string {
@@ -74,7 +74,7 @@ func modelIDChoices(provider *runtime.Provider) []string {
 	return ids
 }
 
-// effortLevelChoices follows upstream in always offering default, which lets the provider choose.
+// effortLevelChoices always offers default, which lets the provider choose.
 func effortLevelChoices(provider *runtime.Provider, model *string) []string {
 	if provider == nil {
 		return nil

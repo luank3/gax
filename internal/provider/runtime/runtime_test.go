@@ -101,7 +101,7 @@ func TestProviderConfigLinterAllowsMixedAndRegisteredFields(t *testing.T) {
 	}
 }
 
-func TestProviderWarningsFollowUpstreamMetadataLintAndRuleOrder(t *testing.T) {
+func TestProviderWarningsFollowMetadataLintAndRuleOrder(t *testing.T) {
 	store := config.New(config.DefaultSettings())
 	store.SetEnvironment(nil)
 	if err := store.LoadConfig([]byte(`{"providers":{"demo":{"base_url":"https://demo.example/v1","api":"openai-completions","metadata_api":"invalid","model_apis":{"claude-*":false},"thinking_mode":"budget","port":8080}}}`)); err != nil {
@@ -726,7 +726,7 @@ func TestOpenRouterModelProbeQueriesCatalogAndStoresMetadata(t *testing.T) {
 	}
 }
 
-func TestOpenRouterModelProbeEscapesSelectedModelLikeUpstream(t *testing.T) {
+func TestOpenRouterModelProbeEscapesSelectedModel(t *testing.T) {
 	store := config.New(config.DefaultSettings())
 	store.SetEnvironment(func(name string) (string, bool) {
 		return "openrouter-probe-key", name == "OPENROUTER_API_KEY"

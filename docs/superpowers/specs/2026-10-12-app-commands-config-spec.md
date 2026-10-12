@@ -112,20 +112,20 @@ Non-goal: the provider-side request shapes behind `/usage` and `/model`, and the
   (`internal/app/config_commands.go:36`) has no asserting test; the nearest indirect one is
   `TestValidPresetNamesPreserveConfigOrderAndSkipInvalidEntries` (`internal/app/app_test.go:146`).
 - The `must name a provider` branches (`internal/app/config_commands.go:220`, `:249`) have no
-  asserting test; `TestLoadPresetCoercesBooleanAndNumberScalarsLikeUpstream` only covers the
+  asserting test; `TestLoadPresetCoercesBooleanAndNumberScalars` only covers the
   coercion path through the same function.
 - The declined-overwrite branch, `keep it` then `left preset '<name>' unchanged`
   (`internal/app/preset_save.go:52-56`), never runs;
   `TestRunTTYPresetSaveConfirmsOverwriteAndCanClearTint` selects `overwrite` only.
 - Resolved 2026-10-12: the note at `docs/superpowers/plans/2026-10-10-repl-provider-selection.md:3`
-  claiming upstream takes no arguments for `/provider`, `/model`, or `/effort` was wrong. Upstream
-  master `2834c2c` takes them (`usage = "[id]"` + `argument_choices` in `src/slash.c`), which is what
-  the handlers and `TestRunREPLSelectsSelectionByArgument` (`internal/app/app_test.go:1162`) do.
+  claiming `/provider`, `/model`, and `/effort` take no arguments was wrong. They declare
+  `usage = "[id]"` plus an `argument_choices` hook, which is what the handlers and
+  `TestRunREPLSelectsSelectionByArgument` (`internal/app/app_test.go:1162`) do.
 - Resolved 2026-10-12: `docs/superpowers/plans/2026-10-10-repl-model-selection.md:18` asks `/model`
-  with no argument to print candidates in a non-TTY REPL, but upstream's `picker_run`
-  (`src/terminal/picker.c:666`) returns -1 without a TTY and prints nothing, so returning silently
-  when the listing holds more than one model (`internal/app/provider_commands.go:388`) is parity. The
-  plan line carries a superseding note.
+  with no argument to print candidates in a non-TTY REPL, but the picker returns -1 without a TTY
+  and prints nothing, so returning silently when the listing holds more than one model
+  (`internal/app/provider_commands.go:388`) is the recorded behavior. The plan line carries a
+  correction.
 
 ## Review
 

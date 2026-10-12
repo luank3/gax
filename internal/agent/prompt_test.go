@@ -35,7 +35,7 @@ func TestBuildSystemPromptAppendsConfiguredTextAndEnvironment(t *testing.T) {
 	}
 }
 
-func TestBuildSystemPromptTaskGuidanceMatchesUpstream(t *testing.T) {
+func TestBuildSystemPromptTaskGuidanceUsesDocumentedWording(t *testing.T) {
 	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_skills":true}`)
 	want := "base\n\n" +
 		"# Background tasks\n\n" +
@@ -44,18 +44,18 @@ func TestBuildSystemPromptTaskGuidanceMatchesUpstream(t *testing.T) {
 		"`gax -p \"<task>\"` (via the bash tool) runs a fresh gax instance with clean context in this directory and prints its final answer to stdout. Delegate to subagents only when the user asks for it. The child inherits this session's provider, model, and effort. For concurrent work, launch subagents with `background: true` and collect answers with task_wait; a synchronous call is simpler when you would otherwise wait immediately. The child prints its session id to stderr at startup; follow up on a finished (or killed) run with `gax --resume=<id> -p \"<follow-up>\"`."
 	result := BuildSystemPrompt(store, "", PromptOptions{})
 	if result.Text != want {
-		t.Fatalf("task and subagent guidance differs from upstream:\n got: %q\nwant: %q", result.Text, want)
+		t.Fatalf("task and subagent guidance differs from the documented wording:\n got: %q\nwant: %q", result.Text, want)
 	}
 }
 
-func TestBuildSystemPromptTasklessSubagentGuidanceMatchesUpstream(t *testing.T) {
+func TestBuildSystemPromptTasklessSubagentGuidanceUsesDocumentedWording(t *testing.T) {
 	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_skills":true,"no_tasks":true}`)
 	want := "base\n\n" +
 		"# Subagents\n\n" +
 		"`gax -p \"<task>\"` (via the bash tool) runs a fresh gax instance with clean context in this directory and prints its final answer to stdout. Delegate to subagents only when the user asks for it. The child inherits this session's provider, model, and effort. Subagents are slow: pass a generous timeout_seconds (e.g. 1800). The child prints its session id to stderr at startup; follow up on a finished (or timed-out) run with `gax --resume=<id> -p \"<follow-up>\"`."
 	result := BuildSystemPrompt(store, "", PromptOptions{})
 	if result.Text != want {
-		t.Fatalf("task-less subagent guidance differs from upstream:\n got: %q\nwant: %q", result.Text, want)
+		t.Fatalf("task-less subagent guidance differs from the documented wording:\n got: %q\nwant: %q", result.Text, want)
 	}
 }
 
@@ -162,7 +162,7 @@ func TestBuildSystemPromptLoadsConfigFilesAndProjectInstructionsRootFirst(t *tes
 	}
 }
 
-func TestBuildSystemPromptUsesUpstreamSpacingBeforeProjectContext(t *testing.T) {
+func TestBuildSystemPromptUsesDocumentedSpacingBeforeProjectContext(t *testing.T) {
 	project := t.TempDir()
 	if err := os.WriteFile(filepath.Join(project, "AGENTS.md"), []byte("project rule\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -175,7 +175,7 @@ func TestBuildSystemPromptUsesUpstreamSpacingBeforeProjectContext(t *testing.T) 
 	}
 	before := result.Text[:heading]
 	if trailing := len(before) - len(strings.TrimRight(before, "\n")); trailing != 2 {
-		t.Fatalf("environment/project spacing differs from upstream: %q", result.Text)
+		t.Fatalf("environment/project spacing differs from the documented output: %q", result.Text)
 	}
 }
 

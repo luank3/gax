@@ -98,7 +98,7 @@ presentation around the text (retry markers, status footers, tool rows) is `inte
   earlier break intact.
 - **Source:** `internal/terminal/markdown/wrap.go:221` `breakAtLastSpace`, guarded by
   `wrapper.lastBreakByte >= 0` at `internal/terminal/markdown/wrap.go:165`.
-- **Assertion:** `TestRenderMatchesUpstreamCursorWrapFixtures` at
+- **Assertion:** `TestRenderMatchesCursorWrapFixtures` at
   `internal/terminal/markdown/scan_test.go:375`: `Render("héllo wörld", 8, false)` is
   `"héllo wö\x1b[3D\x1b[K\nwörld"`.
 - **Rejected:** Breaking at the budget without cursor control: the moved bytes stay visible and are

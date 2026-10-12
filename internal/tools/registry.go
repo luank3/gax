@@ -593,7 +593,7 @@ func (registry *Registry) RunWithDisplay(name, arguments string, imageInput int,
 	return run(arguments, imageInput, display)
 }
 
-// Presentation resolves upstream tool-display metadata from the same preprocessed arguments used
+// Presentation resolves tool-display metadata from the same preprocessed arguments used
 // for execution while leaving the original conversation item untouched.
 func (registry *Registry) Presentation(call conversation.Item) ToolPresentation {
 	name := stringValue(call.ToolName)

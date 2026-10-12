@@ -1555,7 +1555,7 @@ func shapeCommandOutput(data []byte, outputCap int, savedPath string) (string, b
 		return result.String(), true
 	}
 
-	// If the head has no complete line before the tail, match the upstream tail-only fallback and
+	// If the head has no complete line before the tail, match the tail-only fallback and
 	// spend the full byte and line budget on the ending of the command output.
 	tail, tailStart, tailLines = commandTailSlice(data, outputCap, maxReadLines)
 	keptSize := formatByteSize(int64(len(tail)))

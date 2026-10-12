@@ -641,7 +641,7 @@ func (editor *Editor) readPasteBody() (string, error) {
 			pending = pending[1:]
 		}
 	}
-	// A timed-out or interrupted paste may leave marker-prefix bytes buffered. Upstream drops
+	// A timed-out or interrupted paste may leave marker-prefix bytes buffered. The ported behavior drops
 	// these bytes rather than leaking a partial terminator into the editor.
 	return string(body), nil
 }

@@ -95,7 +95,7 @@
 - **Source:** `internal/provider/modelsort/modelsort.go:23` (`CompareIDs`), tokenizer at
   `internal/provider/modelsort/modelsort.go:54`.
 - **Assertion:** `TestCompareIDsVersionSnapshotVariantOrder` in
-  `internal/provider/modelsort/modelsort_test.go:8` and `TestSortIDsUpstreamFixtures` at `:43`.
+  `internal/provider/modelsort/modelsort_test.go:8` and `TestSortIDsFixtures` at `:43`.
 - **Rejected:** `sort.Strings`; byte order puts `babbage-001` before `babbage-002`, while
   `internal/provider/modelsort/modelsort_test.go:22` requires the higher numeric run first.
 ---
@@ -108,7 +108,7 @@
 - **Source:** `internal/provider/mock/mock.go:58` (`Stream`), cursor advance at
   `internal/provider/mock/mock.go:132`, warnings at `internal/provider/mock/mock.go:209`.
 - **Assertion:** `TestCancelledScriptTurnDoesNotAdvance` in `internal/provider/mock/mock_test.go:80`
-  and `TestScriptWarningsMatchUpstreamDiagnostics` at `:120`.
+  and `TestScriptWarningsMatchDocumentedDiagnostics` at `:120`.
 - **Rejected:** Advancing the cursor before the turn finishes; the cancellation test replays the
   first turn and expects it again.
 

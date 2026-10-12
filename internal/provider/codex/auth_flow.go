@@ -458,7 +458,7 @@ func parseDeviceUserCode(body []byte) (deviceUserCode, error) {
 	return deviceUserCode{DeviceAuthID: deviceID, UserCode: userCode, Interval: time.Duration(interval) * time.Second}, nil
 }
 
-// parseDecimalPrefix matches strtol's base-10 handling for the upstream string interval: leading
+// parseDecimalPrefix matches strtol's base-10 handling for the interval string: leading
 // ASCII whitespace and a sign are accepted, and parsing stops at the first non-digit.
 func parseDecimalPrefix(value string) int64 {
 	start := 0

@@ -25,7 +25,7 @@ carries diagnostics. Non-goal: the agent loop and slash-command implementations 
 - **Rule:** `options.OneShot` alone selects the single-turn path; otherwise Run runs the line REPL,
   which returns 0 at stdin EOF instead of reporting a read error.
 - **Source:** `internal/app/app.go:790`: the `if options.OneShot` branch.
-- **Assertion:** `TestRunInteractiveEOFLeavesUpstreamTrailingSeparator` in
+- **Assertion:** `TestRunInteractiveEOFLeavesTrailingSeparator` in
   `internal/app/app_test.go:1364`: no `-p`, empty stdin, code 0, three trailing newlines.
 - **Rejected:** Reporting EOF as `gax: read prompt: <err>`; the scanner reports no error at EOF.
 
@@ -122,9 +122,9 @@ carries diagnostics. Non-goal: the agent loop and slash-command implementations 
   (`internal/app/repl.go:62`) are pinned by `TestREPLPromptMarkerFollowsTheInputTTYFlag` and
   `TestREPLCancelledContextExitsWith130` in `internal/app/repl_test.go`; one-shot escalation still
   has no REPL counterpart for the second-interrupt path.
-- The plan text that said `/provider`, `/model`, and `/effort` "reject arguments" was corrected
-  on 2026-10-12: upstream master `2834c2c` declares `usage = "[id]"` with an `argument_choices` hook
-  for all three, so applying an argument is parity (`TestRunREPLSelectsSelectionByArgument`,
+- The plan text that said `/provider`, `/model`, and `/effort` "reject arguments" was corrected on
+  2026-10-12: all three declare `usage = "[id]"` with an `argument_choices` hook, so applying an
+  argument is the recorded behavior (`TestRunREPLSelectsSelectionByArgument`,
   `internal/app/app_test.go:1162`).
 
 ## Review

@@ -118,7 +118,7 @@ func TestInvalidLoadClearsOnlyThatTier(t *testing.T) {
 	}
 }
 
-func TestTypedParsingUsesBoundsAndUpstreamUnits(t *testing.T) {
+func TestTypedParsingUsesBoundsAndDocumentedUnits(t *testing.T) {
 	store := New([]Setting{
 		{Key: "count", Kind: KindInt, Default: "4", Min: 1, Max: 10},
 		{Key: "size", Kind: KindSize, Default: "50k"},
@@ -139,7 +139,7 @@ func TestTypedParsingUsesBoundsAndUpstreamUnits(t *testing.T) {
 	}
 }
 
-func TestIntParsingMatchesUpstreamStrtolAndCIntBounds(t *testing.T) {
+func TestIntParsingMatchesStrtolAndCIntBounds(t *testing.T) {
 	setting := Setting{Key: "count", Kind: KindInt, Default: "4"}
 	store := New([]Setting{setting})
 	for _, test := range []struct {
@@ -233,7 +233,7 @@ func TestOpenAIReasoningRequiredIsNotARegisteredSetting(t *testing.T) {
 	}
 }
 
-func TestOpenAIReasoningRoundtripUsesUpstreamEnvironmentAlias(t *testing.T) {
+func TestOpenAIReasoningRoundtripUsesEnvironmentAlias(t *testing.T) {
 	const key = "providers.openai-compatible.reasoning_roundtrip"
 	const envVar = "GAX_REASONING_ROUNDTRIP"
 	const incorrectEnvVar = "GAX_OPENAI_REASONING_ROUNDTRIP"
@@ -262,7 +262,7 @@ func TestOpenAIReasoningRoundtripUsesUpstreamEnvironmentAlias(t *testing.T) {
 		return "reasoning_content", name == incorrectEnvVar
 	})
 	if got := incorrectStore.String(key); got != nil {
-		t.Fatalf("non-upstream alias %s unexpectedly set the provider reasoning field to %q", incorrectEnvVar, *got)
+		t.Fatalf("alias %s unexpectedly set the provider reasoning field to %q", incorrectEnvVar, *got)
 	}
 }
 

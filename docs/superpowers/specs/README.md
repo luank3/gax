@@ -51,10 +51,9 @@ Findings that need a decision, not just a test. Everything else lives in each sp
 
 - `/provider`, `/model`, and `/effort` accept and apply an argument in gax
   (`TestRunREPLSelectsSelectionByArgument`, `internal/app/app_test.go:1162`). **Resolved
-  2026-10-12:** this is ported-behavior parity, not a divergence. Upstream master `2834c2c` declares
-  `usage = "[id]"` (and `"[level]"` for `/effort`) with an `argument_choices` hook for all three in
-  `src/slash.c`; the earlier commit gax was ported from predates upstream's argument-taking
-  commits. The
+  2026-10-12:** this is the recorded behavior, not a divergence. The commands declare
+  `usage = "[id]"` (and `"[level]"` for `/effort`) with an `argument_choices` hook for all three.
+  The
   2026-10-11 "accepts no arguments" notes were wrong; `2026-10-10-repl-provider-selection.md` and
   `2026-10-10-slash-command-front-end.md` now carry a correction, as does
   `2026-10-10-command-entrypoint.md:22`.
@@ -68,7 +67,7 @@ Findings that need a decision, not just a test. Everything else lives in each sp
   backend this entry was written against with six search APIs, you.com leading them, and kept the
   crawl as the fallback for a backend that cannot answer
   (`docs/superpowers/plans/2026-10-12-web-search-providers.md`).
-- `docs/superpowers/plans/2026-10-09-config-provider-registry.md:46` counts "all 64 ordered upstream
+- `docs/superpowers/plans/2026-10-09-config-provider-registry.md:46` counts "all 64 ordered
   setting entries" while the registry has a different row count; `config-layers` records the delta.
 - `catalog.merge` had no callers. **Resolved 2026-10-12:** deleted instead of wired
   (`internal/catalog/catalog.go`); the fallback order it encoded never ran.

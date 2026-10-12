@@ -2,7 +2,7 @@ package tools
 
 import "testing"
 
-func TestIsExplorationBashMatchesUpstreamCommandShapes(t *testing.T) {
+func TestIsExplorationBashMatchesRecordedCommandShapes(t *testing.T) {
 	for _, command := range []string{
 		"rg pattern | head",
 		"find . -type f | sort | uniq",

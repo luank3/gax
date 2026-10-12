@@ -179,7 +179,7 @@ func TestToolPreviewDiffOmitsFileHeadersAndPreservesBlankRows(t *testing.T) {
 	}
 }
 
-func TestToolPreviewHeadTailMatchesUpstreamModestOverflowAndBlankTail(t *testing.T) {
+func TestToolPreviewHeadTailMatchesModestOverflowAndBlankTail(t *testing.T) {
 	modest := newToolPreviewRenderer(coretools.PreviewHeadTail, coretools.OutputPlain, 100, false)
 	got := modest.Feed([]byte("a\nb\nc\nd\ne\n")) + modest.Finalize()
 	if want := "┌ a\n│ b\n│ c\n│ d\n│ e\r└\n"; got != want {

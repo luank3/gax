@@ -7,7 +7,7 @@ import (
 )
 
 // Join appends suffix to base, trimming boundary slashes while preserving inner components such as
-// "missing/../target" exactly as the upstream path_join helper does.
+// "missing/../target" exactly as the path join does.
 func Join(base, suffix string) string {
 	baseLength := len(base)
 	for baseLength > 1 && base[baseLength-1] == '/' {
@@ -143,7 +143,7 @@ func Dir(value string) string {
 	return value[:parentEnd]
 }
 
-// XDGGaxPath mirrors the upstream XDG path construction and reports false when neither the XDG
+// XDGGaxPath mirrors the XDG path construction and reports false when neither the XDG
 // base nor HOME can resolve a location.
 func XDGGaxPath(xdgBase, home, homeRelative, relative string) (string, bool) {
 	if xdgBase != "" {

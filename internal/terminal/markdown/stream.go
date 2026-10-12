@@ -9,8 +9,8 @@ import (
 //
 // It is a thin adapter over the block parser: Feed hands input to the parser, which emits
 // everything a later byte cannot change and holds the rest. A boundary or a styled-mode change
-// resolves the held bytes against end of segment and starts fresh, which is what upstream's
-// md_flush and md_set_styled do.
+// resolves the held bytes against end of segment and starts fresh, the same way a flush or a
+// styled-mode change does.
 type Stream struct {
 	width  int
 	styled bool

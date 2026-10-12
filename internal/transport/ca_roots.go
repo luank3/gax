@@ -15,7 +15,7 @@ var (
 
 // systemProxyRootCAs loads the machine trust store without the origin-only CA environment
 // overrides. Go's Unix root loader reads SSL_CERT_FILE and SSL_CERT_DIR even when a TLS config
-// leaves RootCAs nil, while upstream keeps HTTPS proxy verification on the system store.
+// leaves RootCAs nil, while the ported transport keeps HTTPS proxy verification on the system store.
 func systemProxyRootCAs() *x509.CertPool {
 	proxyRootsOnce.Do(func() {
 		switch runtime.GOOS {

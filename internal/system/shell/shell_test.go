@@ -9,7 +9,7 @@ import (
 
 func TestFindUsesOnlyAbsolutePATHEntries(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("upstream shell lookup follows POSIX PATH semantics")
+		t.Skip("shell lookup follows POSIX PATH semantics")
 	}
 	root := t.TempDir()
 	bin := filepath.Join(root, "bin")
@@ -64,7 +64,7 @@ func TestFindRequiresExecutableRegularFile(t *testing.T) {
 
 func TestResolveRejectsRelativePathShellAndReportsInvalidConfiguration(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("upstream shell lookup follows POSIX paths")
+		t.Skip("shell lookup follows POSIX paths")
 	}
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, "relative-bin"), 0o700); err != nil {

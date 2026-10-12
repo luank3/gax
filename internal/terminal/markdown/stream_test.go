@@ -388,7 +388,7 @@ func TestStreamOutputMatchesRenderAcrossChunkPartitions(t *testing.T) {
 	}
 }
 
-func TestStreamMatchesUpstreamSplitFeedFixtures(t *testing.T) {
+func TestStreamMatchesSplitFeedFixtures(t *testing.T) {
 	fixtures := []struct {
 		name   string
 		feeds  []string
@@ -431,13 +431,13 @@ func TestStreamMatchesUpstreamSplitFeedFixtures(t *testing.T) {
 				t.Fatal(err)
 			}
 			if got := output.String(); got != fixture.want {
-				t.Fatalf("split-feed output = %q, want upstream fixture %q", got, fixture.want)
+				t.Fatalf("split-feed output = %q, want fixture %q", got, fixture.want)
 			}
 		})
 	}
 }
 
-func TestStreamCloseResolvesUpstreamEOFStyles(t *testing.T) {
+func TestStreamCloseResolvesEOFStyles(t *testing.T) {
 	fixtures := []struct {
 		input  string
 		styled bool
@@ -463,7 +463,7 @@ func TestStreamCloseResolvesUpstreamEOFStyles(t *testing.T) {
 				t.Fatal(err)
 			}
 			if got := output.String(); got != fixture.want {
-				t.Fatalf("Close output = %q, want upstream EOF fixture %q", got, fixture.want)
+				t.Fatalf("Close output = %q, want the EOF fixture %q", got, fixture.want)
 			}
 		})
 	}
@@ -561,7 +561,7 @@ func TestStreamTracksTableAfterEagerProse(t *testing.T) {
 	}
 }
 
-func TestRenderUpstreamSpacesTightEmDash(t *testing.T) {
+func TestRenderSpacesTightEmDash(t *testing.T) {
 	cases := []struct {
 		input string
 		want  string
@@ -618,7 +618,7 @@ func FuzzStreamFeedNeverLatchesOrCorrupts(f *testing.F) {
 				if err := stream.Close(); err != nil {
 					t.Fatalf("Close(%q, %d, %d, %d): %v", input, width, first, second, err)
 				}
-				// Upstream feeds the answer stream to the Markdown renderer unsanitized, so
+				// The answer stream reaches the Markdown renderer unsanitized, so
 				// invalid input may pass through. A valid document must never render as invalid
 				// UTF-8, which would mean wrapping sliced a rune.
 				if utf8.ValidString(input) && !utf8.ValidString(output.String()) {

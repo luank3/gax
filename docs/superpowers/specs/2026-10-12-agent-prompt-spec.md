@@ -39,9 +39,9 @@
 - **Rule:** Emit `taskPrompt` and `subagentPrompt` verbatim unless their flag disables them, and
   with `no_tasks` on swap the subagent text for the taskless variant.
 - **Source:** `internal/agent/prompt.go:102` `buildEnvironmentSuffix` (taskless variant at `:110`).
-- **Assertion:** `TestBuildSystemPromptTaskGuidanceMatchesUpstream` at
+- **Assertion:** `TestBuildSystemPromptTaskGuidanceUsesDocumentedWording` at
   `internal/agent/prompt_test.go:38` and
-  `TestBuildSystemPromptTasklessSubagentGuidanceMatchesUpstream` at `:51`.
+  `TestBuildSystemPromptTasklessSubagentGuidanceUsesDocumentedWording` at `:51`.
 - **Rejected:** Disabling subagents when `no_tasks` is on; the taskless variant keeps delegation.
 
 ---

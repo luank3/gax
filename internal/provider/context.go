@@ -8,7 +8,7 @@ import (
 )
 
 // ToolParam describes one JSON Schema property advertised to a model. A zero Minimum is omitted,
-// matching the upstream tool definition format.
+// matching the tool definition format.
 type ToolParam struct {
 	Name        string
 	Type        string
@@ -31,7 +31,7 @@ type Context struct {
 	Items        []conversation.Item
 	Tools        []ToolDefinition
 	Effort       *string
-	// ImageInput follows the upstream tri-state convention: 1 supports images, 0 rejects them,
+	// ImageInput follows the tri-state convention: 1 supports images, 0 rejects them,
 	// and -1 means unknown (treated as supported to avoid silently discarding image content).
 	ImageInput int
 	SessionID  *string

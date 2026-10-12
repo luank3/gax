@@ -9,7 +9,7 @@ import (
 )
 
 // watchTerminationEscalation re-raises a termination signal after restore runs. restore must be
-// allocation-free terminal cleanup (upstream's restore_terminal): the process is about to die, so
+// allocation-free terminal cleanup (the restore path): the process is about to die, so
 // a hidden cursor would otherwise leak into the parent shell.
 func watchTerminationEscalation(stopContext func(), killChildren func(), restore func()) func() {
 	signals := make(chan os.Signal, 2)

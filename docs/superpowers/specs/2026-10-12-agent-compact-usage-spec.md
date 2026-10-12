@@ -108,7 +108,7 @@ Non-goal: provider account usage shown by `/usage` (`internal/slash/slash.go:54`
   falls back to `stream failed` when `ErrorMessage` is empty.
 - **Source:** `internal/app/compact_command.go:38` `runCompactCommand`
 - **Assertion:** `TestRunCompactUsesFocusAndReplacesHistoryWithSummarySeed` in
-  `internal/app/app_test.go:1494`, and `TestRunCompactWithoutHistoryUsesUpstreamStyle` in
+  `internal/app/app_test.go:1494`, and `TestRunCompactWithoutHistoryUsesRecordedStyle` in
   `internal/app/app_test.go:2194`
 - **Rejected:** printing outcomes through the live renderer instead of `compactNote`
   (`internal/app/compact_command.go:102`); the notes go to `stdout` with their dim wrapper.
@@ -119,7 +119,7 @@ Non-goal: provider account usage shown by `/usage` (`internal/slash/slash.go:54`
   threshold table divides the limit by 100 evenly.
 - The `CompactNoSummary` outcome (`internal/agent/compact.go:59`) and the `stream failed` fallback
   (`internal/app/compact_command.go:46`) have no asserting test; nearest is
-  `TestRunCompactWithoutHistoryUsesUpstreamStyle` (`internal/app/app_test.go:2194`).
+  `TestRunCompactWithoutHistoryUsesRecordedStyle` (`internal/app/app_test.go:2194`).
 - The `Unpriced = true` assignment (`internal/agent/stats.go:211`) is never asserted; the tests
   naming `Unpriced` assert false (`internal/agent/stats_test.go:70`, `:138`, `:159`).
 - The negative `Cost` reset (`internal/agent/usage.go:26`) is unasserted;

@@ -146,7 +146,7 @@ func runTTYREPL(ctx context.Context, stdin *os.File, persistPromptHistory bool, 
 		PasteHook:      func() (string, bool) { return terminalpaste.CaptureClipboard(ctx) },
 		PasteFilter:    terminalpaste.FileURIsToPaths,
 	}
-	// A turn runs with the cursor hidden, as upstream's REPL does: the editor owns the cursor for
+	// A turn runs with the cursor hidden: the editor owns the cursor for
 	// the prompt, and everything between prompts (streamed answers, tool output, the animated
 	// indicator) paints with it off. The deferred show keeps an abandoned cursor from reaching
 	// the parent shell.

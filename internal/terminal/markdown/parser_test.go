@@ -127,7 +127,7 @@ func TestParserCensus(t *testing.T) {
 	}
 }
 
-// TestParserClosesFenceAtEndOfInput pins the upstream EOF branch: a valid closer with no trailing
+// TestParserClosesFenceAtEndOfInput pins the end-of-input branch: a valid closer with no trailing
 // newline closes the fence rather than being copied into the body.
 func TestParserClosesFenceAtEndOfInput(t *testing.T) {
 	want := ansiDim + "foo\n" + ansiBoldOff
@@ -136,7 +136,7 @@ func TestParserClosesFenceAtEndOfInput(t *testing.T) {
 	}
 }
 
-// TestParserBailsOversizedPartialRowEagerly pins upstream's md_table_bail_partial: a row that alone
+// TestParserBailsOversizedPartialRowEagerly pins the oversize bail: a row that alone
 // exceeds the byte cap ends the attempt during the feed, emitting the collected table and the row
 // literally instead of retaining them.
 func TestParserBailsOversizedPartialRowEagerly(t *testing.T) {

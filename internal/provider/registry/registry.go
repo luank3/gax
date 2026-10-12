@@ -101,7 +101,7 @@ var shipped = []Definition{
 	{ID: "mock", Internal: true, NoEfforts: true, Hooks: HookConstruct},
 }
 
-// The OpenCode gateway pins a conversation to one upstream by its session header — Go rejects
+// The OpenCode gateway pins a conversation to one backend by its session header — Go rejects
 // requests without one — and attributes usage by client.
 func openCodeHeaders() json.RawMessage {
 	return json.RawMessage(`{"x-opencode-session":"{session_id}","x-opencode-client":"gax"}`)
