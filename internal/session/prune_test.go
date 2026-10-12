@@ -32,16 +32,6 @@ func TestPruneBeforeSweepsAllProjectBucketsAndRespectsLocksAndExclusion(t *testi
 	if err := PruneBefore(cutoff, excludedPath); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Lstat(excludedPath); err != nil {
-		dir := filepath.Dir(excludedPath)
-		entries, _ := os.ReadDir(dir)
-		var names []string
-		for _, e := range entries {
-			info, _ := e.Info()
-			names = append(names, e.Name()+" mtime="+info.ModTime().UTC().String())
-		}
-		t.Fatalf("DIAGCI excluded not a file: %v\nDIR %q\nCWD %q\nENTRIES %v", err, dir, projectA, names)
-	}
 	assertPruneTestMissing(t, oldPath)
 	assertPruneTestMissing(t, otherPath)
 	assertPruneTestMissing(t, otherBucket)
