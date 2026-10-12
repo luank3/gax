@@ -19,8 +19,8 @@ Connect the existing CLI, config, provider, agent, tool, and session packages be
   - [x] Parse Openference model metadata and preserve Agnes model listings without invented capabilities.
   - [x] Resolve dotted preset names literally across state and config tiers, including save metadata.
   - [x] Replay Chat Completions reasoning only under a configured, provider-default, or catalog-selected field; do not infer a request field from response-member names stored in the transcript.
-  - [x] Match upstream slash-name completion and `@file` completion; `/provider`, `/model`, and `/effort` reject arguments and open their TTY pickers without arguments.
-    - Divergence (recorded 2026-10-12): gax still applies a supplied argument (`TestRunREPLSelectsSelectionByArgument` in `internal/app/app_test.go`), which the superseding note in `2026-10-10-repl-provider-selection.md` says official master `ff45833` removed. Decide whether to keep it as a documented extension or restore upstream parity; see `docs/superpowers/specs/README.md`.
+  - [x] Match upstream slash-name completion and `@file` completion; `/provider`, `/model`, and `/effort` take an optional argument and open their TTY pickers without one.
+    - Correction (2026-10-12): the argument form matches upstream master `2834c2c` (`usage = "[id]"`/`"[level]"` plus `argument_choices` in `src/slash.c`), not a fork deviation; `ff45833` predates upstream's argument-taking commits. Asserted by `TestRunREPLSelectsSelectionByArgument` in `internal/app/app_test.go`; see the correction notes in `2026-10-10-repl-provider-selection.md` and `2026-10-10-slash-command-front-end.md`.
   - [x] Match Ollama's context guidance, with no default reasoning replay member.
   - [x] Carry OpenRouter pricing, context tiers, and tool support from model listings into usage estimates and picker rows.
   - [x] Probe selected OpenRouter, Anthropic, Codex, and llama.cpp metadata in the background; keep Openference's metadata in its explicit `/models` listing; use Codex's versioned catalog.

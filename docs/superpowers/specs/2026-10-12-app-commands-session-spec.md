@@ -122,10 +122,10 @@ session-log or branch files. Non-goal: `internal/slash` grammar and `internal/ap
   (`internal/app/live_tty_linux_test.go:1191`).
 - The `kill` boundary clause `argument[4] != ' ' && argument[4] != '\t'`
   (`internal/app/tasks_command.go:23`) has no case: the table covers only `bogus` and `kill`.
-- Plan text disagrees: the superseded note at
-  `docs/superpowers/plans/2026-10-10-slash-command-front-end.md:10` says `/provider`, `/model`, and
-  `/effort` "take no arguments", yet `TestRunREPLConsumesSlashCommands`
-  (`internal/app/app_test.go:2064`) expects `/model fast` to apply.
+- Resolved 2026-10-12: the note at
+  `docs/superpowers/plans/2026-10-10-slash-command-front-end.md:10` that said `/provider`, `/model`,
+  and `/effort` take no arguments was wrong about upstream and now carries a correction; taking one
+  is parity, which `TestRunREPLConsumesSlashCommands` (`internal/app/app_test.go:2064`) asserts.
 
 ## Review
 

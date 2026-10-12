@@ -47,22 +47,27 @@ entries; read the spec against its cited lines rather than trusting a summary of
 Findings that need a decision, not just a test. Everything else lives in each spec's `Gaps` and
 `Review` sections; the mechanical check below covers citation integrity, not correctness of judgment.
 
-### gax behavior that diverges from the pinned upstream
+### Recorded decisions and corrections
 
 - `/provider`, `/model`, and `/effort` accept and apply an argument in gax
-  (`TestRunREPLSelectsSelectionByArgument`, `internal/app/app_test.go:1162`) while the superseding
-  notes in `2026-10-10-repl-provider-selection.md:3`, `2026-10-10-repl-model-selection.md:18`, and
-  `2026-10-10-slash-command-front-end.md:10` record that the porting baseline removed the argument
-  form. The divergence is now noted at `2026-10-10-command-entrypoint.md:22`. Decide: keep it as an
-  extension or restore parity.
+  (`TestRunREPLSelectsSelectionByArgument`, `internal/app/app_test.go:1162`). **Resolved
+  2026-10-12:** this is upstream parity, not a divergence. Upstream master `2834c2c` declares
+  `usage = "[id]"` (and `"[level]"` for `/effort`) with an `argument_choices` hook for all three in
+  `src/slash.c`; the fork commit `ff45833` predates upstream's argument-taking commits. The
+  2026-10-11 "accepts no arguments" notes were wrong; `2026-10-10-repl-provider-selection.md` and
+  `2026-10-10-slash-command-front-end.md` now carry a correction, as does
+  `2026-10-10-command-entrypoint.md:22`.
 - `docs/sessions.md:76` said `/undo` truncates the log; `session.Log.Undo`
   (`internal/session/log.go:321`) appends an `undo` record and rewinds the write cursor. The doc now
   says that.
 - `docs/superpowers/plans/2026-10-11-web-tools.md:36` requires an error when a search returns
-  nothing usable; `(*Client).searchBrave` returns an empty `Report` for some of those shapes
-  (`internal/web/search.go:75`). Decide which side is right before citing either.
+  nothing usable. **Resolved 2026-10-12:** the plan governs; `(*Client).searchBrave` now rejects an
+  empty or entry-less listing (`internal/web/search.go:126`), matching the DuckDuckGo path, and
+  `TestSearchReportsBraveKeyAndRateLimitFailures` pins both shapes.
 - `docs/superpowers/plans/2026-10-09-config-provider-registry.md:46` counts "all 64 ordered upstream
   setting entries" while the registry has a different row count; `config-layers` records the delta.
+- `catalog.merge` had no callers. **Resolved 2026-10-12:** deleted instead of wired
+  (`internal/catalog/catalog.go`); the fallback order it encoded never ran.
 - The terminal line editor (keys, paste, resize, interrupt, history file) has **no** plan entry. That
   is the largest behavior area in the tree whose only record is the code plus these specs.
 

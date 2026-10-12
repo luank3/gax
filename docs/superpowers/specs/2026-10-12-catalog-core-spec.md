@@ -116,8 +116,8 @@ an estimate from `Price`, and exposes the refresh controls. Non-goal: it never p
 
 ## Gaps
 
-- `merge` at `internal/catalog/catalog.go:398` has no callers (`rg '\bmerge\('` matches only the
-  definition), so its fallback order has no asserting test; the live path is `fillModel`.
+- `merge` at `internal/catalog/catalog.go:398` had no callers, so its fallback order never ran;
+  resolved 2026-10-12 by deleting it. The live path is `fillModel`.
 - The transport branch of `fetchSnapshot` at `internal/catalog/lifecycle.go:139` is unasserted:
   `TestFailedRefreshKeepsCacheAndReportsStaleAgeOnce` returns HTTP 200 with an unparseable body.
 - The one-shot guard at `internal/catalog/lifecycle.go:73` has no double-call test; the nearest

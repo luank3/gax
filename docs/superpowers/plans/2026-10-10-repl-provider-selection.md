@@ -1,5 +1,11 @@
 # Line REPL Provider Selection Plan
 
+> Upstream-parity correction (2026-10-12): the 2026-10-11 note below was wrong about upstream.
+> `ff45833` is a commit on the fork's branch, not upstream master, and its ancestry predates
+> upstream's own argument-taking commits. Upstream master (`2834c2c`) declares `usage = "[id]"`
+> (`"[level]"` for `/effort`) with an `argument_choices` hook in `src/slash.c`, so it takes those
+> arguments and completes them with Tab; `2026-10-12-slash-argument-completion.md` ports that
+> behavior and supersedes the note below.
 > Superseded on 2026-10-11: the optional `/provider [id]` and `/model [id]` line-command behavior in this historical plan came from a fork snapshot. Official master `ff458337f8ba7366d71fad4da0210a53b658678a` accepts no arguments for `/provider`, `/model`, or `/effort`; those commands use TTY pickers.
 
 > **For agentic workers:** REQUIRED-SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

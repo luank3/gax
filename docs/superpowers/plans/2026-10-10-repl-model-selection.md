@@ -15,6 +15,12 @@
 - Keep model IDs exactly as returned by the provider.
 - Do not require a model-list request for an explicit `/model <id>` switch.
 - Preserve the currently selected effort and provider when switching models.
+> Superseded on 2026-10-12: the `/model`-without-arguments behavior below came from the fork
+> snapshot. Upstream `picker_run` (`src/terminal/picker.c:666`) returns -1 when stdin or stdout
+> is not a TTY and prints nothing, so a line REPL silently keeps the current model; gax matches
+> that (`internal/app/provider_commands.go`), and the note that follows this one records the
+> upstream argument/tab-completion story for `/provider`, `/model`, and `/effort`.
+
 - Make `/model` without an argument usable in a non-TTY REPL by printing candidates.
 - Persist the changed model as a conversation selection record.
 

@@ -122,9 +122,10 @@ carries diagnostics. Non-goal: the agent loop and slash-command implementations 
   (`internal/app/repl.go:62`) are pinned by `TestREPLPromptMarkerFollowsTheInputTTYFlag` and
   `TestREPLCancelledContextExitsWith130` in `internal/app/repl_test.go`; one-shot escalation still
   has no REPL counterpart for the second-interrupt path.
-- Plan text disagrees with behavior: `docs/superpowers/plans/2026-10-10-command-entrypoint.md:22`
-  says `/provider`, `/model`, and `/effort` "reject arguments", yet
-  `TestRunREPLSelectsSelectionByArgument` (`internal/app/app_test.go:1162`) applies one.
+- The plan text that said `/provider`, `/model`, and `/effort` "reject arguments" was corrected
+  on 2026-10-12: upstream master `2834c2c` declares `usage = "[id]"` with an `argument_choices` hook
+  for all three, so applying an argument is parity (`TestRunREPLSelectsSelectionByArgument`,
+  `internal/app/app_test.go:1162`).
 
 ## Review
 

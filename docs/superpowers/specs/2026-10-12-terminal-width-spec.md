@@ -95,7 +95,7 @@ wrapped strings, match indexes, SGR-styled rows. Non-goal: repainting and termio
   `unknown theme '<value>' (expected auto, dark, light, ansi, or off)` or
   `unknown tint '<value>' (expected teal, violet, rose, or sage)`.
 - **Source:** `internal/terminal/theme/theme.go:88` (`New`), order in `:207` (`detect`).
-- **Assertion:** `TestAutoThemeAndInvalidValues` in `internal/terminal/theme/theme_test.go:88`.
+- **Assertion:** `TestAutoThemeAndInvalidValues` in `internal/terminal/theme/theme_test.go:90`.
 - **Rejected:** Falling back silently; `internal/terminal/theme/theme_test.go:103` requires two
   warnings, so a fixed `dark` fallback fails despite `TERM=xterm-256color` selecting `dark`.
 
@@ -107,8 +107,7 @@ wrapped strings, match indexes, SGR-styled rows. Non-goal: repainting and termio
   `Link` for `dark` and `light` only, `off` drops every color while keeping `bold`, `dim`, and
   `underline`, and `TintOpen` returns nothing for other palettes or an unknown tint.
 - **Source:** `internal/terminal/theme/theme.go:170` (`applyTint`), `off` table at `:156`.
-- **Assertion:** `TestDarkThemeTintsOnlyModelRolesAndPreserveCloseSequences` in
-  `internal/terminal/theme/theme_test.go:35`, `TestOffThemeKeepsNonColorAttributes` at `:59` and
+- **Assertion:** `TestDarkThemeTintsOnlyModelRolesAndPreserveCloseSequences` in `internal/terminal/theme/theme_test.go:37`, `TestOffThemeKeepsNonColorAttributes` at `:59` and
   `TestTintPreviewUsesTheActiveThemePalette` at `:72`.
 - **Rejected:** Tinting a fixed role such as `Accent`; `internal/terminal/theme/theme_test.go:41`
   requires its open to equal the teal one, and `:83` requires an empty `ansi` preview.

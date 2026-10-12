@@ -122,10 +122,12 @@ Non-goal: JavaScript execution and cookies, so a client-rendered page yields the
 - The summary fragments `redirected to ` (`internal/tools/web.go:141`) and `first ` plus
   ` of a larger response` (`internal/tools/web.go:136`) have no asserting test; the nearest is
   `TestFetchReturnsTextDocumentWithFinalURLAndHeaders` (`internal/web/fetch_test.go:16`).
-- Contradicts the plan (`docs/superpowers/plans/2026-10-11-web-tools.md:36`): the plan demands an
-  error, but `searchBrave` returns an empty `Report` (`internal/web/search.go:126`).
-- The `(no results)` and `(untitled)` fallbacks (`internal/tools/web.go:148`, `:157`) and
-  `(empty response)` (`internal/tools/web.go:117`) have no asserting test.
+- Resolved 2026-10-12: the plan (`docs/superpowers/plans/2026-10-11-web-tools.md:36`) governs, so
+  `searchBrave` now rejects an empty or entry-less listing (`internal/web/search.go:126`) instead of
+  returning an empty `Report`; `TestSearchReportsBraveKeyAndRateLimitFailures` pins both shapes.
+- `webSearchText`'s `(no results)` branch (`internal/tools/web.go:148`) is unreachable now that both
+  backends error on an empty listing; the `(untitled)` fallback (`:157`) and `(empty response)`
+  (`:117`) still have no asserting test.
 - The `maxEntityLength` bound (`internal/web/html.go:457`) has no asserting test: the `entities`
   case reaches only the missing-`;` and unknown-name paths.
 
