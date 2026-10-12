@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2026-10-12
 
 Initial Go reimplementation of [hax](https://github.com/OleksandrChekhovskyi/hax), tracking the
 baseline commit `ff45833`.
@@ -42,3 +42,5 @@ baseline commit `ff45833`.
   name that takes one.
 - CI (gofmt, `go vet`, race-enabled tests, cross-builds) and GoReleaser-based releases for Linux
   and macOS on amd64 and arm64.
+
+[0.1.0]: https://github.com/luank3/gax/releases/tag/v0.1.0
