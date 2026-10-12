@@ -159,6 +159,13 @@ func TestSearchReportsBraveKeyAndRateLimitFailures(t *testing.T) {
 		{name: "rate limit", status: http.StatusTooManyRequests, want: "rate limit"},
 		{name: "server error", status: http.StatusBadGateway, want: "HTTP 502"},
 		{name: "invalid json", status: http.StatusOK, body: "not json", want: "not valid JSON"},
+		{name: "empty listing", status: http.StatusOK, body: `{"web":{"results":[]}}`, want: "no results"},
+		{
+			name:   "listing without usable entries",
+			status: http.StatusOK,
+			body:   `{"web":{"results":[{"title":"","url":"","description":""},{"title":"   ","url":"  "}]}}`,
+			want:   "no results",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

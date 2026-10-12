@@ -117,11 +117,21 @@ func (client *Client) searchBrave(ctx context.Context, query string, count int, 
 		if len(results) == count {
 			break
 		}
+		title := inlineText(entry.Title)
+		link := strings.TrimSpace(entry.URL)
+		if title == "" && link == "" {
+			continue
+		}
 		results = append(results, Result{
-			Title:   inlineText(entry.Title),
-			URL:     strings.TrimSpace(entry.URL),
+			Title:   title,
+			URL:     link,
 			Snippet: inlineText(entry.Description),
 		})
+	}
+	// An empty listing is reported with its reason instead of reaching the model as "no results",
+	// matching the DuckDuckGo path below (see docs/superpowers/plans/2026-10-11-web-tools.md).
+	if len(results) == 0 {
+		return Report{}, errors.New("the Brave Search API returned no results for this query")
 	}
 	return Report{Backend: BackendBrave, Results: results}, nil
 }
