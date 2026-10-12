@@ -16,8 +16,7 @@ rendering, persistence, and compaction policy.
 - **Rule:** Report every streamed `KindToolCall` in the turn's range through `ToolSeen` before
   dispatching any of them.
 - **Source:** `internal/agent/loop.go:162`: `RunLoop`
-- **Assertion:** `TestRunLoopObservesEveryToolCallBeforeDispatchingAny` in
-  `internal/agent/loop_test.go:516`
+- **Assertion:** `TestRunLoopObservesEveryToolCallBeforeDispatchingAny` in `internal/agent/loop_test.go:555`
 - **Rejected:** Reporting each call from inside the dispatch loop as it runs; calls that are
   refused, skipped, or dropped by a failed turn would then never reach the frontend.
 
@@ -41,8 +40,7 @@ rendering, persistence, and compaction policy.
   `SkippedResult` (`[interrupted]`) and origin `OriginSkipped`, and at most one interrupt marker
   is added.
 - **Source:** `internal/agent/loop.go:193`: `RunLoop`
-- **Assertion:** `TestRunLoopAbortSkipsRestOfToolBatchWithoutDuplicateMarker` in
-  `internal/agent/loop_test.go:408`
+- **Assertion:** `TestRunLoopAbortSkipsRestOfToolBatchWithoutDuplicateMarker` in `internal/agent/loop_test.go:447`
 - **Rejected:** Appending an unconditional assistant marker after the batch; `MarkInterrupt`
   returns early when the tail already carries `OriginInterrupted` or `OriginSkipped`
   (`internal/agent/session.go:172`).
@@ -54,8 +52,7 @@ rendering, persistence, and compaction policy.
 - **Rule:** A `SignalPause` seen while dispatching a batch sets `pausePending`, and the loop
   returns `LoopPaused` only once every call in that batch has a result.
 - **Source:** `internal/agent/loop.go:184`: `RunLoop`
-- **Assertion:** `TestRunLoopPauseFinishesToolBatchBeforeReturning` in
-  `internal/agent/loop_test.go:451`
+- **Assertion:** `TestRunLoopPauseFinishesToolBatchBeforeReturning` in `internal/agent/loop_test.go:490`
 - **Rejected:** Returning `LoopPaused` from inside the dispatch loop; history would keep a
   `KindToolCall` with no paired `KindToolResult`, which `AbsorbAbort` exists to prevent
   (`internal/agent/loop_turn.go:217`).
@@ -67,8 +64,7 @@ rendering, persistence, and compaction policy.
 - **Rule:** Repairing a failed turn calls `Turn.KeepText`, so the repaired range holds only
   `KindAssistant` items and no unrun `KindToolCall` is observed or answered.
 - **Source:** `internal/agent/loop_turn.go:230`: `AbsorbAbort`
-- **Assertion:** `TestRunLoopProviderFailureDropsUnrunCallBeforeObservation` in
-  `internal/agent/loop_test.go:552`
+- **Assertion:** `TestRunLoopProviderFailureDropsUnrunCallBeforeObservation` in `internal/agent/loop_test.go:591`
 - **Rejected:** Reusing the cancel repair here; it would keep the assembled call and pair a
   never-run call with a synthetic `[interrupted]` result.
 
@@ -130,7 +126,8 @@ rendering, persistence, and compaction policy.
 
 ## Review
 
-- `internal/agent/loop.go:307`: the `error: no tool executor is configured` fallback fires only
+- `internal/agent/loop.go:307`: the `error: no tool executor is configured` fallback is pinned by
+  `TestRunLoopAdvertisedCallWithoutExecutorReportsTheGap` (`internal/agent/loop_test.go`); it fires only
   with both `ToolCall` and `ToolRegistry` absent; no test reaches it, and its origin is `""`.
 - `internal/agent/loop.go:156`: `pausedEmpty` suppresses the continuation boundary, but the
   `turn.HasUsage()` half of the condition on line 157 has no test of its own.

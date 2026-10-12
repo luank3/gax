@@ -118,11 +118,10 @@ carries diagnostics. Non-goal: the agent loop and slash-command implementations 
   plus a blank line to stdout and have no asserting test;
   `TestResolvePagerRejectsMissingConfiguredCommand` (`internal/app/pager_test.go:24`) covers only
   `resolvePager` itself.
-- `runREPL`'s `return 130` for a canceled context (`internal/app/repl.go:62`) has no test; the
-  nearest is `TestRunOneShotSecondSIGINTEscalatesAndKillsBashGroup`
-  (`internal/app/app_test.go:468`), which is one-shot.
-- The non-TTY prompt gate at `internal/app/repl.go:58`, which writes `> ` only when `inputTTY` is
-  true, has no test; `TestRunInteractiveEOFLeavesUpstreamTrailingSeparator` covers the loop only.
+- The non-TTY prompt gate (`internal/app/repl.go:58`) and the canceled-context `130`
+  (`internal/app/repl.go:62`) are pinned by `TestREPLPromptMarkerFollowsTheInputTTYFlag` and
+  `TestREPLCancelledContextExitsWith130` in `internal/app/repl_test.go`; one-shot escalation still
+  has no REPL counterpart for the second-interrupt path.
 - Plan text disagrees with behavior: `docs/superpowers/plans/2026-10-10-command-entrypoint.md:22`
   says `/provider`, `/model`, and `/effort` "reject arguments", yet
   `TestRunREPLSelectsSelectionByArgument` (`internal/app/app_test.go:1162`) applies one.

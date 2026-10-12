@@ -17,7 +17,7 @@
 - **Rule:** `read` renders a returned line as `%6d` plus `→` plus the line's own bytes, so a slice
   keeps the file's absolute line numbers instead of restarting at 1.
 - **Source:** `internal/tools/files.go:210` (`runRead` via `readTextSlice`).
-- **Assertion:** `TestReadTextSlicesAndCapsOutput` in `internal/tools/registry_test.go:42`.
+- **Assertion:** `TestReadTextSlicesAndCapsOutput` in `internal/tools/registry_test.go:43`.
 - **Rejected:** Numbering the returned slice from 1. The test requires `     2→second\n` for
   `offset=2, limit=1`, so slice-relative numbering is falsified.
 
@@ -27,9 +27,9 @@
 - **Rule:** With no `offset`/`limit`, `read` refuses an over-cap file: `%s is %d bytes; cap is %d.
   Pass offset/limit to read a slice, or use bash with grep/head/tail.`
 - **Source:** `internal/tools/files.go:77` (`runRead`).
-- **Assertion:** `TestReadTextSlicesAndCapsOutput` in `internal/tools/registry_test.go:42`.
+- **Assertion:** `TestReadTextSlicesAndCapsOutput` in `internal/tools/registry_test.go:43`.
 - **Rejected:** Returning the first cap bytes. The test asserts `cap is 24` with no slice requested
-  and `[truncated at 24 bytes` for a requested one (registry_test.go:68).
+  and `[truncated at 24 bytes` for a requested one (internal/tools/registry_test.go:68).
 
 ---
 ### Edit refuses an ambiguous match unless `replace_all` is set
@@ -37,8 +37,7 @@
 - **Rule:** `edit` counts with `bytes.Count` and, when `old_string` matches more than once and
   `replace_all` is not true, answers `'old_string' matches %d places in %s` and writes nothing.
 - **Source:** `internal/tools/files.go:505` (`runEdit`).
-- **Assertion:** `TestEditRequiresUniqueExactMatchAndCanReplaceAll` in
-  `internal/tools/registry_test.go:225`.
+- **Assertion:** `TestEditRequiresUniqueExactMatchAndCanReplaceAll` in `internal/tools/registry_test.go:226`.
 - **Rejected:** Replacing the first match and reporting a diff. The test re-reads the file and
   requires `foo\nfoo\nfoo\n` to survive the refusal.
 
@@ -48,7 +47,7 @@
 - **Rule:** `write` returns an empty result when the new bytes equal the file's bytes, and otherwise
   installs them by renaming a temp file created in the target's directory, preserving its mode.
 - **Source:** `internal/tools/write.go:14` (`writeWithDiff`).
-- **Assertion:** `TestWriteCreatesAndUpdatesFiles` in `internal/tools/registry_test.go:179`.
+- **Assertion:** `TestWriteCreatesAndUpdatesFiles` in `internal/tools/registry_test.go:180`.
 - **Rejected:** Returning the diff unconditionally. The test requires empty result text for an
   unchanged write, so a no-op cannot be reported as an edit.
 
@@ -111,18 +110,17 @@
 - **Rule:** `Definitions()` emits read, edit, write, bash, task_wait, web_fetch, web_search, skill;
   `no_tasks`, `no_web`, and `no_skills` drop their tools from that list.
 - **Source:** `internal/tools/registry.go:837` (`builtInDefinitions`).
-- **Assertion:** `TestBuiltInToolDefinitions` in `internal/tools/registry_test.go:17`.
+- **Assertion:** `TestBuiltInToolDefinitions` in `internal/tools/registry_test.go:18`.
 - **Rejected:** Advertising `skill` while refusing it at execution.
   `TestSkillToolDefinitionsAndDisable` (internal/tools/skill_test.go:97) requires the definition
   itself to be gone.
 
 ## Gaps
 
-- The nil-registry branch returning `error: tool registry is unavailable` (registry.go:534) has no
-  asserting test; `TestToolRunReturnsConversationToolResult` (registry_test.go:271) covers only the
-  unknown-name branch.
-- The line-count truncation marker `[truncated at %d lines` (files.go:104) is unasserted; only the
-  byte variant is checked (registry_test.go:68).
+- The nil-registry branches (`internal/tools/registry.go:534` and `:569`) and the line-count
+  truncation marker `[truncated at %d lines` (`internal/tools/files.go:104`) are pinned by
+  `TestNilRegistryReportsUnavailable` and `TestReadWholeFileIsCappedAtTheLineLimit` in
+  `internal/tools/registry_test.go`; only the byte variant was checked before (`internal/tools/registry_test.go:68`).
 - `resolveWriteTarget`'s 32-step loop and its `too many symbolic links` error (write.go:103) are
   unexercised; write_test.go:12 covers only a link whose target has non-existent components.
 - `writeWithDiff`'s failure paths (mkstemp, chmod, fsync, rename at write.go:45-77) have no test;

@@ -16,8 +16,7 @@ Non-goal: choosing the wire, endpoint, headers, or credentials; `internal/provid
 - **Rule:** Emit a single `role: "assistant"` message per run of adjacent `KindAssistant`,
   `KindToolCall`, and `KindReasoning` items.
 - **Source:** `internal/provider/openai/chat_body.go:80`, `appendAssistantMessage`.
-- **Assertion:** `TestBuildMessagesGroupsAssistantReasoningAndToolCalls` in
-  `internal/provider/openai/chat_body_test.go:73`.
+- **Assertion:** `TestBuildMessagesGroupsAssistantReasoningAndToolCalls` in `internal/provider/openai/chat_body_test.go:74`.
 - **Rejected:** one message per record; the `role: "tool"` result loses its `tool_calls` parent.
 
 ---
@@ -25,8 +24,7 @@ Non-goal: choosing the wire, endpoint, headers, or credentials; `internal/provid
 - **Rule:** Replay a `KindReasoning` item only when its recorded provider and model match the
   request, comparing canonical ids so `llama.cpp` matches `llamacpp`.
 - **Source:** `internal/provider/openai/chat_body.go:210`, `provenanceMatches`.
-- **Assertion:** `TestBuildMessagesGroupsAssistantReasoningAndToolCalls` in
-  `internal/provider/openai/chat_body_test.go:73`.
+- **Assertion:** `TestBuildMessagesGroupsAssistantReasoningAndToolCalls` in `internal/provider/openai/chat_body_test.go:74`.
 - **Rejected:** comparing provider ids literally; the test records `llama.cpp`, not `llamacpp`.
 
 ---
@@ -34,8 +32,7 @@ Non-goal: choosing the wire, endpoint, headers, or credentials; `internal/provid
 - **Rule:** Name the plain reasoning member from `BodyOptions.ReasoningField` alone, never from the
   transcript, and leave the member out when the field is nil or empty.
 - **Source:** `internal/provider/openai/chat_body.go:125`, `hasReasoningField`.
-- **Assertion:** `TestBuildMessagesDoesNotInferReasoningFieldFromTranscript` in
-  `internal/provider/openai/chat_body_test.go:177`.
+- **Assertion:** `TestBuildMessagesDoesNotInferReasoningFieldFromTranscript` in `internal/provider/openai/chat_body_test.go:178`.
 - **Rejected:** reading `item.ReasoningField`; that recorded member may hold `role`.
 
 ---
@@ -43,8 +40,7 @@ Non-goal: choosing the wire, endpoint, headers, or credentials; `internal/provid
 - **Rule:** With `ReasoningRequired`, write the configured member as an empty string on otherwise
   valid assistant messages, and still drop turns with nothing else to send.
 - **Source:** `internal/provider/openai/chat_body.go:140`, the `reasoningRequired` branch.
-- **Assertion:** `TestBuildMessagesSendsRequiredReasoningFieldOnAssistantMessages` in
-  `internal/provider/openai/chat_body_test.go:99`.
+- **Assertion:** `TestBuildMessagesSendsRequiredReasoningFieldOnAssistantMessages` in `internal/provider/openai/chat_body_test.go:100`.
 - **Rejected:** inventing a message for a contentless assistant record; the test expects none.
 
 ---
@@ -52,8 +48,7 @@ Non-goal: choosing the wire, endpoint, headers, or credentials; `internal/provid
 - **Rule:** Emit a reasoning-only assistant message with `content` set to null, never an empty
   string.
 - **Source:** `internal/provider/openai/chat_body.go:130`, the `"content": nil` message literal.
-- **Assertion:** `TestBuildMessagesUsesNullContentForReasoningOnlyAssistant` in
-  `internal/provider/openai/chat_body_test.go:165`.
+- **Assertion:** `TestBuildMessagesUsesNullContentForReasoningOnlyAssistant` in `internal/provider/openai/chat_body_test.go:166`.
 - **Rejected:** writing `""`; the test compares the member against nil, and an empty text part is
   not null.
 
@@ -71,8 +66,7 @@ Non-goal: choosing the wire, endpoint, headers, or credentials; `internal/provid
 - **Rule:** Apply `extra_body` after every protocol-owned field, merging nested objects key by key
   and letting arrays and scalars replace the generated member.
 - **Source:** `internal/provider/openai/chat_body.go:289`, the `mergeObject` call in `BuildBody`.
-- **Assertion:** `TestBuildBodyComposesChatRequest` in
-  `internal/provider/openai/chat_body_test.go:11`.
+- **Assertion:** `TestBuildBodyComposesChatRequest` in `internal/provider/openai/chat_body_test.go:12`.
 - **Rejected:** replacing the whole member; the test keeps `keep` while `include_usage` flips.
 
 ---
@@ -104,8 +98,9 @@ Non-goal: choosing the wire, endpoint, headers, or credentials; `internal/provid
 
 ## Gaps
 
-- Rule 7's rejection branches are untested: `decode extra_body: %w` and `extra_body must be a JSON
-  object` at `internal/provider/openai/chat_body.go:284`; the merge path is covered only
+- Rule 7's rejection branches are pinned by `TestBuildBodyRejectsMalformedExtraBody`
+  (`internal/provider/openai/chat_body_test.go`): `decode extra_body: %w` and
+  `extra_body must be a JSON object` at `internal/provider/openai/chat_body.go:284`; the merge path is covered only
   indirectly by `TestPrepareAppliesModelRoutingAndProviderExtraBody` in
   `internal/provider/client/client_test.go:465`.
 - Anthropic budget mode has no asserting test: `applyThinking` at
