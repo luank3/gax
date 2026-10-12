@@ -15,7 +15,7 @@ in-memory conversation state and compaction, which `internal/agent` owns.
 - **Rule:** `Directory(cwd)` is `<XDG_STATE_HOME>/gax/sessions/<EncodeCWD(cwd)>`; `EncodeCWD` trims
   leading slashes, turns `/` into `-`, truncates to 79 bytes, and appends `.` plus a path hash.
 - **Source:** `internal/session/path.go:57`, `internal/session/path.go:37`
-- **Assertion:** `TestDirectoryPreservesXDGPathFormatting` in `internal/session/path_test.go:27`
+- **Assertion:** `TestDirectoryPreservesXDGPathFormatting` in `internal/session/path_test.go:28`
 - **Rejected:** path-cleaning the state root; the test pins `/tmp/state//gax/sessions/...`.
 
 ---
@@ -26,7 +26,7 @@ in-memory conversation state and compaction, which `internal/agent` owns.
   empty cwd fails with `cannot resolve prompt history without a working directory`.
 - **Source:** `internal/session/path.go:62`
 - **Assertion:** `TestPromptHistoryPathSharesCWDSessionDirectory` in
-  `internal/session/path_test.go:8`
+  `internal/session/path_test.go:9`
 - **Rejected:** resolving history from the state root, sharing one file across projects.
 
 ---
@@ -47,7 +47,7 @@ in-memory conversation state and compaction, which `internal/agent` owns.
 - **Rule:** `ResumeLog` opens the path with `O_NOFOLLOW` and without `O_CREAT`, so a pruned or
   symlinked path fails instead of being recreated, and it never rewrites the header.
 - **Source:** `internal/session/log.go:119`, `internal/session/log.go:394`
-- **Assertion:** `TestResumeLogDoesNotRecreatePrunedSession` in `internal/session/prune_test.go:187`
+- **Assertion:** `TestResumeLogDoesNotRecreatePrunedSession` in `internal/session/prune_test.go:188`
 - **Rejected:** opening with `O_CREAT`; a pruner can unlink the file between listing and resume.
 
 ---
@@ -69,7 +69,7 @@ in-memory conversation state and compaction, which `internal/agent` owns.
   in every project bucket, sparing files a writer holds `LOCK_EX` and the `excludePath`.
 - **Source:** `internal/session/prune.go:59`, `internal/session/prune.go:277`
 - **Assertion:** `TestPruneBeforeSweepsAllProjectBucketsAndRespectsLocksAndExclusion` in
-  `internal/session/prune_test.go:10`
+  `internal/session/prune_test.go:11`
 - **Rejected:** pruning only the caller's bucket; the sweep must reach a second project too.
 
 ---
@@ -80,7 +80,7 @@ in-memory conversation state and compaction, which `internal/agent` owns.
   regular file, never descends through a symlinked bucket, and removes a bucket only when empty.
 - **Source:** `internal/session/prune.go:277`, `internal/session/prune.go:228`
 - **Assertion:** `TestPruneBeforeLeavesUnrelatedFilesAndSymlinksAlone` in
-  `internal/session/prune_test.go:52`
+  `internal/session/prune_test.go:53`
 - **Rejected:** filtering on the `.jsonl` suffix alone; `backup_...jsonl` survives without an id.
 
 ---
@@ -91,7 +91,7 @@ in-memory conversation state and compaction, which `internal/agent` owns.
   and younger than `pruneInterval` (24h); only a completed sweep rewrites it with `1`.
 - **Source:** `internal/session/prune.go:68`, `internal/session/prune.go:15`
 - **Assertion:** `TestStartPruneMarksCompletedSweepAndAppliesDailyThrottle` in
-  `internal/session/prune_test.go:154`
+  `internal/session/prune_test.go:155`
 - **Rejected:** stamping the marker before the sweep; an aborted run would suppress retries a day.
 
 ---
