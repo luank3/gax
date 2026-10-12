@@ -1382,6 +1382,58 @@ func TestRunTTYREPLNotifiesWhenTurnCompletes(t *testing.T) {
 	}
 }
 
+func TestRunTTYREPLHidesCursorForTheTurn(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if serveTTYModelProbe(w, r) {
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"ready\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+	}))
+	defer server.Close()
+	prepareTTYAppEnv(t, server.URL)
+
+	master, slave := openTestPTY(t)
+	defer master.Close()
+	defer slave.Close()
+	capture := &ptyCapture{}
+	go capture.read(master)
+	finished := make(chan int, 1)
+	go func() { finished <- Run(nil, slave, true, slave, io.Discard) }()
+	waitPTYEditorReadyCount(t, capture, 1, 2*time.Second)
+	if got := capture.string(); strings.Contains(got, ansiCursorHide) {
+		t.Fatalf("cursor was hidden before the first prompt was submitted: %q", got)
+	}
+	if _, err := master.Write([]byte("hello\r")); err != nil {
+		t.Fatal(err)
+	}
+	waitPTYOutput(t, capture, "ready", 5*time.Second)
+	// The second prompt proves the turn ended, so the cursor is back for the editor by then.
+	waitPTYEditorReadyCount(t, capture, 2, 5*time.Second)
+	_, _ = master.Write([]byte{0x04})
+	select {
+	case code := <-finished:
+		if code != 0 {
+			t.Fatalf("REPL exit code = %d; output: %q", code, capture.string())
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("REPL did not exit after Ctrl-D; output: %q", capture.string())
+	}
+
+	got := capture.string()
+	hiddenAt := strings.Index(got, ansiCursorHide)
+	if hiddenAt < 0 {
+		t.Fatalf("turn ran without hiding the cursor: %q", got)
+	}
+	shownAt := strings.Index(got[hiddenAt:], ansiCursorShow)
+	if shownAt < 0 {
+		t.Fatalf("cursor was not restored for the next prompt: %q", got)
+	}
+	if turn := got[hiddenAt : hiddenAt+shownAt]; !strings.Contains(turn, "ready") {
+		t.Fatalf("cursor was restored before the turn painted its answer: %q", got)
+	}
+}
+
 func TestRunTTYSlashModelPickerSwitchesModelForNextRequest(t *testing.T) {
 	var requestModel = make(chan string, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

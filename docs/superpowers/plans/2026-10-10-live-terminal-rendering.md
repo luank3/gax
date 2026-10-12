@@ -574,3 +574,54 @@ port now does the same — `Tick` writes the two-row park and `clearStatus` clim
 `TestRendererParksStatusBelowOpenCollapsedReadRow` pins the byte stream: `\n\n` before the label,
 then `\r\x1b[2K\x1b[2A\x1b[13G` before `, b.txt`. The row the indicator borrows is the gap the
 block separator owes the next block anyway, so the committed layout is unchanged.
+
+### Flicker-free status frames and a hidden cursor (2026-10-13)
+
+The status row flickered in a way upstream's does not, and the terminal cursor sat blinking at the
+end of the row (and at the end of every streamed answer) for the whole turn.
+
+**Why it flickered.** Every frame was four separate writes — `\r\x1b[2K`, then `\x1b[2m`, then the
+glyph and label, then `\x1b[0m` — and the erase came *first*. `stdout` is the raw `*os.File`, so
+each of those is its own `write(2)`: between the erase and the paint the terminal shows an empty
+row, which a multiplexer or a slow link renders as a blink. Upstream builds one row and flushes it
+once (`draw_label_row_locked` plus `finish_row_repaint`, `src/render/spinner.c:91`), and it erases
+the row's *tail* (`ANSI_ERASE_LINE`, `\x1b[K`) after the paint rather than the row before it, which
+is why its comment says the order avoids a blank frame.
+
+A label change was worse: `setStatus` erased the visible row and restarted the 300 ms show grace,
+so `working... → thinking... → working...`, each `processing... N%` progress event, and each
+`retrying in Ns...` tick blanked the row for a third of a second. Upstream never erases on a label
+change — `spinner_set_label` redraws the row in place, and `spinner_request_label` keeps the
+displayed label until the candidate settles. `PausePending` did the same erase, so pressing Escape
+blanked the indicator before `pausing...` came back.
+
+**Why the cursor was visible.** Upstream's REPL owns cursor visibility rather than the spinner
+(`cursor_show`/`cursor_hide`, `src/agent.c:1162`): it shows the cursor for `input_readline` and
+hides it again until the next prompt, so a turn — streamed answer, tool output, animated
+indicator — runs with it off. The port never emitted DECTCEM, so the hardware cursor parked at the
+end of the status row and followed the streamed text. A fatal signal has to restore it, as
+upstream's `restore_terminal` does, or the parent shell inherits an invisible cursor.
+
+**What changed.**
+
+- `Tick` assembles one frame (`\r` + dim + glyph + space + label + reset + `\x1b[K`) and writes it
+  once, and never erases the row before painting it.
+- The show grace applies to a first appearance only; a label that replaces a visible one repaints
+  over it on the next tick.
+- `setStatus` and `PausePending` no longer clear on a label change — only the empty label hides the
+  indicator. `clearStatus` assembles its erase, climb and column restore into one write.
+- `runTTYREPL` shows the cursor before `ReadTTYLine` and hides it again for the turn, restoring it
+  on every exit path; `watchTerminationEscalation` writes `\x1b[?25h` before re-raising a fatal
+  signal.
+
+`TestRendererRepaintsStatusInPlaceWithoutErasingFirst` pins the three-frame byte stream (no
+`\r\x1b[2K` between frames) and `TestRendererParksStatusBelowOpenCollapsedReadRow` gains the tail
+erase per frame; `TestRendererKeepsStatusWithinTerminalWidth` now measures the resolved screen,
+since the tail erase occupies no cells. `TestRunTTYREPLHidesCursorForTheTurn` pins the PTY order:
+hidden after the submitted prompt, restored only after the answer.
+
+**Still not ported.** Upstream wraps indicator transitions in DEC 2026 synchronized output
+(`spinner_swap_begin`/`swap_end`) so an erase and the writes that replace it land as one frame, and
+it paints tool status through the spinner's own view (`spinner_set_tool_status_view`) instead of
+the renderer writing rows itself. The port writes each transition as a single write instead, which
+covers the indicator but not the erase-plus-replacement pair.

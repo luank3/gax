@@ -348,7 +348,13 @@ func Run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 	}
 	liveTTY := !options.OneShot && !options.JSON && terminalinput.TTYPair(stdin, stdout, stdinTTY)
 	ctx, cancelSignals := context.WithCancel(context.Background())
-	stopSignalEscalation := watchTerminationEscalation(cancelSignals, tools.KillChildren)
+	stopSignalEscalation := watchTerminationEscalation(cancelSignals, tools.KillChildren, func() {
+		// The REPL hides the cursor for the duration of a turn; a fatal signal ends the process
+		// without unwinding it, so the cursor is restored here (upstream restore_terminal).
+		if liveTTY {
+			showCursor(stdout)
+		}
+	})
 	stopSignalHandlers = func() {
 		stopSignalEscalation()
 		cancelSignals()

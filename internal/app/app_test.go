@@ -1658,6 +1658,10 @@ func TestPresetSelectionStartsModelMetadataRefresh(t *testing.T) {
 	t.Setenv("GAX_ANTHROPIC_API_KEY", "test-key")
 	t.Setenv("GAX_CATALOG_URL", "")
 	t.Setenv("GAX_CATALOG_REFRESH", "0")
+	// Applying a preset persists it to state.json, so the state tier has to stay in the sandbox.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "config"))
+	t.Setenv("XDG_STATE_HOME", filepath.Join(t.TempDir(), "state"))
 	store := config.New(config.DefaultSettings())
 	store.SetEnvironment(os.LookupEnv)
 	if err := store.LoadConfig([]byte(`{"presets":{"review":{"provider":"anthropic-compatible","model":"test-model"}}}`)); err != nil {

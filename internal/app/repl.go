@@ -88,6 +88,15 @@ func ttyPrompt(haveUTF8 bool) string {
 	return terminaltheme.Open(terminaltheme.Accent) + "\x1b[1m❯\x1b[22m" + terminaltheme.Close(terminaltheme.Accent) + " "
 }
 
+const (
+	ansiCursorHide = "\x1b[?25l"
+	ansiCursorShow = "\x1b[?25h"
+)
+
+func hideCursor(stdout io.Writer) { _, _ = io.WriteString(stdout, ansiCursorHide) }
+
+func showCursor(stdout io.Writer) { _, _ = io.WriteString(stdout, ansiCursorShow) }
+
 func runTTYREPL(ctx context.Context, stdin *os.File, persistPromptHistory bool, stdout, stderr io.Writer,
 	store *config.Store, tools *coretools.Registry, state *agent.Session, run func(string) replOutput, pendingInput *string,
 	argumentChoices slash.ArgumentChoices, handleCommand func(slash.Parsed) bool) int {
@@ -137,6 +146,11 @@ func runTTYREPL(ctx context.Context, stdin *os.File, persistPromptHistory bool, 
 		PasteHook:      func() (string, bool) { return terminalpaste.CaptureClipboard(ctx) },
 		PasteFilter:    terminalpaste.FileURIsToPaths,
 	}
+	// A turn runs with the cursor hidden, as upstream's REPL does: the editor owns the cursor for
+	// the prompt, and everything between prompts (streamed answers, tool output, the animated
+	// indicator) paints with it off. The deferred show keeps an abandoned cursor from reaching
+	// the parent shell.
+	defer showCursor(stdout)
 	for {
 		if ctx.Err() != nil {
 			return 130
@@ -148,7 +162,9 @@ func runTTYREPL(ctx context.Context, stdin *os.File, persistPromptHistory bool, 
 			*pendingInput = ""
 		}
 		prompt := ttyPrompt(terminalocale.HaveUTF8())
+		showCursor(stdout)
 		text, submitted, err := terminalinput.ReadTTYLine(ctx, stdin, stdout, core, history, prompt, editorOptions)
+		hideCursor(stdout)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return 130

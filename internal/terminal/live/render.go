@@ -25,6 +25,7 @@ const (
 	ansiBoldOff      = "\x1b[22m"
 	ansiReset        = "\x1b[0m"
 	ansiEraseLine    = "\r\x1b[2K"
+	ansiEraseTail    = "\x1b[K"
 )
 
 var spinnerFrames = [...]string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -879,7 +880,9 @@ func (renderer *Renderer) Tick(now time.Time) error {
 	if renderer.mode != modeIdle && !(tableStatus && renderer.mode == modeText) {
 		return nil
 	}
-	if now.Before(showAt) {
+	// The show grace delays a first appearance only. A label that replaces a visible one repaints
+	// over it on the next tick, as upstream's spinner_set_label redraws without erasing.
+	if !renderer.statusVisible && now.Before(showAt) {
 		return nil
 	}
 	frame := int(now.Sub(started) / spinnerInterval)
@@ -887,41 +890,39 @@ func (renderer *Renderer) Tick(now time.Time) error {
 		frame = 0
 	}
 	frame %= len(spinnerFrames)
+	if renderer.statusVisible && renderer.statusPainted == label && renderer.statusFrame == frame {
+		return nil
+	}
+	// One frame per write, with the row's tail erased after the paint instead of before it:
+	// erasing first leaves a blank row on screen for every frame (upstream draw_label_row_locked
+	// followed by finish_row_repaint).
+	var row strings.Builder
 	if renderer.statusVisible {
-		if renderer.statusPainted == label && renderer.statusFrame == frame {
-			return nil
-		}
-		if err := renderer.write(ansiEraseLine); err != nil {
-			return err
-		}
+		row.WriteByte('\r')
 	} else {
 		if renderer.collapsedLineOpen {
 			// Park the indicator below the open read row: the extra row is the gap the cleared
 			// indicator leaves behind (upstream spinner_park).
-			if err := renderer.write("\n\n"); err != nil {
-				return err
-			}
+			row.WriteString("\n\n")
 			renderer.statusParkedRows = 2
 			renderer.statusParkedColumn = renderer.collapsedCells
 		} else if renderer.outputStarted && renderer.lineNewlines == 0 {
-			if err := renderer.write("\n"); err != nil {
-				return err
-			}
+			row.WriteByte('\n')
 		}
 		renderer.statusLineNewlines = renderer.lineNewlines
 	}
 	if renderer.styled {
-		if err := renderer.write(ansiDim); err != nil {
-			return err
-		}
+		row.WriteString(ansiDim)
 	}
-	if err := renderer.write(spinnerFrames[frame] + " " + renderer.statusText(label, now)); err != nil {
-		return err
-	}
+	row.WriteString(spinnerFrames[frame])
+	row.WriteByte(' ')
+	row.WriteString(renderer.statusText(label, now))
 	if renderer.styled {
-		if err := renderer.write(ansiReset); err != nil {
-			return err
-		}
+		row.WriteString(ansiReset)
+	}
+	row.WriteString(ansiEraseTail)
+	if err := renderer.write(row.String()); err != nil {
+		return err
 	}
 	renderer.statusVisible = true
 	renderer.statusFrame = frame
@@ -939,15 +940,13 @@ func (renderer *Renderer) PausePending(now time.Time) error {
 		return io.ErrClosedPipe
 	}
 	const label = "pausing... (esc again to interrupt)"
-	if renderer.statusLabel != label {
-		if renderer.statusVisible {
-			if err := renderer.clearStatus(); err != nil {
-				return err
-			}
-		}
-		renderer.statusLabel = label
-		renderer.statusStarted = now
+	if renderer.statusLabel == label {
+		return nil
 	}
+	// The pause label takes the row over without erasing it: the next tick paints it in place, so
+	// a visible indicator never blinks off and on around the pause.
+	renderer.statusLabel = label
+	renderer.statusStarted = now
 	return nil
 }
 
@@ -1029,41 +1028,42 @@ func (renderer *Renderer) closeCollapsedCluster() error {
 }
 
 func (renderer *Renderer) setStatus(label string) {
-	if renderer.statusVisible && label != renderer.statusLabel {
-		if err := renderer.clearStatus(); err != nil {
-			return
-		}
-	}
 	if label == renderer.statusLabel {
 		return
 	}
-	renderer.statusLabel = label
 	if label == "" {
+		if err := renderer.clearStatus(); err != nil {
+			return
+		}
+		renderer.statusLabel = ""
 		renderer.statusStarted = time.Time{}
-	} else {
-		renderer.statusStarted = time.Now()
+		return
 	}
+	// A label that replaces a visible one is painted over it by the next tick, never erased
+	// first: upstream's spinner_set_label redraws the row and the erase follows the paint.
+	renderer.statusLabel = label
+	renderer.statusStarted = time.Now()
 }
 
 func (renderer *Renderer) clearStatus() error {
 	if !renderer.statusVisible {
 		return nil
 	}
-	if err := renderer.write(ansiEraseLine); err != nil {
+	var clear strings.Builder
+	clear.WriteString(ansiEraseLine)
+	if renderer.statusParkedRows > 0 {
+		// A parked indicator sits below the open read row, so clearing it must climb back and
+		// restore the row's column for the next coalesced read.
+		fmt.Fprintf(&clear, "\x1b[%dA", renderer.statusParkedRows)
+		if renderer.statusParkedColumn > 0 {
+			fmt.Fprintf(&clear, "\x1b[%dG", renderer.statusParkedColumn+1)
+		}
+	}
+	if err := renderer.write(clear.String()); err != nil {
 		return err
 	}
 	renderer.lineNewlines = renderer.statusLineNewlines
 	if renderer.statusParkedRows > 0 {
-		// A parked indicator sits below the open read row, so clearing it must climb back and
-		// restore the row's column for the next coalesced read.
-		if err := renderer.write(fmt.Sprintf("\x1b[%dA", renderer.statusParkedRows)); err != nil {
-			return err
-		}
-		if renderer.statusParkedColumn > 0 {
-			if err := renderer.write(fmt.Sprintf("\x1b[%dG", renderer.statusParkedColumn+1)); err != nil {
-				return err
-			}
-		}
 		renderer.lineNewlines = 0
 	}
 	renderer.statusParkedRows = 0

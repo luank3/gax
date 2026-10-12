@@ -8,7 +8,10 @@ import (
 	"github.com/luank3/gax/internal/system/spawn"
 )
 
-func watchTerminationEscalation(stopContext func(), killChildren func()) func() {
+// watchTerminationEscalation re-raises a termination signal after restore runs. restore must be
+// allocation-free terminal cleanup (upstream's restore_terminal): the process is about to die, so
+// a hidden cursor would otherwise leak into the parent shell.
+func watchTerminationEscalation(stopContext func(), killChildren func(), restore func()) func() {
 	signals := make(chan os.Signal, 2)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 	clearInterruptHandlers := spawn.SetParentInterruptHandlers(
@@ -24,6 +27,7 @@ func watchTerminationEscalation(stopContext func(), killChildren func()) func() 
 			select {
 			case received := <-signals:
 				if received == syscall.SIGQUIT {
+					restore()
 					reraiseTerminationSignal(signals, received)
 					return
 				}
@@ -36,6 +40,7 @@ func watchTerminationEscalation(stopContext func(), killChildren func()) func() 
 					killChildren()
 				}
 				stopContext()
+				restore()
 				reraiseTerminationSignal(signals, received)
 				return
 			case <-done:

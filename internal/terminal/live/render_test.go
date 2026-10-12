@@ -9,6 +9,7 @@ import (
 
 	"github.com/luank3/gax/internal/conversation"
 	terminaltheme "github.com/luank3/gax/internal/terminal/theme"
+	terminalvt "github.com/luank3/gax/internal/terminal/vtresolve"
 	terminalwidth "github.com/luank3/gax/internal/terminal/width"
 	coretools "github.com/luank3/gax/internal/tools"
 )
@@ -293,8 +294,44 @@ func TestRendererKeepsStatusWithinTerminalWidth(t *testing.T) {
 	if err := renderer.Tick(start.Add(statusShowGrace)); err != nil {
 		t.Fatal(err)
 	}
-	if cells := terminalwidth.Cells(output.String()); cells > width-1 {
+	// The row's tail is erased after the paint and occupies no cells on screen.
+	shown := string(terminalvt.Resolve(output.Bytes()))
+	if cells := terminalwidth.Cells(strings.TrimSuffix(shown, "\n")); cells > width-1 {
 		t.Fatalf("status occupies %d terminal cells at width %d: %q", cells, width, output.String())
+	}
+}
+
+// A frame rewrites the row from column zero and erases only what follows the label; erasing the
+// row first would show a blank indicator for the length of a write. A label that replaces a
+// visible one repaints the same way, so swapping labels never blinks the row off and on.
+func TestRendererRepaintsStatusInPlaceWithoutErasingFirst(t *testing.T) {
+	var output bytes.Buffer
+	renderer := NewRenderer(&output, 80, false, false)
+	_ = renderer.Begin()
+	start := renderer.statusStarted
+	if err := renderer.Tick(start.Add(statusShowGrace)); err != nil {
+		t.Fatal(err)
+	}
+	if err := renderer.Tick(start.Add(statusShowGrace + spinnerInterval)); err != nil {
+		t.Fatal(err)
+	}
+	if err := renderer.Event(conversation.Event{Kind: conversation.EventReasoningDelta, Text: "cot"}); err != nil {
+		t.Fatal(err)
+	}
+	swapped := renderer.statusStarted
+	if err := renderer.Tick(swapped.Add(statusShowGrace)); err != nil {
+		t.Fatal(err)
+	}
+
+	got := output.String()
+	want := spinnerFrames[3] + " working..." + ansiEraseTail +
+		"\r" + spinnerFrames[4] + " working..." + ansiEraseTail +
+		"\r" + spinnerFrames[3] + " thinking..." + ansiEraseTail
+	if got != want {
+		t.Fatalf("status frames = %q, want %q", got, want)
+	}
+	if strings.Contains(got, ansiEraseLine) {
+		t.Fatalf("status frame erased the row before painting it: %q", got)
 	}
 }
 
@@ -578,10 +615,11 @@ func TestRendererParksStatusBelowOpenCollapsedReadRow(t *testing.T) {
 		got = strings.ReplaceAll(got, frame, "X")
 	}
 	// A parked indicator sits below the open row and clearing it climbs back to the row's last
-	// column, so the next read still coalesces onto that row instead of a fresh line.
-	want := "[read] a.txt\n\nX working..." +
+	// column, so the next read still coalesces onto that row instead of a fresh line. Each frame
+	// erases the row's tail after painting it, never before.
+	want := "[read] a.txt\n\nX working..." + ansiEraseTail +
 		"\r\x1b[2K\x1b[2A\x1b[13G, b.txt" +
-		"\n\nX working..." +
+		"\n\nX working..." + ansiEraseTail +
 		"\r\x1b[2K\x1b[2A\x1b[20G\n"
 	if got != want {
 		t.Fatalf("parked status output = %q, want %q", got, want)
