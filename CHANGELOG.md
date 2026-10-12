@@ -43,4 +43,15 @@ tracking the baseline commit `ff45833`.
 - CI (gofmt, `go vet`, race-enabled tests, cross-builds) and GoReleaser-based releases for Linux
   and macOS on amd64 and arm64.
 
+### Fixed
+
+- A resumed session is no longer swept: the pruning marker compared path strings, and an `*os.Root`
+  names its entries relative to the root, so the comparison missed and the sweep unlinked the file
+  it was asked to keep. It now compares file identity.
+- A project reached through a symlink keeps one session bucket. macOS hands out
+  `/var/folders/...` while `os.Getwd` reports `/private/var/...`, so a resumed session could look
+  in a bucket the writer never used.
+- The test suite passes on macOS: it had never run there, because `go vet` failed on a helper
+  defined only in a Linux-tagged test file.
+
 [0.1.0]: https://github.com/luank3/gax/releases/tag/v0.1.0
