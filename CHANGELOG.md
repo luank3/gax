@@ -23,6 +23,9 @@ baseline commit `ff45833`.
   DeepSeek's required reasoning replay.
 - Built-in tools (`read`, `edit`, `write`, `bash`, `task_wait`, `web_fetch`, `web_search`, `skill`),
   background tasks, and `gax -p` subagents with recursion limits.
+- `web_search` backends: You.com (the default, keyless through its free MCP profile), Brave, Octen,
+  Exa, Firecrawl, and TinyFish, selected by `web.search_provider` or by the first configured key,
+  with the keyless DuckDuckGo crawl as the fallback when a backend cannot answer.
 - A `skill` tool that loads a skill by name, so the skill listing in the system prompt carries
   descriptions without document paths.
 - Live terminal rendering: incremental Markdown, streamed tool output, reflowed to the display

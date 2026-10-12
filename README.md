@@ -145,7 +145,7 @@ Every setting has a `GAX_`-prefixed environment variable (`GAX_PROVIDER`, `GAX_M
 `GAX_EFFORT`, `GAX_PRESET`, `GAX_THEME`, `GAX_SHOW_REASONING`, `GAX_NO_SESSION`, `GAX_TRACE`,
 `GAX_TRANSCRIPT`, `GAX_BASH_TIMEOUT`, `GAX_BASH_COMPRESS`, `GAX_COMPACT_AUTO`, `GAX_CATALOG_URL`, …). Run `/config`
 in the REPL for the complete, ordered list; provider and search keys are unprefixed
-(`OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `BRAVE_API_KEY`, …). Credential values are redacted from
+(`OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `BRAVE_API_KEY`, `EXA_API_KEY`, …). Credential values are redacted from
 diagnostics and wire traces.
 
 Example `config.json`:
@@ -206,10 +206,14 @@ composing a path. `no_skills` (or `--bare`) drops both the listing and the tool,
 skill shadows a built-in of the same name.
 
 `web_fetch` retrieves a URL and converts an HTML response to plain text unless the model passes
-`strip: false` for the raw body; `web_search` returns ranked titles, URLs, and snippets, searching
-through the Brave Search API when `BRAVE_API_KEY` is set and through DuckDuckGo's HTML endpoint
-otherwise. Both follow `web.timeout` and `web.max_bytes`, and `GAX_NO_WEB=on` (or `no_web` in
-`config.json`) drops them from the toolset.
+`strip: false` for the raw body; `web_search` returns ranked titles, URLs, and snippets. You.com is
+the default backend: with `YDC_API_KEY` it answers through the Web Search API, without one through
+its keyless free MCP profile (100 queries a day). Brave (`BRAVE_API_KEY`), Octen (`OCTEN_API_KEY`),
+Exa (`EXA_API_KEY`), Firecrawl (`FIRECRAWL_API_KEY`), and TinyFish (`TINYFISH_API_KEY`) answer when
+their key is set, `web.search_provider` pins one of them (or `duckduckgo`) outright, and a backend
+that cannot answer — rate-limited, broken, out of credit — falls back to the keyless DuckDuckGo
+crawl, which is also the last resort of a fresh install. Both tools follow `web.timeout` and
+`web.max_bytes`, and `GAX_NO_WEB=on` (or `no_web` in `config.json`) drops them from the toolset.
 
 ### Bash output compression
 

@@ -33,7 +33,7 @@ entries; read the spec against its cited lines rather than trusting a summary of
 | `2026-10-12-tools-registry-spec.md` | 140 | 10 | `tools` (registry, read/edit/write, task_wait) |
 | `2026-10-12-tools-bash-spec.md` | 140 | 10 | `tools` (bash, classifier, preprocess) |
 | `2026-10-12-bashcompress-spec.md` | 140 | 9 | `bashcompress` |
-| `2026-10-12-web-tools-spec.md` | 139 | 9 | `web`, `tools/web.go` |
+| `2026-10-12-web-tools-spec.md` | 226 | 13 | `web`, `tools/web.go` |
 | `2026-10-12-terminal-input-spec.md` | 138 | 7 | `terminal/input` |
 | `2026-10-12-terminal-live-spec.md` | 140 | 9 | `terminal/live` |
 | `2026-10-12-terminal-markdown-spec.md` | 139 | 9 | `terminal/markdown` |
@@ -61,9 +61,12 @@ Findings that need a decision, not just a test. Everything else lives in each sp
   (`internal/session/log.go:321`) appends an `undo` record and rewinds the write cursor. The doc now
   says that.
 - `docs/superpowers/plans/2026-10-11-web-tools.md:36` requires an error when a search returns
-  nothing usable. **Resolved 2026-10-12:** the plan governs; `(*Client).searchBrave` now rejects an
-  empty or entry-less listing (`internal/web/search.go:126`), matching the DuckDuckGo path, and
-  `TestSearchReportsBraveKeyAndRateLimitFailures` pins both shapes.
+  nothing usable. **Resolved 2026-10-12:** the plan governs; every backend now rejects an empty or
+  entry-less listing in `finishSearch` (`internal/web/search.go:560`), and
+  `TestSearchReportsBackendFailures` pins the shapes. The same day replaced the DuckDuckGo HTML
+  backend this entry was written against with six search APIs, you.com leading them, and kept the
+  crawl as the fallback for a backend that cannot answer
+  (`docs/superpowers/plans/2026-10-12-web-search-providers.md`).
 - `docs/superpowers/plans/2026-10-09-config-provider-registry.md:46` counts "all 64 ordered upstream
   setting entries" while the registry has a different row count; `config-layers` records the delta.
 - `catalog.merge` had no callers. **Resolved 2026-10-12:** deleted instead of wired
