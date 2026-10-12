@@ -263,7 +263,7 @@ func pruneTreeAt(ctx context.Context, root *os.Root, rootInfo os.FileInfo, cutof
 				f, _ := os.OpenFile("/tmp/gax-sweep.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 				_, _ = fmt.Fprintf(f, "BUCKET %q exclude=%q entries=%d\n", projectRoot.Name(), excludePath, len(entries))
 				for _, entry := range entries {
-					_, _ = fmt.Fprintf(f, "  %s\n", entry.Name())
+					_, _ = fmt.Fprintf(f, "  %s equal=%v\n", entry.Name(), systempath.Join(projectRoot.Name(), entry.Name()) == excludePath)
 				}
 				_ = f.Close()
 			}
