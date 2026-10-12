@@ -897,9 +897,12 @@ func (renderer *Renderer) Tick(now time.Time) error {
 	// erasing first leaves a blank row on screen for every frame (upstream draw_label_row_locked
 	// followed by finish_row_repaint).
 	var row strings.Builder
+	// The statusLineNewlines recorded here is the count clearStatus restores, so it has to
+	// describe the row this paint commits.
 	if renderer.statusVisible {
 		row.WriteByte('\r')
 	} else {
+		renderer.statusLineNewlines = renderer.lineNewlines
 		if renderer.collapsedLineOpen {
 			// Park the indicator below the open read row: the extra row is the gap the cleared
 			// indicator leaves behind (upstream spinner_park).
@@ -907,9 +910,13 @@ func (renderer *Renderer) Tick(now time.Time) error {
 			renderer.statusParkedRows = 2
 			renderer.statusParkedColumn = renderer.collapsedCells
 		} else if renderer.outputStarted && renderer.lineNewlines == 0 {
+			// The paint's own newline ends the row it covers, and the erase returns to that row:
+			// without counting it the next block separator lands one row too low, leaving a second
+			// blank line before the row that follows. Upstream writes the indicator outside disp,
+			// so its count still sees the answer's own newlines.
 			row.WriteByte('\n')
+			renderer.statusLineNewlines = 1
 		}
-		renderer.statusLineNewlines = renderer.lineNewlines
 	}
 	if renderer.styled {
 		row.WriteString(ansiDim)

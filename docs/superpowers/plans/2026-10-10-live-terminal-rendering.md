@@ -1,5 +1,15 @@
 # Live Terminal Rendering Implementation Plan
 
+> Upstream-parity correction (2026-10-12): a status row painted on the row an answer's own
+> newline would have taken used to drop that newline from the count `clearStatus` restores, so
+> the next block separator (`openBlock`) added a second blank line. The visible effect was two
+> blank lines between a streamed answer and the tool row that followed it, whenever the delayed
+> `working...` indicator appeared between them; upstream writes the indicator outside `disp` and
+> keeps one. `statusLineNewlines` now records the count the paint's own newline commits
+> (`internal/terminal/live/render.go`), covered by
+> `TestStatusRowLeavesOneBlankLineBeforeTheToolHeader`. Verified live against `hax` on the same
+> prompt and model: both render one blank line before `[bash]`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Port Hax's live interactive TTY rendering for streamed assistant output and built-in tool calls while leaving canonical conversation history unchanged.

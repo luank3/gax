@@ -626,6 +626,45 @@ func TestRendererParksStatusBelowOpenCollapsedReadRow(t *testing.T) {
 	}
 }
 
+func TestStatusRowLeavesOneBlankLineBeforeTheToolHeader(t *testing.T) {
+	var output bytes.Buffer
+	renderer := NewRenderer(&output, 80, true, false)
+	if err := renderer.Begin(); err != nil {
+		t.Fatal(err)
+	}
+	renderer.SyncExternalLine()
+	if err := renderer.Event(conversation.Event{Kind: conversation.EventTextDelta, Text: "comparing"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := renderer.Event(conversation.Event{Kind: conversation.EventToolCallStart}); err != nil {
+		t.Fatal(err)
+	}
+	// The answer ends without a newline and the streamed tool call leaves the model busy long
+	// enough for the delayed status to paint the row the header is about to take.
+	if err := renderer.SetStatusLabel("working..."); err != nil {
+		t.Fatal(err)
+	}
+	if err := renderer.Tick(renderer.statusStarted.Add(statusShowGrace)); err != nil {
+		t.Fatal(err)
+	}
+	if err := renderer.ToolStart(conversation.Item{ToolName: conversation.String("bash")},
+		coretools.ToolPresentation{Argument: "ls", HasArgument: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	got := output.String()
+	for _, frame := range spinnerFrames {
+		got = strings.ReplaceAll(got, frame, "X")
+	}
+	want := "\ncomparing" +
+		"\n" + ansiDim + "X working..." + ansiReset + ansiEraseTail +
+		ansiEraseLine + "\n" +
+		terminaltheme.Open(terminaltheme.Chrome) + "[bash]" + ansiReset + " " + ansiBold + "ls" + ansiBoldOff + "\n"
+	if got != want {
+		t.Fatalf("tool header after a painted status = %q, want %q", got, want)
+	}
+}
+
 func TestRendererStartsNewCollapsedReadRowWhenClusterWouldOverflow(t *testing.T) {
 	var output bytes.Buffer
 	renderer := NewRenderer(&output, 20, false, false)
