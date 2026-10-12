@@ -3,6 +3,7 @@ package session
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -32,14 +33,17 @@ func TestPruneBeforeSweepsAllProjectBucketsAndRespectsLocksAndExclusion(t *testi
 		t.Fatal(err)
 	}
 	if _, err := os.Lstat(excludedPath); err != nil {
-		dir := filepath.Dir(excludedPath)
-		entries, _ := os.ReadDir(dir)
-		var names []string
-		for _, e := range entries {
-			info, _ := e.Info()
-			names = append(names, e.Name()+" mtime="+info.ModTime().UTC().String())
-		}
-		t.Fatalf("DIAGCI excluded not a file: %v\nDIR %q\nCWD %q\nENTRIES %v", err, dir, projectA, names)
+		var tree []string
+		root := filepath.Dir(filepath.Dir(filepath.Dir(excludedPath)))
+		_ = filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil {
+				return nil
+			}
+			tree = append(tree, strings.TrimPrefix(path, root)+" mtime="+info.ModTime().UTC().String())
+			return nil
+		})
+		t.Fatalf("DIAGCI excluded not a file: %v\nCWD %q\nEXPECTED excluded=%q recent=%q old=%q locked=%q\nTREE %s",
+			err, projectA, filepath.Base(excludedPath), filepath.Base(recentPath), filepath.Base(oldPath), filepath.Base(lockedPath), strings.Join(tree, "\n"))
 	}
 	assertPruneTestMissing(t, oldPath)
 	assertPruneTestMissing(t, otherPath)
