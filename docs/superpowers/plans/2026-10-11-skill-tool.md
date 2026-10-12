@@ -14,7 +14,7 @@ the model that wants to read a file beside a document).
 **Tech Stack:** Go standard library, the existing tool registry, config store, and system path/fs
 helpers.
 
-**Spec:** upstream hax lists skills in the system prompt with their paths and has no skill tool
+**Spec:** the C implementation lists skills in the system prompt with their paths and has no skill tool
 (`src/agent_env.c: collect_skills`), so both halves of this change are deliberate gax divergences,
 like the built-in `customize-gax` skill they apply to. What the prompt keeps — names and
 descriptions — is what the model needs to *choose*; what it drops — the path — is what the tool can
@@ -98,9 +98,9 @@ produce on demand, and the model would only echo it back into a `read` call.
 - A skill directory whose `SKILL.md` cannot be read for its frontmatter is not listed at all, so the
   tool's load error only fires for a document that disappears between the listing and the load.
 
-## Upstream divergence
+## Divergence from the ported behavior
 
-Upstream keeps paths in the prompt listing and has no skill tool. gax keeps the listing's choosing
+The ported listing keeps paths in the prompt and has no skill tool. gax keeps the listing's choosing
 information (name, description) and moves the addressing information (path) behind a tool call,
 which is the same trade the built-in `customize-gax` skill already made for its own content: the
 registry-driven settings table is only paid for when the document is loaded.

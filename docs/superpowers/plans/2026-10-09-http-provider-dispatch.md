@@ -6,8 +6,6 @@
 
 **Tech:** Go 1.25 standard library; no new dependencies.
 
-**Sources:** hax `src/providers/http_provider.c`, `wire.c`, and the three provider wire/body/stream modules at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
-
 ## Task 1: Prepare model-specific HTTP requests
 
 **Files:** create `internal/provider/client/client.go` and `client_test.go`.

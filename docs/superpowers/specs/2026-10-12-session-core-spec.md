@@ -124,8 +124,8 @@ in-memory conversation state and compaction, which `internal/agent` owns.
 
 ## Review
 
-- `internal/session/path.go:41` seeds the hash with `1469598103934665603`, matching hax
-  `src/session.c:340` rather than the canonical FNV-1a basis; changing it would relocate every
+- `internal/session/path.go:41` seeds the hash with `1469598103934665603`, which is not the
+  canonical FNV-1a basis; changing it would relocate every
   bucket, and nothing pins the seed.
 - `internal/session/log.go:418` checks `locked && !hasLinks(info)` only after a successful
   `syscall.Flock`, so a failed lock skips the link-count check; the symlink half is pinned by

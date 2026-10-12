@@ -16,7 +16,7 @@ anything, and the result carries `[full output: <path>]`.
 **Tech Stack:** Go standard library only (`strings`, `strconv`, `sort`, `encoding/json`, `regexp`
 where a shape genuinely needs it).
 
-**Spec:** upstream hax has no output compressor, so this is a deliberate gax addition. The filter
+**Spec:** the C implementation has no output compressor, so this is a deliberate gax addition. The filter
 set, caps, and output shapes follow `rtk-ai/rtk` (Apache-2.0) as read at commit `master` on
 2026-10-12: `src/cmds/system/ls.rs` (`compact_ls`), `src/cmds/system/tree.rs`, `src/cmds/system/
 read.rs` + `src/core/filter.rs` (`MinimalFilter`), `src/cmds/system/search.rs`, `src/cmds/system/
@@ -217,7 +217,8 @@ values first and neither carries a marker of its own. `go build`, `cargo build`,
 `go test`/`cargo test` invocation that fails to compile are not filtered at all: their diagnostics
 reach the model byte for byte.
 
-## Upstream divergence
+## gax addition
 
-hax has no output compressor: the bash tool returns captured bytes shaped only by the output cap and
-line-width rules. Everything here is a gax addition, and it is off-switchable (`bash.compress`).
+The bash tool returns captured bytes shaped only by the output cap and line-width rules, so nothing
+here mirrors the ported behavior. The compressor is gax's own, and it is off-switchable
+(`bash.compress`).

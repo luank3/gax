@@ -2,33 +2,29 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Port upstream's command-argument handling for `/provider`, `/model`, and `/effort`: their
+**Goal:** Implement command-argument handling for `/provider`, `/model`, and `/effort`: their
 `[id]`/`[level]` prompt placeholders, the values they accept as an argument, and Tab completion of
 the values every command that enumerates them offers.
 
 **Architecture:** `internal/slash` keeps the registry and grammar: a command carries the
 `Usage` placeholder it already had plus `ArgumentChoices`, which marks the commands whose first
-argument word the completer owns. The completer itself mirrors upstream's `match`/`complete`/
+argument word the completer owns. The completer itself mirrors the reference's `match`/`complete`/
 `candidates` triple in the editor's existing `Completer` shape — the matched span is the text after
 the slash, so name and argument completion share one code path. `internal/app/slash_completion.go`
 supplies the per-command candidate lists from the live selection and adapts them to the editor.
 
 **Tech Stack:** Go standard library only.
 
-**Spec:** upstream `src/slash.c` (`collect_choices`, `match_command`, `complete_command`,
-`list_command_choices`, `slash_hint`, `provider_id_choices`, `model_id_choices`,
-`effort_level_choices`, `preset_name_choices`), `src/select.c`
-(`select_provider_choices`, `select_model_choices`, `select_effort_choices`), and
-`src/text/completion.c` (`completion_extend`, `completion_keep_prefixed`) at upstream master
-`2834c2c`, which is the merge `8b86733` in the local hax checkout. Commits: `bbe0675` (argument
-completion and `Completion`), `8da9af8` (`/provider`, `/model`, `/effort` take an argument),
-`6f55942` (provider and effort choices), `2834c2c` (model ids from the provider listing). Upstream
-tests: `tests/test_slash.c` (`test_complete_*`, `test_completer_matches_word_at_cursor`,
-`test_hint_*`, `test_selectors_receive_arguments`).
+**Spec:** the ported command surface gains argument handling: the commands that enumerate values
+(`/provider`, `/model`, `/effort`, `/preset`, `/new`, `/clear`) own the first argument word, their
+placeholders already say so (`usage = "[id]"`, `"[level]"`), and completion of that word extends the
+same match/complete/candidates machinery the command-name completer already uses. The per-command
+candidate lists come from the live selection: provider ids, model ids, effort levels, and preset
+names.
 
 ## Constraints
 
-- Registry order, usage strings, and diagnostics stay upstream's: `/provider [id]`, `/model [id]`,
+- Registry order, usage strings, and diagnostics follow the ported behavior: `/provider [id]`, `/model [id]`,
   `/effort [level]`.
 - A command that enumerates its argument owns that word. Every other argument word stays with the
   completers that follow, so `@file` mentions inside a `/compact` focus keep working.
@@ -53,7 +49,7 @@ tests: `tests/test_slash.c` (`test_complete_*`, `test_completer_matches_word_at_
 
 - [x] Confirm the handlers' argument paths (`runProviderCommand`, `runModelCommand`,
   `runEffortCommand`) are reachable now that the parser accepts an argument, and that a missing or
-  unknown value keeps its upstream diagnostic on the display channel.
+  unknown value keeps its documented diagnostic on the display channel.
 - [x] Verify with `internal/app` tests: `/provider <id>`, `/model <id>`, `/effort <level>` switch,
   `/provider missing` names the unknown provider, and a level the model does not take is reported.
 - [x] Verify `@file` completion is unaffected after a command that enumerates nothing.
@@ -92,34 +88,32 @@ tests: `tests/test_slash.c` (`test_complete_*`, `test_completer_matches_word_at_
 
 ## Record
 
-- **The parity note that removed this extension was wrong.** `2026-10-10-slash-command-front-end.md`
-  recorded that "official master `ff45833` completes slash command names only ... `/provider`,
-  `/model`, and `/effort` take no arguments and open pickers". `ff45833` is not upstream master: it
-  is a commit on the fork's branch, whose ancestry predates upstream's `8da9af8`. Upstream master at
-  the time already took arguments, and `2834c2c` completes them. gax had kept the handlers'
-  argument paths (`runProviderCommand`, `runModelCommand`, `runEffortCommand`) — dead code, since
-  the registry declared no usage and the parser rejected the argument — and this change makes them
+- **The note that removed this extension was wrong.** `2026-10-10-slash-command-front-end.md`
+  recorded that slash commands complete their names only and that `/provider`, `/model`, and
+  `/effort` take no arguments. That was read off a revision that predates the argument-taking
+  behavior, which already existed when the note was written. gax had kept the handlers' argument
+  paths (`runProviderCommand`, `runModelCommand`, `runEffortCommand`) — dead code, since the
+  registry declared no usage and the parser rejected the argument — and this change makes them
   live, which is where the summary text "switch provider, then model and effort" comes from.
-- **One completer, not three.** Upstream's inside-the-package `match`/`complete`/`candidates` and
+- **One completer, not three.** The reference's inside-the-package `match`/`complete`/`candidates` and
   gax's `terminalinput.Completer` fields already line up, so `internal/slash` gains no new wiring:
   `Match` returns the span from after the slash through the cursor and `Complete` returns its
   replacement, exactly as the name-only version did.
-- **`Command.ArgumentChoices` is upstream's `argument_choices` hook, without the function value.**
+- **`Command.ArgumentChoices` is the `argument_choices` hook, without the function value.**
   The package cannot know a registry or a store, so it keeps only the flag that decides who owns the
   argument word, and the app passes the values in.
-- **`/new` and `/clear` share the preset candidates**, as upstream's `find_command` does.
+- **`/new` and `/clear` share the preset candidates**, as `find_command` does.
 - **Effort candidates always end with `default`**, even when the model lists no levels, matching
   `select_effort_choices`; the candidate itself is not filtered, so a provider with no levels still
   offers the value `/effort` accepts.
-- **Preset candidates are alphabetical and grammar-checked.** Upstream sorts them
+- **Preset candidates are alphabetical and grammar-checked.** They are sorted
   (`completion_sort`) and drops names that cannot be one word, so `/preset code review<Tab>` offers
   nothing rather than a partial name.
-- **Model candidates need one listing first.** Upstream's probes report ids as a side effect of
+- **Model candidates need one listing first.** The probes report ids as a side effect of
   metadata work; gax has no listing-only probe, so completion uses
   `Provider.ListedModelIDs()` — populated by `ListModels`, which is what the `/model` picker and
-  `/provider <id>` run. `docs/usage.md` upstream documents the same fallback ("open the `/model`
+  `/provider <id>` run. The same fallback is documented ("open the `/model`
   picker once").
-- **Not ported:** upstream's `?q=` OpenRouter search probe and its listing-only probes
-  (`2834c2c`'s `model_meta` rework, which exists to make `/model` complete without the picker ever
-  running). Upstream's `text/display_safe` sanitizing of echoed candidates is applied where gax
+- **Not ported:** the `?q=` OpenRouter search probe and the listing-only probes (which exist to
+  make `/model` complete without the picker ever running). The `text/display_safe` sanitizing of echoed candidates is applied where gax
   builds them (`terminalSafeText`), next to the other terminal-bound values.

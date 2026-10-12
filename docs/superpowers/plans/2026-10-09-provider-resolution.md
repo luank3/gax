@@ -1,12 +1,12 @@
 # Provider Resolution Plan
 
-**Goal:** Turn a registry definition plus layered configuration into a safe, testable runtime provider description that matches hax's generic HTTP-provider resolution rules.
+**Goal:** Turn a registry definition plus layered configuration into a safe, testable runtime provider description following the generic HTTP-provider resolution rules.
 
 **Architecture:** Add `internal/provider/runtime` as a pure resolution layer over `config.Store`, `provider/config`, and `provider/registry`. It resolves the endpoint and protocol, metadata dialect, credentials, defaults, headers, extra body, and an availability result without doing network I/O. Stream execution, metadata fetching, dynamic auth hooks, and the CLI remain later layers.
 
 **Tech:** Go 1.25 standard library; no new dependencies.
 
-**Sources:** hax `src/providers/http_provider.c`, `registry.c`, `wire.c`, `provider_config.c`, `docs/providers.md`, and `docs/configuration.md` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
+**Sources:** the ported sources, `docs/providers.md`, and `docs/configuration.md`.
 
 ## Constraints
 

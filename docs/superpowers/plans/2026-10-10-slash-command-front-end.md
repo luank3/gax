@@ -1,27 +1,27 @@
 # Slash Command Front-End Implementation Plan
 
-> Upstream-parity correction (2026-10-12): the 2026-10-11 note below was wrong about upstream. The
-> argument-completion extension was removed as "based on a fork snapshot", but `ff45833` is a commit
-> on the fork's branch, not upstream master, and its ancestry predates upstream's own
-> argument-taking commits. Upstream master (`2834c2c`) takes arguments for `/provider`, `/model`,
-> and `/effort` and completes their values with Tab; `2026-10-12-slash-argument-completion.md` ports
-> that behavior and supersedes the note.
+> Correction (2026-10-12): the 2026-10-11 note below was wrong. `/provider`, `/model`, and
+> `/effort` do take arguments and complete their values with Tab, and the extension this plan
+> described is the intended behavior; `2026-10-12-slash-argument-completion.md` ports it and
+> supersedes the note.
 >
-> Superseded note (2026-10-11): this is a historical implementation plan. The argument-completion extension described in the original plan was based on a fork snapshot and has been removed. Official master `ff458337f8ba7366d71fad4da0210a53b658678a` completes slash command names only (plus `@file` in the editor); `/provider`, `/model`, and `/effort` take no arguments and open pickers.
+> Superseded note (2026-10-11): this is a historical implementation plan. The argument-completion
+> extension described in the original plan was removed at the time, on the mistaken belief that
+> slash commands complete their names only (plus `@file` in the editor).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Port upstream slash-command recognition, command metadata, command-name completion, hints, and the useful line-REPL commands.
+**Goal:** Port slash-command recognition, command metadata, command-name completion, hints, and the useful line-REPL commands.
 
 **Architecture:** Keep the command registry and grammar in a pure `internal/slash` package. The REPL consumes parsed outcomes and handles help and diagnostics without letting command-shaped input accidentally become a model prompt.
 
 **Tech Stack:** Go standard library only.
 
-**Spec:** hax `src/slash.c` and `tests/test_slash.c` at the porting baseline commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
+
 
 ## Global Constraints
 
-- Preserve the upstream command and alias order used by `/help` and completion.
+- Preserve the command and alias order used by `/help` and completion.
 - A slash-prefixed path or token containing punctuation/control bytes must remain normal prompt text.
 - Unknown command names and invalid arguments are consumed with diagnostics.
 - Do not add terminal UI dependencies in this slice.
@@ -48,7 +48,7 @@
 
 - [x] Write tests for command order, alias parsing, unknown names, bad usage, path/control fall-through, completion, candidate lists, cursor matching, and hints.
 - [x] Run `go test ./internal/slash` and verify it fails because the package API is absent.
-- [x] Implement the pure registry and parser with ASCII command-name bytes and upstream whitespace behavior.
+- [x] Implement the pure registry and parser with ASCII command-name bytes and the documented whitespace behavior.
 - [x] Run `go test ./internal/slash` and verify all cases pass.
 
 ### Task 2: Line REPL command routing
@@ -84,7 +84,7 @@
 - [x] Implement undo routing and `session.ForkFile`, preserving source headers while changing branch id/time/selection and marking copied items inherited.
 - [x] Run targeted app and session tests and verify live state and disk state agree.
 
-### Task 4: Upstream slash-name completion
+### Task 4: Slash-name completion
 
 - [x] Match and complete slash command names at the cursor, with safe boundary handling.
 - [x] Reject arguments for `/provider`, `/model`, and `/effort`; selection happens through their TTY pickers.

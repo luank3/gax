@@ -2,7 +2,7 @@
 
 ## Goal
 
-Match upstream catalog lifecycle behavior: load a bounded provider-shaped cache, refresh it once in the background when stale, keep the last good snapshot on failure, expose stale age once, and support bounded wait, drain, and shutdown.
+Match the catalog lifecycle behavior: load a bounded provider-shaped cache, refresh it once in the background when stale, keep the last good snapshot on failure, expose stale age once, and support bounded wait, drain, and shutdown.
 
 ## Tasks
 

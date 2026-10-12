@@ -4,10 +4,10 @@
 
 **Goal:** Make requests that belong to no recorded conversation carry a real session id, so the
 OpenCode Go gateway's required `x-opencode-session` header is never empty; give Codex's streamed
-requests the identity headers upstream sends; retire the `opencode-zen` and `agnes` shipped defs.
+requests the identity headers the endpoints expect; retire the `opencode-zen` and `agnes` shipped defs.
 
 **Architecture:** `runtime.ProcessSessionID()` lazily generates one UUID v4 per process — the port
-of upstream `provider_process_session_id()` (`src/providers/provider_config.c:237`). Every place
+of `provider_process_session_id()`. Every place
 that expands the `{session_id}` placeholder (`Provider.ConfiguredHeaders`, and therefore
 `Headers`/`MetadataHeaders`) substitutes it when the caller has no conversation id, and
 `internal/provider/client` resolves the same value once per request so the prompt cache key and
@@ -16,10 +16,9 @@ the headers agree on one affinity id.
 **Tech Stack:** Go standard library (`crypto/rand`, `encoding/hex`, `sync`), the existing provider
 runtime and client.
 
-**Spec:** upstream resolves the fallback at its HTTP layer
-(`src/providers/http_provider.c:388` for requests, `:596`/`:602` for metadata and usage) because
-the OpenCode gateway pins a conversation to one upstream by that header and rejects requests
-without one (`src/providers/registry.c:26`). gax resolves it where it expands the placeholder.
+**Spec:** the fallback belongs where a request is built, because the OpenCode gateway pins a
+conversation to one backend by that header and rejects requests without one. gax resolves it where
+it expands the placeholder.
 
 ## Constraints
 
@@ -56,7 +55,7 @@ without one (`src/providers/registry.c:26`). gax resolves it where it expands th
 
 - [x] Write failing registry tests: the shipped order without `opencode-zen` and `agnes`, and a
       lookup for each retired id.
-- [x] Delete both defs, keeping the shared OpenCode header helper (with upstream's why-comment)
+- [x] Delete both defs, keeping the shared OpenCode header helper (with its why-comment)
       for `opencode-go`.
 - [x] Re-point the generic model-listing test at `openai-compatible` so the "listed IDs keep
       unknown capabilities and no invented pricing" coverage survives.
@@ -86,25 +85,25 @@ without one (`src/providers/registry.c:26`). gax resolves it where it expands th
 ## Record
 
 - `ProcessSessionID()` is a `sync.Once` UUID v4: the fallback is per process, exactly like
-  upstream's static buffer, so consecutive requests of one run share one affinity id and a later
+  the same static buffer, so consecutive requests of one run share one affinity id and a later
   run gets a fresh one.
 - The fallback lives at the expansion boundary rather than at each caller, so model listing and
   `/usage` requests (which pass `""` on purpose) get the same non-empty header as model requests.
-- `Provider.Headers` resolves the id too, because the Codex branch needs it: upstream's
+- `Provider.Headers` resolves the id too, because the Codex branch needs it: the
   `codex_auth_headers` (`src/providers/codex_auth.c:275`) keys its session identity and beta flag
   off the *streaming* flag, which gax no longer passes on the request path — the SSE Accept and
   Content-Type moved to the transport, so the Responses wire marks the streamed case instead. The
-  non-streamed branch sends upstream's `Accept: application/json`, which the Codex `/models`
+  non-streamed branch sends `Accept: application/json`, which the Codex `/models`
   request previously went without.
 - Retiring `agnes` also drops its catalog-less listing behavior; that path is still covered by the
   `openai-compatible` test, which asserts unknown capabilities and unpriced metadata.
-- Upstream still ships both defs; gax diverges deliberately because the Zen endpoint no longer
+- The reference still ships both defs; gax diverges deliberately because the Zen endpoint no longer
   serves and the Agnes AI endpoint is unusable. `docs/superpowers/plans/2026-10-10-*.md` keep
   their historical task lines and carry a dated note pointing here.
 
-## Upstream divergence
+## Divergence from the ported behavior
 
 `src/providers/registry.c` ships `opencode-zen` (pay-as-you-go) and `agnes` (Agnes AI, with an
 `agnes_parse_model` hook gax never ported). gax ships neither: the Zen gateway no longer works, and
 the Agnes AI hub is not usable. Everything else in the inventory — including `opencode-go` and its
-usage windows — stays aligned with the baseline.
+usage windows — stays aligned with the ported behavior.

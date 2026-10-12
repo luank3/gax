@@ -113,7 +113,7 @@ results, or write errors. Non-goal: provider field vocabulary and credentials, o
   reaches `PresetJSON` through `loadPreset`.
 - The state half of the failed-load rule is unasserted: `internal/config/config_test.go:116` checks
   only that malformed JSON errors, never that the state tier is then empty.
-- The cited plan says "all 64 ordered upstream setting entries"
+- The cited plan says "all 64 ordered setting entries"
   (`docs/superpowers/plans/2026-10-09-config-provider-registry.md:46`) while
   `TestSettingValidationAndDefaultRegistry` pins 69 entries at
   `internal/config/config_test.go:189`.

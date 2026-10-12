@@ -1,6 +1,6 @@
 # Provider Model Listing Plan
 
-> Upstream-parity correction (2026-10-11): generic OpenAI-compatible providers fetch `/models` when the picker opens, not as a background metadata probe. Openference parses rich metadata from that explicit listing but has no selected-model probe; Agnes keeps listed IDs with unknown capabilities and pricing.
+> Correction (2026-10-11): generic OpenAI-compatible providers fetch `/models` when the picker opens, not as a background metadata probe. Openference parses rich metadata from that explicit listing but has no selected-model probe; Agnes keeps listed IDs with unknown capabilities and pricing.
 
 > Inventory note (2026-10-11): the Agnes AI def was retired, so the generic-listing coverage moved to `openai-compatible`; see `2026-10-11-provider-affinity-and-inventory.md`.
 
@@ -35,6 +35,6 @@
 - [x] Verify runtime/client and provider tests.
 - [x] Run race tests, vet, and Linux/macOS builds.
 
-## Upstream interaction boundary
+## Interaction with the ported behavior
 
-Upstream provides rich model metadata through selected-provider probes and explicit `/models` listings. Generic OpenAI-compatible providers list models only when their picker opens; Openference parses metadata from that listing and has no selected-model probe.
+Rich model metadata arrives through selected-provider probes and explicit `/models` listings. Generic OpenAI-compatible providers list models only when their picker opens; Openference parses metadata from that listing and has no selected-model probe.

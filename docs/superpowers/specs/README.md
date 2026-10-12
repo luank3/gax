@@ -51,7 +51,7 @@ Findings that need a decision, not just a test. Everything else lives in each sp
 
 - `/provider`, `/model`, and `/effort` accept and apply an argument in gax
   (`TestRunREPLSelectsSelectionByArgument`, `internal/app/app_test.go:1162`). **Resolved
-  2026-10-12:** this is upstream parity, not a divergence. Upstream master `2834c2c` declares
+  2026-10-12:** this is ported-behavior parity, not a divergence. Upstream master `2834c2c` declares
   `usage = "[id]"` (and `"[level]"` for `/effort`) with an `argument_choices` hook for all three in
   `src/slash.c`; the earlier commit gax was ported from predates upstream's argument-taking
   commits. The

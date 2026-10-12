@@ -6,8 +6,6 @@
 
 **Tech:** Go 1.25 standard library; no new dependencies.
 
-**Sources:** hax `src/providers/http_provider.c`, `chat_body.c`, and `catalog.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`; per-item reasoning replay from `the hax checkout` commit `e040365`.
-
 ## Task 1: Resolve provider and model request policy
 
 **Files:** `internal/provider/runtime/runtime.go` and `runtime_test.go`.
@@ -40,4 +38,4 @@
 - Catalog reasoning-field hints apply only when `reasoning_roundtrip` is not pinned.
 - With no configured, catalog, or provider-default field, recorded Chat Completions reasoning replays under the member it arrived in; `auto` and `on` request this default resolution.
 - User `max_tokens` is capped at the catalog model output limit; otherwise the model limit wins over the 32k fallback.
-- Anthropic thinking follows known effort metadata, selected effort, and the configured mode in upstream order.
+- Anthropic thinking follows known effort metadata, selected effort, and the configured mode in the documented order.

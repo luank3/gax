@@ -4,7 +4,7 @@
 
 ## Goal
 
-Port upstream base-prompt selection and the dynamic suffix containing environment details, project `AGENTS.md` instructions, and skill descriptions.
+Port base-prompt selection and the dynamic suffix containing environment details, project `AGENTS.md` instructions, and skill descriptions.
 
 ## Tasks
 
@@ -13,6 +13,3 @@ Port upstream base-prompt selection and the dynamic suffix containing environmen
 - [x] Run focused and repository-wide tests, race checks, build, vet, and whitespace checks.
 - [x] Port preset role listings and exact platform/environment display details.
 
-## Source
-
-hax `src/agent_core.c`, `agent_env.c`, `config.c`, and `text/frontmatter.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.

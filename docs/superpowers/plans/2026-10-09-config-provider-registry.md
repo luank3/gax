@@ -2,13 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Port hax's configuration resolution and provider registry substrate into Go so later agent and CLI layers can use the same provider selection behavior.
+**Goal:** Port the configuration resolution and provider registry substrate into Go so later agent and CLI layers can use the same provider selection behavior.
 
 **Architecture:** Keep JSON configuration tiers and typed setting metadata in `internal/config`. Put environment aliases and provider-field resolution in `internal/provider/config`; keep immutable shipped definitions and dynamic user-defined entries in `internal/provider/registry`. Provider construction remains a later task that consumes these values and the already implemented wire/transport packages.
 
 **Tech Stack:** Go 1.25 standard library, `encoding/json`, `os`, and `testing`; no third-party dependencies.
-
-**Spec:** hax `docs/configuration.md`, `docs/providers.md`, and upstream `src/config.c`, `src/providers/provider_config.c`, and `src/providers/registry.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
 
 ## Global Constraints
 
@@ -16,7 +14,7 @@
 - `(default)` stops lookup at that tier and resolves to the setting's registry default.
 - JSON accepts both nested objects and flat dotted keys; numeric and boolean scalar values coerce to strings for scalar getters.
 - `model` and `effort` values stored with a provider selection apply only while that provider is active, with `llama.cpp` canonicalized to `llamacpp`.
-- Shipped providers retain upstream autoselect order; internal providers stay addressable by name but are excluded from enumeration.
+- Shipped providers retain the autoselect order; internal providers stay addressable by name but are excluded from enumeration.
 - Provider credentials and header values must not be written to diagnostics or trace output.
 - Preserve the full project objective; this plan implements only the configuration and registry subsystem.
 
@@ -43,7 +41,7 @@
 
 - [x] **Step 1: Write tests** for precedence, dotted and nested JSON, scalar coercion, default sentinel, provider-bound model/effort, meaningful empty values, invalid-load clearing, and typed parsing/bounds.
 - [x] **Step 2: Run** `go test ./internal/config` and confirm the absent API fails to compile.
-- [x] **Step 3: Implement** the store and all 64 ordered upstream setting entries.
+- [x] **Step 3: Implement** the store and all 64 ordered setting entries.
 - [x] **Step 4: Run** `go test ./internal/config` and `go test ./...`.
 
 ### Task 2: Provider configuration and credentials
@@ -70,7 +68,7 @@
 **Interfaces:**
 - Consumes provider-scoped config from Task 2.
 - Produces `type Definition`, `type Registry`, `func New(config *config.Store) *Registry`, `func (r *Registry) Find(name string) (*Definition, bool)`, `func (r *Registry) All() []*Definition`, `func (r *Registry) Default() *Definition`, and `func (r *Registry) DisplayName(def *Definition) string`.
-- Register the upstream shipped IDs, defaults, canonical names, internal visibility, and autoselect priority; config-only provider names append after shipped user-facing entries.
+- Register the shipped IDs, defaults, canonical names, internal visibility, and autoselect priority; config-only provider names append after shipped user-facing entries.
 
 - [x] **Step 1: Write tests** for exact shipped order/default, `llama.cpp` alias lookup, internal provider exclusion, and custom config-only registration.
 - [x] **Step 2: Run** `go test ./internal/provider/registry` and confirm the missing API fails.

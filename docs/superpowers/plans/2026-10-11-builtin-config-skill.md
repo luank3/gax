@@ -15,9 +15,8 @@ from the `read` tool. The settings table inside the document is generated from
 **Tech Stack:** Go standard library (`embed`, `io/fs`), the existing system-prompt builder and read
 tool.
 
-**Spec:** hax has no built-in skills (`docs/usage.md` describes discovery only), so this is a
-deliberate gax addition; the skill *content* mirrors `README.md` and `docs/configuration.md` of the
-baseline.
+**Spec:** this is a deliberate gax addition — discovery lists only skills found on disk. The skill
+*content* is drawn from gax's own `README.md` and `docs/configuration.md`.
 
 ## Constraints
 
@@ -74,8 +73,8 @@ baseline.
   (2026-10-11-skill-tool.md). `no_skills`, `--bare`, and `--raw` drop both.
 - `internal/skill` is the first use of `go:embed` in the port; `go.mod` still has no `require` block.
 
-## Upstream interaction boundary
+## Interaction with the ported behavior
 
-Upstream discovers skills from disk only (`src/agent_env.c: collect_skills`) and never ships one.
+Discovery reads skills from disk only and ships none.
 The `gax:` scheme is a gax-only extension: discovered skills keep their filesystem paths, and the
-`# Skills` section wording is unchanged, so upstream parity for user skills is untouched.
+`# Skills` section wording is unchanged, so user skills read exactly as they did before.

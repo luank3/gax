@@ -14,13 +14,13 @@ Connect the existing CLI, config, provider, agent, tool, and session packages be
 - [x] Run repository tests, race checks, build, vet, whitespace checks, and command smoke tests.
 - [x] Port the full terminal UI, slash commands, session picker, live rendering, compaction, and complete usage/cost reporting.
   - [x] Render full history and brief recent-turn replay with prompt rails, Markdown, origin markers, and tool previews.
-  - [x] Match upstream tool-header preprocessing and summarized-write preview fallbacks.
+  - [x] Match tool-header preprocessing and summarized-write preview fallbacks.
   - [x] Match the shipped provider inventory, including Openference and Agnes, without a DeepSeek provider.
   - [x] Parse Openference model metadata and preserve Agnes model listings without invented capabilities.
   - [x] Resolve dotted preset names literally across state and config tiers, including save metadata.
   - [x] Replay Chat Completions reasoning only under a configured, provider-default, or catalog-selected field; do not infer a request field from response-member names stored in the transcript.
-  - [x] Match upstream slash-name completion and `@file` completion; `/provider`, `/model`, and `/effort` take an optional argument and open their TTY pickers without one.
-    - Correction (2026-10-12): the argument form matches upstream master `2834c2c` (`usage = "[id]"`/`"[level]"` plus `argument_choices` in `src/slash.c`), not a fork deviation; `ff45833` predates upstream's argument-taking commits. Asserted by `TestRunREPLSelectsSelectionByArgument` in `internal/app/app_test.go`; see the correction notes in `2026-10-10-repl-provider-selection.md` and `2026-10-10-slash-command-front-end.md`.
+  - [x] Slash-name completion and `@file` completion; `/provider`, `/model`, and `/effort` take an optional argument and open their TTY pickers without one.
+    - Correction (2026-10-12): the argument form is the intended behavior, not a deviation; an earlier note had read the wrong revision. Asserted by `TestRunREPLSelectsSelectionByArgument` in `internal/app/app_test.go`; see the correction notes in `2026-10-10-repl-provider-selection.md` and `2026-10-10-slash-command-front-end.md`.
   - [x] Match Ollama's context guidance, with no default reasoning replay member.
   - [x] Carry OpenRouter pricing, context tiers, and tool support from model listings into usage estimates and picker rows.
   - [x] Probe selected OpenRouter, Anthropic, Codex, and llama.cpp metadata in the background; keep Openference's metadata in its explicit `/models` listing; use Codex's versioned catalog.
@@ -37,6 +37,3 @@ Connect the existing CLI, config, provider, agent, tool, and session packages be
   byte-identical per declaration (verified by comparing hashed declaration bodies before and
   after), so no behavior changed.
 
-## Source
-
-The C sources this was ported from, including `src/main.c`, `src/cli.c`, `src/oneshot.c`, `src/agent.c`, `src/session.c`, `src/providers/registry.c`, and `docs/sessions.md`.

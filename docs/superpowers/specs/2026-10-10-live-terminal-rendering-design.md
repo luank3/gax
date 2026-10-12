@@ -2,7 +2,7 @@
 
 ## Goal
 
-Port Hax's live interactive terminal presentation to Go. In a TTY REPL, assistant text and
+Present streamed output live in the terminal. In a TTY REPL, assistant text and
 reasoning follow the provider stream, retries and stream boundaries update the display correctly,
 and tool calls/results appear while tools run. The session history and model-facing tool results
 remain canonical and independent of presentation.
@@ -18,7 +18,7 @@ currently set `Observe` for the interactive REPL. It waits for a completed loop,
 text from session items, and renders the full answer with `terminalmarkdown.Render`.
 
 The built-in registry executes tools without a display sink or per-tool presentation metadata.
-Upstream passes a synchronous display callback into tool execution and uses tool metadata to select
+Tool execution takes a synchronous display callback, and tool metadata selects
 argument formatting, preview mode, diff rendering, and collapsed exploration rows. Bash, task-wait,
 and write can emit content while executing; the final model-facing result can include annotations
 that should not be repeated in the user-facing display.
@@ -26,15 +26,15 @@ that should not be repeated in the user-facing display.
 ## Design
 
 Add a stateful renderer under `internal/terminal` that owns the active display mode and consumes
-stream events. Its Markdown engine is a Go port of the upstream streaming renderer, not an adapter
-that only preserves the current Go renderer's smaller feature set. It retains upstream behavior
+stream events. Its Markdown engine is the streaming parser, not an adapter
+that only preserves a batch renderer's smaller feature set. It retains the streaming behavior
 for inline emphasis and code, headings, fences, lists, thematic breaks, blockquotes, soft and hard
 breaks, em-dash spacing, bare links, GFM tables (including alignment, reflow, and bounded
 collection), terminal-width wrapping, ANSI style transitions, and ambiguous syntax split across
 feeds. The existing `Render` function uses the same engine so static and live output cannot drift.
 The live renderer tracks visible content, closes or transitions blocks at reasoning/tool
 boundaries, and resets Markdown state when a retry abandons a partial attempt. A partial attempt
-that was already visible is closed with the upstream-style unexpected end marker before the retry
+that was already visible is closed with the unexpected-end marker before the retry
 begins. Reasoning display follows the existing configuration setting. TTY sizing, ANSI styles,
 and delayed status labels remain renderer concerns; the app supplies the terminal writer and
 configuration.
@@ -69,7 +69,7 @@ changes event assembly, tool-result contents, JSONL records, or session history.
 
 ## Verification
 
-Unit tests port the upstream Markdown regression behavior into Go and cover arbitrary chunk
+Unit tests pin the Markdown regression behavior in Go and cover arbitrary chunk
 partitions (including split UTF-8 and inline markers), immediate prose emission, table buffering,
 block boundaries, wrapping and width edge cases, ANSI style state, retry resets, and writer errors.
 Renderer tests cover event boundaries, retry markers and resets, reasoning visibility, tool preview
@@ -85,8 +85,8 @@ This design covers the interactive renderer and its tool-display integration. Se
 slash-command completeness, compaction policy, and usage/cost parity remain separate open work in
 the command-entrypoint plan.
 
-## Upstream reference
+## Reference behavior
 
-hax `src/agent.c`, `render/render_ctx.c`, `agent_dispatch.c`, `agent_tool.c`,
-`tool.h`, and tool implementations at upstream commit
-`ff458337f8ba7366d71fad4da0210a53b658678a`.
+The renderer follows the streaming rules recorded in
+`docs/superpowers/plans/2026-10-10-live-terminal-rendering.md`, which carries the byte-level
+fixtures and the conformance sweep behind them.

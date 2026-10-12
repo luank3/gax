@@ -1,6 +1,6 @@
 # Busy terminal operation parity
 
-Port the pinned upstream busy spinner to blocking model, catalog, usage, and Codex login operations. Interactive TTY runs show the same delayed animated status, accept double-Escape cancellation, restore terminal input, erase the status row, and leave an interruption marker. Non-TTY output remains unchanged while request contexts still honor cancellation.
+Port the busy spinner to blocking model, catalog, usage, and Codex login operations. Interactive TTY runs show the same delayed animated status, accept double-Escape cancellation, restore terminal input, erase the status row, and leave an interruption marker. Non-TTY output remains unchanged while request contexts still honor cancellation.
 
 ## Verification
 

@@ -1,6 +1,9 @@
 # Superseded: DeepSeek Model and Usage Hooks Plan
 
-> Superseded on 2026-10-11. This plan followed the fork snapshot `23988f9`, not the porting baseline `ff458337f8ba7366d71fad4da0210a53b658678a`, which has no DeepSeek provider, custom model hook, or balance `/usage` command; the implementation was removed from the Go port at the time. DeepSeek's model parser and `/user/balance` reporting were later restored as a deliberate divergence from the baseline.
+> Superseded on 2026-10-11. This plan was written against a revision that had no DeepSeek provider,
+> custom model hook, or balance `/usage` command, and the implementation it describes was removed at
+> the time. DeepSeek's model parser and `/user/balance` reporting were later restored by
+> `2026-10-10-deepseek-provider-parity.md` and its follow-ups.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -9,8 +12,6 @@
 **Architecture:** Keep DeepSeek response parsing and balance fetching in a provider package; pass the existing resolved runtime provider and transport client into the usage query. The REPL dispatches `/usage` by the selected provider's hook, with DeepSeek's report rendered as plain terminal-safe text.
 
 **Tech Stack:** Go provider runtime, shared HTTP transport, REPL slash command.
-
-**Spec:** hax `src/providers/deepseek.c`, `src/providers/usage_fetch.c`, `src/providers/usage_render.c`, and `tests/providers/test_deepseek.c`.
 
 ## Constraints
 
@@ -46,6 +47,6 @@
 - [x] Run `go vet ./...`.
 - [x] Build Linux and macOS targets.
 
-## Upstream interaction boundary
+## Interaction with the ported behavior
 
-The Go runtime fetches OpenAI-style `/models` responses, applies the DeepSeek parser, and exposes the result in the line REPL. TTY model selection, Anthropic's cursor-paginated listing, and llama.cpp discovery are covered. The pinned upstream editor registers only slash-command-name and `@file` completers (`src/agent.c`); provider/model command arguments are not Tab-completed.
+The Go runtime fetches OpenAI-style `/models` responses, applies the DeepSeek parser, and exposes the result in the line REPL. TTY model selection, Anthropic's cursor-paginated listing, and llama.cpp discovery are covered. The editor registers only slash-command-name and `@file` completers; provider/model command arguments are not Tab-completed.

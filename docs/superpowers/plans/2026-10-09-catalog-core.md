@@ -6,8 +6,6 @@
 
 **Tech:** Go 1.25 standard library; no new dependencies.
 
-**Sources:** hax `src/catalog.c`, `catalog.h`, and `providers/http_provider.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
-
 ## Task 1: Parse and merge model metadata
 
 **Files:** create `internal/catalog/catalog.go` and `catalog_test.go`.
@@ -34,7 +32,7 @@
 ## Review focus
 
 - User config wins field by field over the catalog-ID config, which wins over the snapshot.
-- A declared empty field/list remains distinct from absent metadata where upstream requires it.
+- A declared empty field/list remains distinct from absent metadata where the format requires it.
 - Unknown model selectors do not silently select a different protocol.
 - Pricing uses the highest context threshold exceeded and accounts for surcharge-style writes without subtracting them from input.
 - Explicit glob rules win before catalog hints; unmatched catalog-routed models fall back to the provider default only when the catalog has no selector.

@@ -1,20 +1,18 @@
 # Live Terminal Rendering Implementation Plan
 
-> Upstream-parity correction (2026-10-12): a status row painted on the row an answer's own
-> newline would have taken used to drop that newline from the count `clearStatus` restores, so
-> the next block separator (`openBlock`) added a second blank line. The visible effect was two
-> blank lines between a streamed answer and the tool row that followed it, whenever the delayed
-> `working...` indicator appeared between them; upstream writes the indicator outside `disp` and
-> keeps one. `statusLineNewlines` now records the count the paint's own newline commits
-> (`internal/terminal/live/render.go`), covered by
-> `TestStatusRowLeavesOneBlankLineBeforeTheToolHeader`. Verified live against `hax` on the same
-> prompt and model: both render one blank line before `[bash]`.
+> Status-row correction (2026-10-12): a status row painted on the row an answer's own newline
+> would have taken used to drop that newline from the count `clearStatus` restores, so the next
+> block separator (`openBlock`) added a second blank line. The visible effect was two blank lines
+> between a streamed answer and the tool row that followed it, whenever the delayed `working...`
+> indicator appeared between them. `statusLineNewlines` now records the count the paint's own
+> newline commits (`internal/terminal/live/render.go`), covered by
+> `TestStatusRowLeavesOneBlankLineBeforeTheToolHeader`, which pins one blank line before `[bash]`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Port Hax's live interactive TTY rendering for streamed assistant output and built-in tool calls while leaving canonical conversation history unchanged.
+**Goal:** Render streamed assistant output and built-in tool calls live in the TTY REPL while leaving canonical conversation history unchanged.
 
-**Architecture:** Port the upstream incremental Markdown engine into Go and make both static and live Markdown use it. Add a stateful terminal renderer that consumes provider events, per-call tool presentation metadata, and a display sink in the tool registry; wire both paths only into the TTY REPL. One-shot, JSONL, and non-TTY output keep their current contracts.
+**Architecture:** Make the Markdown engine incremental and use it for both static and live Markdown. Add a stateful terminal renderer that consumes provider events, per-call tool presentation metadata, and a display sink in the tool registry; wire both paths only into the TTY REPL. One-shot, JSONL, and non-TTY output keep their current contracts.
 
 **Tech Stack:** Go standard library `io`, existing `internal/terminal/markdown`, `internal/terminal/width`, `internal/agent` hooks, and built-in `internal/tools`.
 
@@ -31,9 +29,9 @@
 
 ## Review Focus
 
-- Existing Go Markdown output is not the parity oracle. Port the behavior covered by upstream `tests/render/test_markdown.c`, including inline and block parsing, list normalization, soft/hard breaks, em-dash spacing, wrapping, links, GFM tables, bounded table collection, and style transitions; preserve it in Go regression fixtures.
+- Existing Go Markdown output is not the oracle. Pin the intended behavior with checked-in fixtures covering inline and block parsing, list normalization, soft/hard breaks, em-dash spacing, wrapping, links, GFM tables, bounded table collection, and style transitions; preserve it in Go regression fixtures.
 - A UTF-8 rune split across provider chunks must render once and remain valid: test in `internal/terminal/markdown/stream_test.go`.
-- Definite prose must be emitted during `Feed`, before `Close`, while ambiguous syntax and tables remain buffered as upstream does: test in `internal/terminal/markdown/stream_test.go`.
+- Definite prose must be emitted during `Feed`, before `Close`, while ambiguous syntax and tables remain buffered: test in `internal/terminal/markdown/stream_test.go`.
 - A retry after visible text must mark and reset only the visible attempt: test in `internal/terminal/live/render_test.go`.
 - A table split across many stream chunks must remain buffered and render once at its boundary: test in `internal/terminal/markdown/stream_test.go`.
 - A tool that streams bytes and returns a final summary must not duplicate user-visible output: test in `internal/tools/registry_test.go` and `internal/app/app_test.go`.
@@ -51,10 +49,10 @@
 **Interfaces:**
 - Produce `type Stream struct` with `NewStream(width int, styled bool, write func(string) error) *Stream`, `Feed(chunk string) error`, `Boundary() error`, `Reset() error`, `Close() error`, and `InTable() bool`.
 - `Feed` accepts arbitrary byte chunk boundaries, including partial UTF-8 sequences, and emits definite prose eagerly. Ambiguous suffixes and tables remain buffered until resolved. `Boundary` flushes the current parse state and leaves the stream reusable. `Reset` discards buffered parser/wrapper/table state without writing. `Close` flushes remaining content exactly once and is idempotent.
-- `Feed` eagerly emits unwrapped plain prose and defers ambiguous Markdown; width-constrained rendering and exact upstream parser parity are completed in Task 5. `Boundary` flushes the current segment and leaves the stream reusable. `Reset` discards buffered parser state. `Close` flushes remaining content exactly once.
+- `Feed` eagerly emits unwrapped plain prose and defers ambiguous Markdown; width-constrained rendering and exact parser parity are completed in Task 5. `Boundary` flushes the current segment and leaves the stream reusable. `Reset` discards buffered parser state. `Close` flushes remaining content exactly once.
 - `Render(input, width, styled)` must use the same stream entry point so static and incremental paths share lifecycle behavior. The stream tests compare aggregated output with `Render` across the supported fixtures and chunk partitions.
 
-- [x] **Step 1: Add failing stream tests** for eager prose, inline emphasis split across feeds, tables, partial UTF-8, reset, writer failure, and the em-dash/setext upstream regressions already in scope.
+- [x] **Step 1: Add failing stream tests** for eager prose, inline emphasis split across feeds, tables, partial UTF-8, reset, writer failure, and the em-dash/setext regressions already in scope.
 - [x] **Step 2: Run `go test ./internal/terminal/markdown -run '^TestStream' -count=1`** and confirm the new API or expected behavior fails.
 - [x] **Step 3: Implement the stream lifecycle and eager unwrapped prose path**; defer ambiguous Markdown and buffer tables until their boundary.
 - [x] **Step 4: Route `Render` through `Stream`; run the Markdown package tests and verify fixture output, writer-error latching, and feed-partition invariance.**
@@ -75,11 +73,11 @@
 - Add `type ToolPresentation struct` with `Argument string`, `Extra string`, `OutputStyle ToolOutputStyle`, `PreviewMode ToolPreviewMode`, `HeaderRows int`, and `CollapsedArgument string` fields. `Argument`, `Extra`, and `CollapsedArgument` are resolved from the original call arguments before local path or Bash preprocessing.
 - Add `type ToolExecution struct` with `Result conversation.Item`, `Presentation ToolPresentation`, `OutputSummarizesDisplay bool`, and `HiddenTail int` for model-only suffixes.
 - Add `Registry.Presentation(call conversation.Item) ToolPresentation` and `Registry.ExecuteWithDisplay(call conversation.Item, imageInput int, display DisplaySink) ToolExecution`; keep `Registry.Execute` as a wrapper returning `ToolExecution.Result`.
-- Tool runners receive an optional `DisplaySink` as a third run parameter; the existing `Run` and `Execute` methods pass `nil` and keep their result contract. Read, write, edit, bash, and task-wait supply upstream-equivalent presentation metadata; bash resolves exploration preview mode from its command and task-wait formats its displayed argument and suffix before rendering.
+- Tool runners receive an optional `DisplaySink` as a third run parameter; the existing `Run` and `Execute` methods pass `nil` and keep their result contract. Read, write, edit, bash, and task-wait supply equivalent presentation metadata; bash resolves exploration preview mode from its command and task-wait formats its displayed argument and suffix before rendering.
 
 - [x] **Step 1: Write failing tests** for metadata on all built-ins, bash exploration preview selection, task-wait argument suffix, write content streaming, bash/task-wait live output, and canonical result preservation.
 - [x] **Step 2: Run the focused registry and bash tests** and confirm the display-aware API and callback assertions fail.
-- [x] **Step 3: Implement metadata resolution and `ExecuteWithDisplay`**; adapt runners to emit display bytes only when a sink is present and mark summarized display output where upstream does.
+- [x] **Step 3: Implement metadata resolution and `ExecuteWithDisplay`**; adapt runners to emit display bytes only when a sink is present and mark summarized display output where the renderer expects it.
 - [x] **Step 4: Run focused tests** and verify callbacks receive exact visible bytes while returned conversation items remain unchanged.
 
 ### Task 3: Stateful live terminal renderer
@@ -123,7 +121,7 @@
 - [x] **Step 4: Wire the renderer through the existing loop hooks** with TTY/JSON gating and first-error propagation.
 - [x] **Step 5: Run focused app tests** and verify one-shot, JSONL, and non-TTY output remains unchanged.
 
-### Task 5: Full upstream Markdown parity
+### Task 5: Full Markdown parity
 
 **Files:**
 - Modify: `internal/terminal/markdown/render.go`
@@ -135,14 +133,14 @@
 - Modify: `internal/terminal/markdown/stream_test.go`
 
 **Interfaces:**
-- Replace the interim stream parser with the upstream behavior of `md_feed`, `md_flush`, `md_reset`, line scanning, inline parsing, wrapping, table layout/reflow, and style transitions in package-local Go code.
+- Replace the interim stream parser with the full behavior of line scanning, inline parsing, wrapping, table layout/reflow, and style transitions in package-local Go code.
 - Keep the `Stream` API from Task 1. Preserve eager output, feed-partition invariance, UTF-8 boundaries, writer-error latching, and reusable boundaries.
-- Port the behavior covered by hax `tests/render/test_markdown.c` into checked-in Go fixtures, grouped by pass-through, block/inline syntax, feed partitioning, hard/soft breaks, wrapping, links, tables, styles, and width behavior. Tests must not require the C checkout at runtime.
+- Port the reference behavior into checked-in Go fixtures, grouped by pass-through, block/inline syntax, feed partitioning, hard/soft breaks, wrapping, links, tables, styles, and width behavior. Tests must not require the C checkout at runtime.
 
-- [x] **Step 1: Add failing Go regression fixtures** for upstream behavior missing from the interim renderer, including eager wrapped prose, block and inline state across feeds, cursor-safe wrapping, link wrapping, table caps/reflow/alignment, and style transitions.
+- [x] **Step 1: Add failing Go regression fixtures** for behavior missing from the interim renderer, including eager wrapped prose, block and inline state across feeds, cursor-safe wrapping, link wrapping, table caps/reflow/alignment, and style transitions.
 - [x] **Step 2: Run `go test ./internal/terminal/markdown -count=1`** and confirm the parity fixtures fail.
-- [x] **Step 3: Port the upstream state machine, wrapper, and table layout/reflow** while retaining the public Go API.
-- [x] **Step 4: Run all Markdown tests** and verify upstream fixture output and feed-partition invariance.
+- [x] **Step 3: Port the reference state machine, wrapper, and table layout/reflow** while retaining the public Go API.
+- [x] **Step 4: Run all Markdown tests** and verify fixture output and feed-partition invariance.
 
 ### Task 6: Repository verification and parity-plan updates
 
@@ -170,10 +168,10 @@ a known gap.
   latched "markdown stream output changed after it was emitted" and the live renderer aborted the
   answer stream. Emission now requires the bytes to survive the buffered input and both a content
   and a termination probe, and `stream_test.go` pins the CR and vertical-tab cases.
-- [x] Emit a heading's terminating newline when the heading line closes, as upstream does
+- [x] Emit a heading's terminating newline when the heading line closes
   (`markdown.c:772`), instead of deferring it into the next block's separator. Deferring it lost
   the break whenever the output already ended in a newline, so a heading after a table rendered as
-  `...m\n0` where upstream supplies the heading's break plus the blank line it owes the next block.
+  `...m\n0` where the heading's break is supplied plus the blank line it owes the next block.
   The blank-line debt is now one newline relative to the closed heading rather than a target count
   of stripped trailing newlines, which could not see the heading's own (glyph-less) row.
 - [x] Make the inline renderer incremental and unify the two entry points. `inlineState` now
@@ -184,7 +182,7 @@ a known gap.
   `final=true` entry point of that same walker, so streaming and whole-document rendering share one
   implementation and cannot disagree. Verified by `TestInlineResumable*`: the hand-written corpus
   plus 30k generated inputs, both styled modes, each fed in growing windows against the batch
-  result. All 93 Markdown tests, including the upstream fixtures, still pass.
+  result. All 93 Markdown tests, including the regression fixtures, still pass.
 - [x] Resynchronize instead of latching. A contradicted emission is a boundary artifact of
   re-rendering, not a reason to lose the answer: `flushSegment` now continues from the last byte
   the incremental output and the render agree on. Latching reached the live renderer's checkpoint
@@ -202,11 +200,10 @@ a known gap.
   is written.
 - [x] Close the residual segment-composition gap. Carrying the separator state across a boundary is
   what does it: `Boundary` resolves the held bytes against end of segment without discarding the
-  parser, exactly as upstream's `md_flush` keeps `pending_heading_blank`, so a heading that ends a
+  parser, keeping `pending_heading_blank`, so a heading that ends a
   segment still pays the blank line it owes the next block. `TestStreamSegmentBoundaryAfterHeadingKnownGap`
   reported the match and was deleted per its own instruction; the fuzz target now asserts that a
   split render equals the whole-document render.
-
 
 ### Evidence for choosing the fix
 
@@ -230,20 +227,20 @@ closed by carrying separator state, because it is caused by the eager path emitt
 later chunk contradicts, and the probe only samples two continuations of the buffered input.
 
 The benchmark also shows the per-feed cost is inversely proportional to chunk size — the signature
-of re-rendering the whole segment on every `Feed` (O(n^2/chunk)). Upstream is linear: `md_process`
-processes only `tail + chunk` with the tail capped at `TAIL_MAX`.
+of re-rendering the whole segment on every `Feed` (O(n^2/chunk)). The design to reach is linear: a
+step function that processes only `tail + chunk`, with the tail capped at `TAIL_MAX`.
 
 Sizing the parser port against the existing tree:
 
-| Upstream | Lines | Go equivalent | Lines | Reusable as-is |
+| Reference unit | Lines | Go equivalent | Lines | Reusable as-is |
 | --- | --- | --- | --- | --- |
-| `markdown.c` (emit, inline, dispatch) | 1216 | `render.go` | 1187 | inline + emit logic, not the batch loop |
-| `markdown_scan.c` | 170 | `scan.go` | 190 | yes |
-| `markdown_wrap.c` | 385 | `wrap.go` | 297 | needs incrementalization |
-| `markdown_table.c` | 548 | in `render.go` | - | table layout, not collection state |
+| emit, inline, dispatch | 1216 | `render.go` | 1187 | inline + emit logic, not the batch loop |
+| line scan | 170 | `scan.go` | 190 | yes |
+| wrapping | 385 | `wrap.go` | 297 | needs incrementalization |
+| table layout | 548 | in `render.go` | - | table layout, not collection state |
 
 So the port is mostly re-plumbing what exists: convert the batch loop into a resumable state
-machine carrying upstream's ~20 fields, add the bounded deferred tail, and emit through a callback
+machine carrying the same ~20 fields, add the bounded deferred tail, and emit through a callback
 instead of accumulating into a `strings.Builder` (which also deletes `newlineCount`/`stripANSI`,
 the source of the heading bug).
 
@@ -310,44 +307,44 @@ with bounded-tail commit points (Mizushima et al., *Packrat Parsers Can Handle P
 in Mostly Constant Space*, doi:10.1145/1806672.1806679) and elastic sliding windows (Kuramitsu,
 doi:10.2197/ipsjjip.23.505) as the memory bound.
 
-Two consequences for this port:
+Two consequences for this work:
 
-1. **`STEP_DEFER` plus a bounded tail is the correct design, not a workaround.** hax's
-   `md_process` is a faithful instance of it: `md_scan_line(line, len, final)` reports
-   `classification_complete`, each step returns `ADVANCED`/`DEFER`/`PASS`, and `m->tail` holds at
-   most `TAIL_MAX` bytes. The current `commonPrefix(input, input+"x", input+"\n")` probe samples
-   two completions out of infinitely many, which is why divergence is 11/60000 rather than zero,
-   and why the resync exists at all.
-2. **The design to abandon is the one that failed**: a block state machine that accumulates a
-   block and delegates it to `renderDocument`. Delegation is what forced document-level lookahead
-   (`hasTableLookahead`) into a streaming decision. Upstream never delegates: it decides at the
-   byte that makes the decision possible, and otherwise defers.
+1. **`STEP_DEFER` plus a bounded tail is the correct design, not a workaround.** The step function
+   is a faithful instance of it: the line scan reports `classification_complete`, each step returns
+   `ADVANCED`/`DEFER`/`PASS`, and the work buffer holds at most `TAIL_MAX` bytes beyond the current
+   chunk. The current `commonPrefix(input, input+"x", input+"\n")` probe samples two completions
+   out of infinitely many, which is why divergence is 11/60000 rather than zero, and why the resync
+   exists at all.
+2. **The design to abandon is the one that failed**: a block state machine that accumulates a block
+   and delegates it to `renderDocument`. Delegation is what forced document-level lookahead
+   (`hasTableLookahead`) into a streaming decision. The step design never delegates: it decides at
+   the byte that makes the decision possible, and otherwise defers.
 
-So the port is not "a block parser plus the inline walker". It is `md_process` itself —
-`markdown.c:1090` onward — which already exists upstream in exactly the shape needed:
+So the target is not "a block parser plus the inline walker". It is a single step loop over
+`tail + chunk`, which already exists in the tree in pieces:
 
-| Upstream | Role | Port status |
+| Piece | Role | Status |
 | --- | --- | --- |
-| `md_process` loop + `tail`/`TAIL_MAX` | work buffer, deferred tail, `final` threading | missing |
-| `step_line_start` | block dispatch from `at_line_start` | logic exists in `render.go`'s batch switch |
-| `step_inline` | inline bytes + `STEP_PASS` to block markers | logic exists in `inline.go` |
-| `step_in_code_fence`, `step_in_inline_code` | fenced and inline code states | logic exists in `render.go` |
-| `md_table_try_start`/`md_table_step`/`md_table_bail_partial`/`md_table_finish` | two-complete-lines start rule, row collection, oversize bail, EOF last chance | replaced by batch `hasTableLookahead`/`parseTable` |
-| `md_flush` | EOF: table last chance, `final` pass, close open styles, wrap flush | `Stream.Close` |
-| `md_set_styled` | seam semantics for a styled-mode switch | `Stream.SetStyled` |
-| `md_in_table` | spinner while silently accumulating | `Stream.InTable`, currently probing |
+| step loop + tail/`TAIL_MAX` | work buffer, deferred tail, `final` threading | missing |
+| line start | block dispatch from `at_line_start` | logic exists in `render.go`'s batch switch |
+| inline step | inline bytes, pass-through to block markers | logic exists in `inline.go` |
+| code fence / inline code states | fenced and inline code accumulation | logic exists in `render.go` |
+| table start, step, bail, finish | two-complete-lines start rule, row collection, oversize bail, EOF last chance | replaced by batch `hasTableLookahead`/`parseTable` |
+| flush | EOF: table last chance, `final` pass, close open styles, wrap flush | `Stream.Close` |
+| styled-mode seam | seam semantics for a styled-mode switch | `Stream.SetStyled` |
+| in-table probe | spinner while silently accumulating | `Stream.InTable`, currently probing |
 
-The four "EOF fallback" gaps are `final`-flag branches in that loop, not special cases:
-`step_line_start` emits literally when `final` and the classification never completed, defers when
-an indented prefix is incomplete, `md_process` emits the residual tail literally when `final`, and
-`md_flush` gives a collecting table its last chance and emits a rejected final row literally
-(`was_collecting_table`). The leading-pipe gap disappears because `md_table_try_start` needs two
+The four "EOF fallback" gaps are `final`-flag branches in that loop, not special cases: the line
+start emits literally when `final` and the classification never completed, defers when an indented
+prefix is incomplete, the step loop emits the residual tail literally when `final`, and the flush
+gives a collecting table its last chance and emits a rejected final row literally
+(`was_collecting_table`). The leading-pipe gap disappears because the table start needs two
 *complete lines in the work buffer* and returns `DEFER` otherwise — no document context.
 
 Keep the conformance compromises: setext headings, reference-style links, and footnotes need
-unbounded lookahead, and every streaming renderer surveyed gives them up the same way hax does
-(never retro-transform earlier lines). `ScanLine(line, final)`/`LineInfo.Complete` already carries
-the completeness signal the `final` branches need, and `inline.go` is already resumable, so this is
+unbounded lookahead, and every streaming renderer surveyed gives them up the same way (never
+retro-transform earlier lines). `ScanLine(line, final)`/`LineInfo.Complete` already carries the
+completeness signal the `final` branches need, and `inline.go` is already resumable, so this is
 re-plumbing, not new parsing logic.
 
 Revised order of work:
@@ -382,7 +379,7 @@ separator; the test records the rate and will tighten to zero at step 5.
 
 What the port settled, in case it is re-derived: a line's boundary — whether the paragraph
 continues, so whether the line is trimmed and what separator follows — needs the next line's first
-bytes, exactly as upstream's newline handler does; everything else about a line is line-local.
+bytes, exactly as the newline handler does; everything else about a line is line-local.
 Prose therefore streams as it arrives while only its trailing whitespace run, a trailing backtick
 run, and a whitespace-or-backtick-only partial line wait. A non-positive width must bypass the
 wrapper entirely (it expands tabs to four spaces and keeps carriage returns), and a partial line
@@ -390,7 +387,7 @@ mid-stream is scanned with `final=false`: only a line at end of input takes the 
 
 The generated census now reports **0 / 8000 divergences**, so the parser reproduces the batch
 renderer exactly on everything the gate covers. Two batch bugs surfaced on the way and are fixed:
-the raw-tail join was applied to a whitespace-only final line, where upstream keeps the inline
+the raw-tail join was applied to a whitespace-only final line, where the inline state keeps the
 rendering and emits only the newline, and a paragraph line whose classification is still unsettled
 (`LineIncomplete`, such as a bare `0`) starts a new block instead of continuing the paragraph.
 
@@ -402,7 +399,7 @@ Three defects had to be fixed before the conversion held, and all three were rea
   a row broke in the wrong place (`"héllo wörld"` split after two bytes). It now holds an
   incomplete trailing rune, and `finish()` resolves it at the end of a block.
 - A valid fence closer at end of input must close the fence rather than be copied into the body.
-- An oversized partial table row bails the attempt during the feed, as upstream's
+- An oversized partial table row bails the attempt during the feed, as the
   `md_table_bail_partial` does, instead of being retained until Close.
 
 Two deliberate behavior changes came with it: prose is emitted only up to the bytes a later byte
@@ -439,7 +436,7 @@ behavior the parser deliberately changes, so the conversion was reverted rather 
   whole-document render (`w` vs `wö`). The wrapper reflows the current row, and it is fed
   incrementally here, so its break point can differ from a single-pass wrap. Worth fixing in the
   wrapper (or by holding the row until a word completes) rather than accepting.
-- `TestStreamCloseResolvesUpstreamEOFStyles` expects an unterminated fence's trailing partial
+- `TestStreamCloseResolvesEOFStyles` expects an unterminated fence's trailing partial
   closer to be dropped (`\x1b[2mfoo\n\x1b[22m`), and the parser emits it as body.
 - `TestStreamBailsOversizedUnterminatedTableRowLosslessly` expects the literal header and row body
   of an oversized unterminated table attempt, which the parser's verbatim path did not produce.
@@ -448,23 +445,22 @@ Until that is done, `renderDocument` remains in the tree as the re-render path's
 the parser's differential oracle; deleting it and converting `parser_test.go`'s corpus gate to
 `feedOnce(input) == Render(input)` is the last step.
 
-### Settling the parser against upstream (2026-10-11)
+### Settling the parser against the reference (2026-10-11)
 
 The batch renderer is deleted, so the suite can no longer flag a block-rule divergence on its own.
-Upstream settles it: `~/dev/hax` builds, and `tests/render/test_markdown.c` shows the driver idiom
-(`md_new(capture, &out, wrap_width)`, `md_feed`, `md_flush`). A throwaway driver linked against
-`build/libhax_lib.a` renders stdin at a given width:
+A throwaway driver built from the reference implementation's library renders stdin at a given
+width (`md_new(capture, &out, wrap_width)`, `md_feed`, `md_flush`):
 
 ```sh
-cc -iquote ~/dev/hax/src -std=c11 -O1 -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 \
-   -o /tmp/mdrender /tmp/mdrender.c ~/dev/hax/build/libhax_lib.a -lcurl -ljansson -lm -lpthread
+cc -iquote <reference>/src -std=c11 -O1 -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 \
+   -o /tmp/mdrender /tmp/mdrender.c <reference>/build/libhax_lib.a -lcurl -ljansson -lm -lpthread
 printf 'input' | /tmp/mdrender <width>
 ```
 
-Four inputs where the parser and the deleted batch renderer disagreed were checked against it at
-widths 0, 8, 20 and 40:
+Four inputs where the parser and the deleted batch renderer disagreed were checked against the
+reference driver at widths 0, 8, 20 and 40:
 
-| Input | Upstream | Parser |
+| Input | Reference | Parser |
 | --- | --- | --- |
 | `- **)word\n 0\n\n` | as the parser | matches |
 | ``01. `\n* `` | as the parser | matches |
@@ -475,10 +471,10 @@ So the two inputs the batch renderer got wrong are now right, and the other two 
 
 1. A short ambiguous prefix after a list item (``1. \r\n`\n``) must fall back literally like a
    paragraph's does. The `!p.itemEnd` gate in `stepProse` skips the end-of-input rules for items;
-   removing it fixes this input and breaks ``01. `\n* ``, which upstream renders as the parser now
-   does. The item path needs upstream's rules rather than either gate.
+   removing it fixes this input and breaks ``01. `\n* ``, which the reference renders as the parser
+   now does. The item path needs the reference rules rather than either gate.
 
-   **Fixed.** The gate is gone, and the deferral now matches upstream's: a line whose streaming scan
+   **Fixed.** The gate is gone, and the deferral now matches the reference: a line whose streaming scan
    is unsettled waits for one more byte whether or not it is newline-terminated, and at end of input
    a line the final scan calls text is emitted literally instead of inline-parsed. The hold requires
    the final scan to be text, so a blank line still ends the paragraph with its two newlines, and a
@@ -487,22 +483,22 @@ So the two inputs the batch renderer got wrong are now right, and the other two 
    ``abc\n`\nxyz\n``, ``abc\n```\nxyz\n``, ``\n``, ````\n`` and `a\n\nb\n` all match; 4 of 34
    probed combinations still differ, all of them the next item.
 2. A deferred tail must be emitted *inside* the inline run it sits in, with that run closing after
-   it, which is what upstream's newline handler plus `md_flush` produce. The walker closed the run
+   it, which is what the reference's newline handling produces. The walker closed the run
    first, so the tail landed outside it. **Fixed** by giving the walker a literal region: the parser
    marks the resolved tail with `inlineLiteralTail` (`'\x01'`, the sibling of the line sentinel) and
    the walker copies it verbatim, so an open run still closes after it. `===- **b—\r\r\n*` now
-   matches upstream at widths 0, 8, 20 and 40 — the width-8 case included, because the tail is part
+   matches the reference at widths 0, 8, 20 and 40 — the width-8 case included, because the tail is part
    of the run the wrapper measures.
 
 Both are pinned by `TestRenderKeepsDeferredTailInsideOpenRun`, whose expected bytes were taken from
-the upstream renderer rather than from the port. The probe list above now reports 40 of 40
+the reference driver rather than from the parser. The probe list above now reports 40 of 40
 combinations matching.
 
-### Upstream sweep: how faithful the port is (2026-10-11)
+### Reference sweep: how faithful the parser is (2026-10-11)
 
-The driver makes the whole port measurable, not just the cases that came up. 300 generated inputs
-from the streaming census alphabet, at widths 0 and 20 (600 cases), rendered by upstream and by the
-port:
+The driver makes the whole parser measurable, not just the cases that came up. 300 generated inputs
+from the streaming census alphabet, at widths 0 and 20 (600 cases), rendered by the reference and by
+the parser:
 
 | Result | Count |
 | --- | --- |
@@ -515,19 +511,19 @@ indentation and tab expansion, no closing-hash stripping, and hashes followed by
 a newline staying prose), each verified against the driver; the remaining
 whitespace cases and the nested-emphasis close order are still open.
 
-The whitespace class is the port's carriage-return and tab policy: a continued line's `\r` is
-trimmed where upstream keeps it as a text byte, a heading's leading tab is trimmed where upstream
-expands it, and trailing spaces before a break follow the same split. The content class is two
-rules: `trimClosingHashes` strips a heading whose text is only hashes (`## # ` renders empty where
-upstream keeps `# `), and a nested-emphasis case (`> *****http://x **\x0b`) closes bold and italic
-in a different order.
+The whitespace class is the parser's carriage-return and tab policy: a continued line's `\r` is
+trimmed where the reference keeps it as a text byte, a heading's leading tab is trimmed where the
+reference expands it, and trailing spaces before a break follow the same split. The content class is
+two rules: `trimClosingHashes` strips a heading whose text is only hashes (`## # ` renders empty
+where the reference keeps `# `), and a nested-emphasis case (`> *****http://x **\x0b`) closes bold
+and italic in a different order.
 
 All of these are port deviations rather than parser regressions: they live in rules the deleted
 batch renderer shared (`joinParagraphWithOptions`' `previousWithoutCR`, the heading `TrimLeft`,
 `trimClosingHashes`), and the parser-vs-batch comparison over the same alphabet found four inputs,
 all fixed above. Separating the two properly needs the batch renderer reconstructed out-of-tree
-(`git archive HEAD`), which is what the review did for those four; the sweep above measures the port
-against upstream and cannot attribute by itself.
+(`git archive HEAD`), which is what the review did for those four; the sweep above measures the
+parser against the reference and cannot attribute by itself.
 
 Method, for repeating it: write `"<base64 input> <width>"` per line to `/tmp/corpus.txt`, render
 each line with `/tmp/mdrender <width>`, render the same lines through `Render(input, width, true)`
@@ -537,15 +533,16 @@ in a throwaway test that writes base64 to `/tmp/go_out.txt`, then compare.
 
 The five rules above could be intentional choices rather than gaps, so the port's own fixtures were
 run through the same driver: 21 fixture inputs from `stream_test.go`, at their own widths, in both
-styled modes. **20 of 21 match upstream byte for byte.** The one that does not is the carriage-return
-case (`foo\r\nbar`), and no test in the package asserts the port's trimmed form as upstream's
-behavior — the CR tests (`TestStreamMatchesRenderForCRLines`, the fixture list entry) compare the
-stream against `Render`, which is self-consistency, not parity.
+styled modes. **20 of 21 match the reference byte for byte.** The one that does not is the
+carriage-return case (`foo\r\nbar`), and no test in the package asserts the parser's trimmed form as
+the intended behavior — the CR tests (`TestStreamMatchesRenderForCRLines`, the fixture list entry)
+compare the stream against `Render`, which is self-consistency, not parity.
 
-So the deviations are gaps rather than deliberate choices: wherever the port has an upstream-derived
-fixture it matches, and the rules it lacks were simply never ported. Fixing them is therefore
-"mirror upstream" work, not a taste question. Each has a C-verified repro, and any fixture whose
-expected bytes encode the port's form of a rule must be corrected from the C in the same change.
+So the deviations are gaps rather than deliberate choices: wherever the parser has a
+reference-derived fixture it matches, and the rules it lacks were simply never ported. Fixing them
+is therefore conformance work, not a taste question. Each has a reference-verified repro, and any
+fixture whose expected bytes encode the parser's form of a rule must be corrected to the reference
+form in the same change.
 
 ### Structured corpus: exact on realistic documents (2026-10-11)
 
@@ -558,7 +555,7 @@ backticks, empty and unterminated fences, tables with alignment rows, ragged row
 inside cells, a row wider than the width and a table wider than the column cap, mixed documents,
 CRLF line endings, unclosed emphasis and code, and runs of blank lines.
 
-**0 of 135 differ.** The port is exact on realistic Markdown; the 15 / 600 residual in the
+**0 of 135 differ.** The parser is exact on realistic Markdown; the 15 / 600 residual in the
 adversarial sweep is confined to degenerate shapes that corpus does not produce.
 
 ### Parked status below an open read row (2026-10-12)
@@ -575,11 +572,11 @@ rendered as
 , transcript.go:1-230
 ```
 
-Upstream parks the indicator instead (`spinner_park`, `src/render/spinner.c:356`): it draws the
+The ported renderer parks the indicator instead: it draws the
 label two rows below an open row and records the row's column, and hiding it (`erase_locked`)
 erases the label row, climbs back, and restores that column, so the next read still coalesces. The
 port now does the same — `Tick` writes the two-row park and `clearStatus` climbs back — and
-`closeCollapsedCluster` clears the indicator first, exactly as upstream's `close_mode`
+`closeCollapsedCluster` clears the indicator first, exactly as the parked-mode close does
 (`src/render/render_ctx.c:21`) hides the spinner before terminating an open row.
 `TestRendererParksStatusBelowOpenCollapsedReadRow` pins the byte stream: `\n\n` before the label,
 then `\r\x1b[2K\x1b[2A\x1b[13G` before `, b.txt`. The row the indicator borrows is the gap the
@@ -587,30 +584,29 @@ block separator owes the next block anyway, so the committed layout is unchanged
 
 ### Flicker-free status frames and a hidden cursor (2026-10-13)
 
-The status row flickered in a way upstream's does not, and the terminal cursor sat blinking at the
+The status row flickered, and the terminal cursor sat blinking at the
 end of the row (and at the end of every streamed answer) for the whole turn.
 
 **Why it flickered.** Every frame was four separate writes — `\r\x1b[2K`, then `\x1b[2m`, then the
 glyph and label, then `\x1b[0m` — and the erase came *first*. `stdout` is the raw `*os.File`, so
 each of those is its own `write(2)`: between the erase and the paint the terminal shows an empty
-row, which a multiplexer or a slow link renders as a blink. Upstream builds one row and flushes it
+row, which a multiplexer or a slow link renders as a blink. The renderer builds one row and flushes it
 once (`draw_label_row_locked` plus `finish_row_repaint`, `src/render/spinner.c:91`), and it erases
 the row's *tail* (`ANSI_ERASE_LINE`, `\x1b[K`) after the paint rather than the row before it, which
 is why its comment says the order avoids a blank frame.
 
 A label change was worse: `setStatus` erased the visible row and restarted the 300 ms show grace,
 so `working... → thinking... → working...`, each `processing... N%` progress event, and each
-`retrying in Ns...` tick blanked the row for a third of a second. Upstream never erases on a label
-change — `spinner_set_label` redraws the row in place, and `spinner_request_label` keeps the
-displayed label until the candidate settles. `PausePending` did the same erase, so pressing Escape
+`retrying in Ns...` tick blanked the row for a third of a second. A label change must never erase:
+the row is redrawn in place, and a pending label keeps the displayed one until it settles.
+`PausePending` did the same erase, so pressing Escape
 blanked the indicator before `pausing...` came back.
 
-**Why the cursor was visible.** Upstream's REPL owns cursor visibility rather than the spinner
-(`cursor_show`/`cursor_hide`, `src/agent.c:1162`): it shows the cursor for `input_readline` and
-hides it again until the next prompt, so a turn — streamed answer, tool output, animated
-indicator — runs with it off. The port never emitted DECTCEM, so the hardware cursor parked at the
-end of the status row and followed the streamed text. A fatal signal has to restore it, as
-upstream's `restore_terminal` does, or the parent shell inherits an invisible cursor.
+**Why the cursor was visible.** The REPL owns cursor visibility rather than the spinner: it shows
+the cursor for the prompt and hides it again until the next one, so a turn — streamed answer, tool
+output, animated indicator — runs with it off. The port never emitted DECTCEM, so the hardware
+cursor parked at the end of the status row and followed the streamed text. A fatal signal has to
+restore it, as the restore path does, or the parent shell inherits an invisible cursor.
 
 **What changed.**
 
@@ -630,8 +626,7 @@ erase per frame; `TestRendererKeepsStatusWithinTerminalWidth` now measures the r
 since the tail erase occupies no cells. `TestRunTTYREPLHidesCursorForTheTurn` pins the PTY order:
 hidden after the submitted prompt, restored only after the answer.
 
-**Still not ported.** Upstream wraps indicator transitions in DEC 2026 synchronized output
-(`spinner_swap_begin`/`swap_end`) so an erase and the writes that replace it land as one frame, and
-it paints tool status through the spinner's own view (`spinner_set_tool_status_view`) instead of
-the renderer writing rows itself. The port writes each transition as a single write instead, which
-covers the indicator but not the erase-plus-replacement pair.
+**Still open.** Indicator transitions should be wrapped in DEC 2026 synchronized output so an erase
+and the writes that replace it land as one frame, and tool status should paint through the
+spinner's own view instead of the renderer writing rows itself. Each transition is written as a
+single write instead, which covers the indicator but not the erase-plus-replacement pair.

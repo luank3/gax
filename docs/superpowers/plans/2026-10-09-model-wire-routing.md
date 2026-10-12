@@ -1,12 +1,10 @@
 # Model Wire Routing Plan
 
-**Goal:** Resolve a provider's request wire per model using ordered `model_apis` glob rules, while preserving the provider default and upstream wildcard behavior.
+**Goal:** Resolve a provider's request wire per model using ordered `model_apis` glob rules, while preserving the provider default and wildcard behavior.
 
 **Architecture:** Extend `internal/provider/runtime` with immutable parsed routing rules and helpers that select a wire and endpoint for a model. Keep catalog metadata inference for a later slice.
 
 **Tech:** Go 1.25 standard library; no new dependencies.
-
-**Sources:** hax `src/providers/http_provider.c` and `wire.c` at commit `ff458337f8ba7366d71fad4da0210a53b658678a`.
 
 ## Task 1: Close runtime review findings
 
