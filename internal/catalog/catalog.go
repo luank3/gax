@@ -395,48 +395,6 @@ func (entry Entry) hasMetadata() bool {
 		entry.EffortsKnown || entry.API != "" || entry.InterleavedDeclared
 }
 
-func merge(dst *Entry, src Entry) {
-	if dst.CostInput < 0 {
-		dst.CostInput = src.CostInput
-	}
-	if dst.CostOutput < 0 {
-		dst.CostOutput = src.CostOutput
-	}
-	if dst.CostCacheRead < 0 {
-		dst.CostCacheRead = src.CostCacheRead
-	}
-	if dst.CostCacheWrite < 0 {
-		dst.CostCacheWrite = src.CostCacheWrite
-	}
-	if dst.CostCacheWrite1H < 0 {
-		dst.CostCacheWrite1H = src.CostCacheWrite1H
-	}
-	if dst.ContextWindow <= 0 {
-		dst.ContextWindow = src.ContextWindow
-	}
-	if dst.MaxOutput <= 0 {
-		dst.MaxOutput = src.MaxOutput
-	}
-	if dst.ImageInput == SupportUnknown {
-		dst.ImageInput = src.ImageInput
-	}
-	if !dst.TiersDeclared && src.TiersDeclared {
-		dst.Tiers = append([]Tier(nil), src.Tiers...)
-		dst.TiersDeclared = true
-	}
-	if !dst.EffortsKnown && src.EffortsKnown {
-		dst.Efforts = append([]string(nil), src.Efforts...)
-		dst.EffortsKnown = true
-	}
-	if dst.API == "" {
-		dst.API = src.API
-	}
-	if !dst.InterleavedDeclared && src.InterleavedDeclared {
-		dst.InterleavedField = src.InterleavedField
-		dst.InterleavedDeclared = true
-	}
-}
-
 type Split struct {
 	CostInput           float64
 	CostCacheRead       float64
