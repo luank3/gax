@@ -3,15 +3,11 @@ package session
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
-
-	systempath "github.com/luank3/gax/internal/system/path"
 )
 
 const pruneInterval = 24 * time.Hour
@@ -117,7 +113,7 @@ func StartPrune(retentionDays int, excludePath string) {
 		defer close(done)
 		defer root.Close()
 		defer marker.Close()
-		if err := pruneTreeAt(ctx, root, rootInfo, cutoff, excludePath); err != nil || ctx.Err() != nil {
+		if err := pruneTreeAt(ctx, root, rootInfo, cutoff, excludedFileInfo(excludePath)); err != nil || ctx.Err() != nil {
 			return
 		}
 		if marker.Truncate(0) != nil {
@@ -224,10 +220,24 @@ func pruneTree(ctx context.Context, cutoff time.Time, excludePath string) error 
 		return nil
 	}
 	defer root.Close()
-	return pruneTreeAt(ctx, root, rootInfo, cutoff, excludePath)
+	return pruneTreeAt(ctx, root, rootInfo, cutoff, excludedFileInfo(excludePath))
 }
 
-func pruneTreeAt(ctx context.Context, root *os.Root, rootInfo os.FileInfo, cutoff time.Time, excludePath string) error {
+// excludedFileInfo resolves the path a sweep must leave alone. The sweep compares file identity
+// rather than path strings: entries under an *os.Root are named relative to that root, while the
+// caller holds an absolute path, so the two strings differ for the same file.
+func excludedFileInfo(excludePath string) os.FileInfo {
+	if excludePath == "" {
+		return nil
+	}
+	info, err := os.Lstat(excludePath)
+	if err != nil || info.Mode()&os.ModeSymlink != 0 {
+		return nil
+	}
+	return info
+}
+
+func pruneTreeAt(ctx context.Context, root *os.Root, rootInfo os.FileInfo, cutoff time.Time, excluded os.FileInfo) error {
 	opened, err := root.Stat(".")
 	if err != nil || !os.SameFile(rootInfo, opened) {
 		return nil
@@ -259,21 +269,12 @@ func pruneTreeAt(ctx context.Context, root *os.Root, rootInfo os.FileInfo, cutof
 		}
 		entries, readErr := fs.ReadDir(projectRoot.FS(), ".")
 		if readErr == nil {
-			{
-				f, _ := os.OpenFile("/tmp/gax-sweep.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-				_, _ = fmt.Fprintf(f, "BUCKET %q exclude=%q entries=%d\n", projectRoot.Name(), excludePath, len(entries))
-				for _, entry := range entries {
-					_, _ = fmt.Fprintf(f, "  ENTRY name=%q built=%q equal=%v\n", entry.Name(), systempath.Join(projectRoot.Name(), entry.Name()), systempath.Join(projectRoot.Name(), entry.Name()) == excludePath)
-				}
-				_, _ = fmt.Fprintf(f, "  ROOTNAME=%q\n", projectRoot.Name())
-				_ = f.Close()
-			}
 			for _, entry := range entries {
 				if err := ctx.Err(); err != nil {
 					_ = projectRoot.Close()
 					return err
 				}
-				pruneSessionFile(projectRoot, entry.Name(), cutoff, excludePath)
+				pruneSessionFile(projectRoot, entry.Name(), cutoff, excluded)
 			}
 		}
 		_ = projectRoot.Close()
@@ -285,28 +286,15 @@ func pruneTreeAt(ctx context.Context, root *os.Root, rootInfo os.FileInfo, cutof
 	return nil
 }
 
-func pruneSessionFile(projectRoot *os.Root, name string, cutoff time.Time, excludePath string) {
+func pruneSessionFile(projectRoot *os.Root, name string, cutoff time.Time, excluded os.FileInfo) {
 	if !PathIsStandard(name) {
-		return
-	}
-	path := systempath.Join(projectRoot.Name(), name)
-	if excludePath != "" && strings.HasSuffix(excludePath, name) {
-		defer func() {
-			f, _ := os.OpenFile("/tmp/gax-diag.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-			_, _ = fmt.Fprintf(f, "SWEEPDIAG path=%q exclude=%q equal=%v\n", path, excludePath, path == excludePath)
-			_ = f.Close()
-		}()
-	}
-	{
-		f, _ := os.OpenFile("/tmp/gax-exclude.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-		_, _ = fmt.Fprintf(f, "SWEEP sees %s exclude=%s equal=%v\n", path, excludePath, path == excludePath)
-		_ = f.Close()
-	}
-	if excludePath != "" && path == excludePath {
 		return
 	}
 	entry, err := projectRoot.Lstat(name)
 	if err != nil || !entry.Mode().IsRegular() || entry.Mode()&os.ModeSymlink != 0 || !entry.ModTime().Before(cutoff) {
+		return
+	}
+	if excluded != nil && os.SameFile(entry, excluded) {
 		return
 	}
 	file, err := projectRoot.Open(name)
@@ -324,6 +312,9 @@ func pruneSessionFile(projectRoot *os.Root, name string, cutoff time.Time, exclu
 	}
 	current, err := projectRoot.Lstat(name)
 	if err != nil || !current.Mode().IsRegular() || current.Mode()&os.ModeSymlink != 0 || !os.SameFile(locked, current) {
+		return
+	}
+	if excluded != nil && os.SameFile(current, excluded) {
 		return
 	}
 	_ = projectRoot.Remove(name)

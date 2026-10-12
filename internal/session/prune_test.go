@@ -1,7 +1,7 @@
 package session
 
 import (
-	"fmt"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,30 +29,18 @@ func TestPruneBeforeSweepsAllProjectBucketsAndRespectsLocksAndExclusion(t *testi
 		setPruneTestMtime(t, path, oldTime)
 	}
 
-	{
-		f, _ := os.Create("/tmp/gax-fixture.txt")
-		dir, _ := Directory(projectA)
-		_, _ = fmt.Fprintf(f, "DIR=%s\nEXCLUDED=%s\nRECENT=%s\nOLD=%s\nLOCKED=%s\n", dir, excludedPath, recentPath, oldPath, lockedPath)
-		entries, _ := os.ReadDir(dir)
-		for _, e := range entries {
-			info, _ := e.Info()
-			_, _ = fmt.Fprintf(f, "ENTRY %s mtime=%s\n", e.Name(), info.ModTime().UTC())
-		}
-		_, _ = fmt.Fprintf(f, "EXCLUDED_EXISTS=%v\n", func() bool { _, err := os.Lstat(excludedPath); return err == nil }())
-		_ = f.Close()
-	}
-
 	if err := PruneBefore(cutoff, excludedPath); err != nil {
 		t.Fatal(err)
 	}
-	{
-		f, _ := os.Create("/tmp/gax-exclude.txt")
-		_, _ = fmt.Fprintf(f, "excluded=%s\nrecent=%s\nold=%s\nlocked=%s\nprojectA=%s\n", excludedPath, recentPath, oldPath, lockedPath, projectA)
-		_ = f.Close()
-	}
 	if _, err := os.Lstat(excludedPath); err != nil {
-		sweep, _ := os.ReadFile("/tmp/gax-sweep.txt")
-		t.Fatalf("DIAGCI excluded missing: %v\nPROJECTA=%q\nEXCLUDED=%q\nSWEEP\n%s", err, projectA, excludedPath, sweep)
+		dir := filepath.Dir(excludedPath)
+		entries, _ := os.ReadDir(dir)
+		var names []string
+		for _, e := range entries {
+			info, _ := e.Info()
+			names = append(names, e.Name()+" mtime="+info.ModTime().UTC().String())
+		}
+		t.Fatalf("DIAGCI excluded not a file: %v\nDIR %q\nCWD %q\nENTRIES %v", err, dir, projectA, names)
 	}
 	assertPruneTestMissing(t, oldPath)
 	assertPruneTestMissing(t, otherPath)
@@ -295,4 +283,64 @@ func assertPruneTestExists(t *testing.T, path string) {
 	if _, err := os.Lstat(path); err != nil {
 		t.Fatalf("%q is missing: %v", path, err)
 	}
+}
+
+// A sweep must recognise the protected session even when the root it walks is named relative to
+// the working directory while the resumed path is absolute; comparing the two path strings alone
+// misses, and the sweep then deletes the session the user asked to resume.
+func TestPruneTreeKeepsExcludedSessionUnderRelativeRoot(t *testing.T) {
+	stateHome := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", stateHome)
+	cwd := filepath.Join(t.TempDir(), "project")
+	if err := os.MkdirAll(cwd, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// Both sessions are closed before the sweep, as a resumed session is in another process:
+	// only the exclusion can keep it, not the writer's shared lock.
+	resumed := writePruneTestSession(t, cwd, false)
+	resumedLog, err := ResumeLog(resumed, Selection{}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := resumedLog.Close(); err != nil {
+		t.Fatal(err)
+	}
+	expired := writePruneTestSession(t, cwd, false)
+	oldTime := time.Now().Add(-31 * 24 * time.Hour)
+	for _, path := range []string{resumed, expired} {
+		setPruneTestMtime(t, path, oldTime)
+	}
+
+	sessionsRoot, err := sessionsRootPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(stateHome); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(previous); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	relativeRoot, err := filepath.Rel(stateHome, sessionsRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, rootInfo, err := openDirectoryRoot(relativeRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+
+	cutoff := time.Now().Add(-30 * 24 * time.Hour)
+	if err := pruneTreeAt(context.Background(), root, rootInfo, cutoff, excludedFileInfo(resumed)); err != nil {
+		t.Fatal(err)
+	}
+	assertPruneTestExists(t, resumed)
+	assertPruneTestMissing(t, expired)
 }
