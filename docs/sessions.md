@@ -22,7 +22,7 @@ are appended in the order the run produced them.
 ### Header record
 
 ```json
-{"type":"session","version":1,"gax_version":"ff45833","id":"…","timestamp":"2026-10-11T11:26:17Z","cwd":"/home/you/project","provider":"deepseek","model":"deepseek-chat","effort":"high","git_branch":"main","git_commit":"ec77f8d","git_subject":"Initial Go reimplementation of hax"}
+{"type":"session","version":1,"gax_version":"v0.1.0","id":"…","timestamp":"2026-10-11T11:26:17Z","cwd":"/home/you/project","provider":"deepseek","model":"deepseek-chat","effort":"high","git_branch":"main","git_commit":"ec77f8d","git_subject":"Add local web_fetch and web_search tools"}
 ```
 
 | Field | Meaning |

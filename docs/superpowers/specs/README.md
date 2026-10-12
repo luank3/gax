@@ -1,8 +1,8 @@
 # Smallest-spec index
 
-One reviewable specification per leaf subsystem, written from the sources and tests at
-`internal/version.Value` (`ff45833`). Each spec carries **Rule / Source / Assertion / Rejected**
-entries; read the spec against its cited lines rather than trusting a summary of them.
+One reviewable specification per leaf subsystem, written from the current sources and tests.
+Each spec carries **Rule / Source / Assertion / Rejected** entries; read the spec against its cited
+lines rather than trusting a summary of them.
 
 ## Reading order for a review
 
@@ -53,7 +53,8 @@ Findings that need a decision, not just a test. Everything else lives in each sp
   (`TestRunREPLSelectsSelectionByArgument`, `internal/app/app_test.go:1162`). **Resolved
   2026-10-12:** this is upstream parity, not a divergence. Upstream master `2834c2c` declares
   `usage = "[id]"` (and `"[level]"` for `/effort`) with an `argument_choices` hook for all three in
-  `src/slash.c`; the fork commit `ff45833` predates upstream's argument-taking commits. The
+  `src/slash.c`; the earlier commit gax was ported from predates upstream's argument-taking
+  commits. The
   2026-10-11 "accepts no arguments" notes were wrong; `2026-10-10-repl-provider-selection.md` and
   `2026-10-10-slash-command-front-end.md` now carry a correction, as does
   `2026-10-10-command-entrypoint.md:22`.

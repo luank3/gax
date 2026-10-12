@@ -5,10 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The build is cgo-free by contract: `make build`, `make install`, `make vet`, and the test targets
+  pin `CGO_ENABLED=0`, so every local build matches the static release archives. Only `make test-race`
+  enables cgo, because the race detector requires it.
+- `gax --version` reports the `dev` default for a plain `go build` or `go install` instead of the
+  upstream commit the port started from; release builds still inject the tag through `-ldflags`.
+- gax no longer tracks a hax baseline. The README, AGENTS.md, and CONTRIBUTING.md describe gax as
+  its own agent that was ported from hax, and the specs index is written against the current sources.
+
 ## [0.1.0] - 2026-10-12
 
-Initial release: a Go reimplementation of [hax](https://github.com/OleksandrChekhovskyi/hax),
-tracking the baseline commit `ff45833`.
+Initial release: a minimalist terminal-native coding agent written in Go, ported from the C agent
+[hax](https://github.com/OleksandrChekhovskyi/hax) and extended past it.
 
 ### Added
 

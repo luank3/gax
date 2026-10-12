@@ -25,6 +25,9 @@ jobs:
       - run: make fmt-check
       - run: make vet
       - run: make test-race
+      # gax is cgo-free; a build that quietly needs cgo would not cross-compile.
+      - run: make build
+      - run: ./bin/gax --version
 
   build:
     name: build (${{ matrix.goos }}/${{ matrix.goarch }})

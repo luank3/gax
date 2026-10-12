@@ -2,17 +2,18 @@
 
 # gax
 
-**A minimalist coding agent in your terminal — the Go reimplementation of [hax](https://github.com/OleksandrChekhovskyi/hax).**
+**A minimalist coding agent in your terminal. One static binary, no runtime dependencies.**
 
 [![CI](https://github.com/luank3/gax/actions/workflows/ci.yml/badge.svg)](https://github.com/luank3/gax/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 </div>
 
-gax is the Go reimplementation of [hax](https://github.com/OleksandrChekhovskyi/hax), the
-minimalist terminal-native coding agent written in C. It targets behavioral parity with the hax
-sources it was ported from — baseline `ff45833`, recorded in `internal/version.Value` — and the
-porting trail lives in [`docs/superpowers/plans`](docs/superpowers/plans).
+gax is a terminal-native coding agent written in Go. It began as a port of the C agent
+[hax](https://github.com/OleksandrChekhovskyi/hax) and has grown past it since: the web tools, the
+bash output compression, and the search backends are gax's own. The design record for each
+subsystem lives in [`docs/superpowers/specs`](docs/superpowers/specs), with the dated plans beside
+it in [`docs/superpowers/plans`](docs/superpowers/plans).
 
 ## Key features
 
@@ -283,11 +284,11 @@ with [AGENTS.md](AGENTS.md) for the repository map and conventions.
 ## Documentation
 
 - [`docs/sessions.md`](docs/sessions.md) — session log and `--json` record formats.
-- [`docs/superpowers/plans`](docs/superpowers/plans) — the per-subsystem porting plans and
-  their acceptance criteria.
+- [`docs/superpowers/plans`](docs/superpowers/plans) — the dated implementation plans and their
+  acceptance criteria.
 - [`docs/superpowers/specs`](docs/superpowers/specs) — design notes for larger subsystems.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). hax, the C implementation this project ports, is MIT-licensed
-as well.
+MIT — see [LICENSE](LICENSE). gax was ported from hax, which is MIT-licensed as well; its
+notice is preserved in the license file.

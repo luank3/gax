@@ -2,14 +2,14 @@
 
 ## Project overview
 
-gax is a Go reimplementation of [hax](https://github.com/OleksandrChekhovskyi/hax), a minimalist
-terminal-native coding agent originally written in C. The port targets behavioral parity with the
-hax sources it was ported from; `internal/version.Value` pins the baseline commit (`ff45833`)
-cited by every plan in `docs/superpowers/plans`.
+gax is a minimalist terminal-native coding agent written in Go, ported from the C agent
+[hax](https://github.com/OleksandrChekhovskyi/hax) and extended well past it. Ported behavior
+follows the upstream sources; gax's own additions (the web tools, the bash output compression, the
+search backends) are documented in `docs/superpowers/specs` and the dated plans beside it.
 
-Standard library only: `go.mod` has no `require` block and must keep none. Features are ported
-from the C source rather than invented; when behavior is ambiguous, read the upstream hax
-checkout before deciding.
+Standard library only: `go.mod` has no `require` block and must keep none. Prefer the ported shape
+of a subsystem over inventing a new one; when a change touches behavior gax inherited, read the
+matching spec in `docs/superpowers/specs` before deciding.
 
 ## Layout
 
@@ -55,16 +55,17 @@ with `make lint test-race`.
 for one-shot runs and fail under an ambient provider/model/effort selection, which makes a
 plain `go test ./...` in a configured shell look broken when it is not.
 
-Cross-compilation is verified for `linux/amd64`, `linux/arm64`, `darwin/amd64`, and
-`darwin/arm64` with `CGO_ENABLED=0`; keep it that way (cgo is an optional locale optimization
-behind build tags).
+gax is cgo-free: the Make targets build with `CGO_ENABLED=0` (override with `make CGO=1 build`), and
+cross-compilation is verified for `linux/amd64`, `linux/arm64`, `darwin/amd64`, and `darwin/arm64`
+with it off. Keep it that way — the cgo locale path is an optional optimization behind build tags,
+not something the shipped binaries use.
 
 ## Conventions
 
 - **No third-party modules.** Only the standard library. Adding a dependency needs an explicit
   decision from the maintainer, not a convenience argument.
 - **Match the port, not personal taste.** Keep function names, error strings, and user-visible
-  text aligned with the Go-side precedents; when porting new behavior, mirror upstream.
+  text aligned with the Go-side precedents, and with what the subsystem's spec records.
 - **Comments explain why.** The existing code documents non-obvious constraints (wire quirks,
   ordering requirements, endpoint bugs) and omits narration. Follow that.
 - **Errors are user-facing.** Messages read as terminal diagnostics (`failed to fetch usage from
@@ -91,16 +92,16 @@ behind build tags).
 2. Change code and tests together; prefer the smallest correct change that fits the surrounding
    style.
 3. Run `make lint test-race`.
-4. Update the plan (tick tasks, or add a dated plan for new work). Plans are the porting record —
-   a behavior change with no plan entry is incomplete.
+4. Update the plan (tick tasks, or add a dated plan for new work). Plans plus the specs are the
+   design record — a behavior change with no plan entry is incomplete.
 5. Commit with an imperative subject; never commit generated binaries (`bin/`, `dist/` are
    ignored).
 
 ## Gotchas
 
 - `internal/version.Value` is injected at release time via
-  `-ldflags -X github.com/luank3/gax/internal/version.Value=<version>`; its default pins the
-  upstream commit, and session headers record it as `gax_version`.
+  `-ldflags -X github.com/luank3/gax/internal/version.Value=<version>`; a plain `go build` reports
+  the `dev` default, and session headers record the value as `gax_version`.
 - The system prompt tells the model that `GAX_SUBAGENT_DEPTH` limits nested `gax -p` runs.
   Subagent recursion, provider inheritance, and the child environment are built in
   `internal/tools/bash.go` and `internal/subagent`.

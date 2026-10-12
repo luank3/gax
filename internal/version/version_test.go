@@ -2,8 +2,8 @@ package version
 
 import "testing"
 
-func TestValueMatchesPinnedUpstreamCheckout(t *testing.T) {
-	if Value != "ff45833" {
-		t.Fatalf("version = %q, want upstream git describe value ff45833", Value)
+func TestValueDefaultsToDevelopmentBuild(t *testing.T) {
+	if Value != "dev" {
+		t.Fatalf("version = %q, want the dev default a plain go build reports", Value)
 	}
 }

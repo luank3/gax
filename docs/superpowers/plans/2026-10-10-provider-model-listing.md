@@ -12,7 +12,7 @@
 
 **Tech Stack:** Go provider runtime, OpenRouter metadata parser, shared bounded HTTP transport.
 
-**Spec:** the porting baseline commit `ff458337f8ba7366d71fad4da0210a53b658678a` (pinned in `internal/version.Value`), especially `src/providers/openai_models.c` and `src/providers/registry.c`.
+**Spec:** the C sources this was ported from, especially `src/providers/openai_models.c` and `src/providers/registry.c`.
 
 ## Constraints
 

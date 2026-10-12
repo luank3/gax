@@ -39,4 +39,4 @@ Connect the existing CLI, config, provider, agent, tool, and session packages be
 
 ## Source
 
-The porting baseline commit `ff458337f8ba7366d71fad4da0210a53b658678a` (pinned in `internal/version.Value`), including `src/main.c`, `src/cli.c`, `src/oneshot.c`, `src/agent.c`, `src/session.c`, `src/providers/registry.c`, and `docs/sessions.md`.
+The C sources this was ported from, including `src/main.c`, `src/cli.c`, `src/oneshot.c`, `src/agent.c`, `src/session.c`, `src/providers/registry.c`, and `docs/sessions.md`.
