@@ -212,6 +212,45 @@ func TestRunLoopRefusesUndeclaredToolsThenContinuesToFinalAnswer(t *testing.T) {
 	}
 }
 
+func TestRunLoopAdvertisedCallWithoutExecutorReportsTheGap(t *testing.T) {
+	state := agent.NewSession()
+	state.Tools = []coreprovider.ToolDefinition{{Name: "read"}}
+	state.AddUser("read a file")
+	var calls int
+	stream := agent.StreamFunc(func(_ context.Context, _ *transport.Client, _ *runtime.Provider, _ string,
+		_ coreprovider.Context, _ client.StreamOptions, _ func() bool, callback func(conversation.Event),
+	) (transport.Response, error) {
+		calls++
+		if calls == 1 {
+			callback(conversation.Event{Kind: conversation.EventToolCallStart, ID: conversation.String("c1"), Name: "read"})
+			callback(conversation.Event{Kind: conversation.EventToolCallEnd, ID: conversation.String("c1")})
+		} else {
+			callback(conversation.Event{Kind: conversation.EventTextDelta, Text: "no executor"})
+		}
+		callback(conversation.Event{Kind: conversation.EventDone})
+		return transport.Response{StatusCode: 200}, nil
+	})
+	result := agent.RunLoop(context.Background(), agent.LoopOptions{Session: state, Stream: stream})
+	if result.Outcome != agent.LoopComplete || result.Turns != 2 || calls != 2 {
+		t.Fatalf("loop did not continue past the missing executor: result=%+v calls=%d", result, calls)
+	}
+	var results []conversation.Item
+	for _, item := range state.Items {
+		if item.Kind == conversation.KindToolResult {
+			results = append(results, item)
+		}
+	}
+	if len(results) != 1 {
+		t.Fatalf("tool results = %+v, want exactly one", results)
+	}
+	if results[0].Output == nil || *results[0].Output != "error: no tool executor is configured" {
+		t.Fatalf("missing-executor output = %v", results[0].Output)
+	}
+	if results[0].Origin != conversation.Origin("") {
+		t.Fatalf("missing-executor origin = %q, want the empty origin", results[0].Origin)
+	}
+}
+
 func TestRunLoopInjectsFinishedTaskNotesBeforeTheNextRequest(t *testing.T) {
 	state := agent.NewSession()
 	state.AddUser("start")

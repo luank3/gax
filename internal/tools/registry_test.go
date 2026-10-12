@@ -3,6 +3,7 @@ package tools
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -452,3 +453,43 @@ func parameterSchema(definition provider.ToolDefinition) map[string]any {
 }
 
 func reflectDeepEqual(left, right any) bool { return reflect.DeepEqual(left, right) }
+
+func TestNilRegistryReportsUnavailable(t *testing.T) {
+	var registry *Registry
+	if got := registry.Run("read", jsonArgs(map[string]any{"path": "x"}), 1); got.Text != "error: tool registry is unavailable" {
+		t.Fatalf("nil registry Run = %q", got.Text)
+	}
+	execution := registry.Execute(conversation.Item{
+		Kind:      conversation.KindToolCall,
+		ToolName:  conversation.String("read"),
+		Arguments: conversation.String(`{"path":"x"}`),
+	}, 1)
+	if execution.Output == nil || *execution.Output != "error: tool registry is unavailable" {
+		t.Fatalf("nil registry Execute = %v", execution.Output)
+	}
+}
+
+func TestReadWholeFileIsCappedAtTheLineLimit(t *testing.T) {
+	var builder strings.Builder
+	for line := 0; line < maxReadLines+3; line++ {
+		builder.WriteString("x\n")
+	}
+	path := filepath.Join(t.TempDir(), "long.txt")
+	if err := os.WriteFile(path, []byte(builder.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	registry := New(Options{OutputCap: 64 * 1024})
+	got := registry.Run("read", jsonArgs(map[string]any{"path": path}), 1)
+	marker := fmt.Sprintf("[truncated at %d lines; file has more — pass offset/limit to read more]", maxReadLines)
+	if !strings.HasSuffix(got.Text, marker) {
+		t.Fatalf("line-capped read = %q, want it to end with %q", got.Text, marker)
+	}
+	body := strings.TrimSuffix(strings.TrimSuffix(got.Text, marker), "\n\n")
+	lines := strings.Split(strings.TrimRight(body, "\n"), "\n")
+	if len(lines) != maxReadLines {
+		t.Fatalf("line-capped read returned %d lines, want %d", len(lines), maxReadLines)
+	}
+	if !strings.HasPrefix(lines[len(lines)-1], fmt.Sprintf("%6d%s", maxReadLines, readLineDelimiter)) {
+		t.Fatalf("last returned line = %q, want line %d", lines[len(lines)-1], maxReadLines)
+	}
+}

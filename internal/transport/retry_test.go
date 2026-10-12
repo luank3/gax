@@ -106,9 +106,13 @@ func TestShouldRetryClassifiesStatusesAndTerminalQuotaErrors(t *testing.T) {
 }
 
 func TestDelayDoublesWithJitterAndClampsToTheCeiling(t *testing.T) {
-	// The doubling loop stops once the delay passes half of MaxDelay, so the widest pre-jitter
-	// delay is 25s: doubling 12.8s passes 15s, and the jitter below can still exceed MaxDelay.
-	const saturated = 25 * time.Second
+	// The loop doubles before it tests, so the pre-jitter delay at attempt n is MaxDelay/2 rounded
+	// up to the next power of two: 12.8s at attempt 7, 25.6s at attempt 8, the 30s clamp after.
+	const (
+		almostSaturated = 12800 * time.Millisecond
+		saturated       = 25600 * time.Millisecond
+		capped          = maxRetryDelay
+	)
 	policy := DefaultRetryPolicy(6, 100*time.Millisecond, 0)
 	for _, test := range []struct {
 		attempt int
@@ -119,10 +123,10 @@ func TestDelayDoublesWithJitterAndClampsToTheCeiling(t *testing.T) {
 		{attempt: 1, base: 200 * time.Millisecond},
 		{attempt: 2, base: 400 * time.Millisecond},
 		{attempt: 3, base: 800 * time.Millisecond},
-		{attempt: 7, base: 12 * time.Second},
+		{attempt: 7, base: almostSaturated},
 		{attempt: 8, base: saturated},
-		{attempt: 20, base: saturated},
-		{attempt: 60, base: saturated},
+		{attempt: 20, base: capped},
+		{attempt: 60, base: capped},
 	} {
 		got := Delay(policy, test.attempt)
 		low := test.base * 75 / 100

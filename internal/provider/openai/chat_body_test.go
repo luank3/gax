@@ -2,6 +2,7 @@ package openai
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/luank3/gax/internal/conversation"
@@ -234,4 +235,33 @@ func cacheControl(message map[string]any) map[string]any {
 	part, _ := parts[len(parts)-1].(map[string]any)
 	control, _ := part["cache_control"].(map[string]any)
 	return control
+}
+
+func TestBuildBodyRejectsMalformedExtraBody(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		extra     string
+		wantError string
+	}{
+		{name: "truncated object", extra: `{"stream":`, wantError: "decode extra_body"},
+		{name: "not an object", extra: `[1,2]`, wantError: "decode extra_body"},
+		{name: "null object", extra: `null`, wantError: "extra_body must be a JSON object"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			body, err := BuildBody(provider.Context{}, "openrouter", "model-1", BodyOptions{
+				ExtraBody: json.RawMessage(test.extra),
+			})
+			if err == nil {
+				t.Fatalf("BuildBody accepted extra_body %s: %#v", test.extra, body)
+			}
+			if !strings.Contains(err.Error(), test.wantError) {
+				t.Fatalf("error = %q, want it to contain %q", err, test.wantError)
+			}
+		})
+	}
+
+	// A rejected extra_body must not fall back to a silently patched request.
+	if _, err := BuildBody(provider.Context{}, "openrouter", "model-1", BodyOptions{ExtraBody: json.RawMessage(`"text"`)}); err == nil {
+		t.Fatal("BuildBody accepted a scalar extra_body")
+	}
 }
