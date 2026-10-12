@@ -43,8 +43,14 @@ func TestSkillToolListsAndLoadsSkills(t *testing.T) {
 	writeTestSkill(t, filepath.Join(project, ".agents", "skills"), "deploy", "---\ndescription: deploy helper\n---\nrun the deploy steps\n")
 
 	listing := registry.Run("skill", `{}`, 1).Text
+	// The registry resolves the working directory before it lists skills, and on macOS a temporary
+	// directory is reached through /var while the resolved form is /private/var.
+	canonical := registry.bashWorkingDirectory()
+	if canonical == "" {
+		t.Fatal("registry has no working directory")
+	}
 	want := "- customize-gax: Change gax's own settings, providers, models, or presets — where config.json lives, which keys exist, what applies live, and what needs a restart. (gax:skills/customize-gax/SKILL.md)\n" +
-		"- deploy: deploy helper (" + filepath.Join(project, ".agents", "skills", "deploy", "SKILL.md") + ")"
+		"- deploy: deploy helper (" + filepath.Join(canonical, ".agents", "skills", "deploy", "SKILL.md") + ")"
 	if listing != want {
 		t.Fatalf("skill listing = %q, want %q", listing, want)
 	}
