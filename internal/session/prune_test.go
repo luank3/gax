@@ -32,6 +32,11 @@ func TestPruneBeforeSweepsAllProjectBucketsAndRespectsLocksAndExclusion(t *testi
 	if err := PruneBefore(cutoff, excludedPath); err != nil {
 		t.Fatal(err)
 	}
+	{
+		f, _ := os.Create("/tmp/gax-exclude.txt")
+		_, _ = fmt.Fprintf(f, "excluded=%s\nrecent=%s\nold=%s\nlocked=%s\nprojectA=%s\n", excludedPath, recentPath, oldPath, lockedPath, projectA)
+		_ = f.Close()
+	}
 	if _, err := os.Lstat(excludedPath); err != nil {
 		var tree []string
 		root := filepath.Dir(filepath.Dir(filepath.Dir(excludedPath)))
@@ -42,8 +47,8 @@ func TestPruneBeforeSweepsAllProjectBucketsAndRespectsLocksAndExclusion(t *testi
 			tree = append(tree, strings.TrimPrefix(path, root)+" mtime="+info.ModTime().UTC().String())
 			return nil
 		})
-		t.Fatalf("DIAGCI excluded not a file: %v\nCWD %q\nEXPECTED excluded=%q recent=%q old=%q locked=%q\nTREE %s",
-			err, projectA, filepath.Base(excludedPath), filepath.Base(recentPath), filepath.Base(oldPath), filepath.Base(lockedPath), strings.Join(tree, "\n"))
+		diag, _ := os.ReadFile("/tmp/gax-exclude.txt")
+		t.Fatalf("DIAGCI excluded not a file: %v\nCWD %q\nTREE %s\nFILE %s", err, projectA, strings.Join(tree, "\n"), diag)
 	}
 	assertPruneTestMissing(t, oldPath)
 	assertPruneTestMissing(t, otherPath)

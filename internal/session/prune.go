@@ -288,6 +288,11 @@ func pruneSessionFile(projectRoot *os.Root, name string, cutoff time.Time, exclu
 			_ = f.Close()
 		}()
 	}
+	{
+		f, _ := os.OpenFile("/tmp/gax-exclude.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		_, _ = fmt.Fprintf(f, "SWEEP sees %s exclude=%s equal=%v\n", path, excludePath, path == excludePath)
+		_ = f.Close()
+	}
 	if excludePath != "" && path == excludePath {
 		return
 	}
