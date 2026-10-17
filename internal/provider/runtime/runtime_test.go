@@ -648,6 +648,69 @@ func TestGenericModelListingDoesNotInventModelMetadata(t *testing.T) {
 	}
 }
 
+func TestUnknownModelManualOverrides(t *testing.T) {
+	newProvider := func(t *testing.T, store *config.Store) *runtime.Provider {
+		t.Helper()
+		provider, err := runtime.NewResolver(store, registry.New(store)).Resolve("openai-compatible")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return provider
+	}
+	newStore := func(t *testing.T, configJSON string) *config.Store {
+		t.Helper()
+		store := config.New(config.DefaultSettings())
+		store.SetEnvironment(nil)
+		if err := store.LoadConfig([]byte(configJSON)); err != nil {
+			t.Fatal(err)
+		}
+		return store
+	}
+
+	t.Run("catalog models pin context and vision for unlisted id", func(t *testing.T) {
+		store := newStore(t, `{"providers":{"openai-compatible":{"base_url":"https://gateway.example/v1","api_key":"test-key"}},"catalog":{"models":{"openai-compatible":{"agnes-3.0-flash":{"limit":{"context":"1m"},"modalities":{"input":["text","image"]}}}}}}`)
+		provider := newProvider(t, store)
+		if got := provider.ContextWindowForModel("agnes-3.0-flash"); got != 1000000 {
+			t.Fatalf("catalog context for agnes-3.0-flash = %d, want 1000000", got)
+		}
+		if got := provider.ImageInputForModel("agnes-3.0-flash"); got != int(catalog.SupportYes) {
+			t.Fatalf("catalog vision for agnes-3.0-flash = %d, want %d", got, int(catalog.SupportYes))
+		}
+	})
+
+	t.Run("context_limit overrides unknown and catalog values", func(t *testing.T) {
+		store := newStore(t, `{"providers":{"openai-compatible":{"base_url":"https://gateway.example/v1","api_key":"test-key"}}}`)
+		provider := newProvider(t, store)
+		if got := provider.ContextWindowForModel("agnes-3.0-flash"); got != 0 {
+			t.Fatalf("unknown context without override = %d, want 0", got)
+		}
+		store.SetOverride("context_limit", stringPtrForRuntimeTest("200k"))
+		if got := provider.ContextWindowForModel("agnes-3.0-flash"); got != 200000 {
+			t.Fatalf("context_limit override = %d, want 200000", got)
+		}
+	})
+
+	t.Run("image_input overrides unknown detection", func(t *testing.T) {
+		store := newStore(t, `{"providers":{"openai-compatible":{"base_url":"https://gateway.example/v1","api_key":"test-key"}}}`)
+		provider := newProvider(t, store)
+		if got := provider.ImageInputForModel("agnes-3.0-flash"); got != int(catalog.SupportUnknown) {
+			t.Fatalf("unknown vision without override = %d, want %d", got, int(catalog.SupportUnknown))
+		}
+		store.SetOverride("image_input", stringPtrForRuntimeTest("on"))
+		if got := provider.ImageInputForModel("agnes-3.0-flash"); got != int(catalog.SupportYes) {
+			t.Fatalf("image_input=on = %d, want %d", got, int(catalog.SupportYes))
+		}
+		store.SetOverride("image_input", stringPtrForRuntimeTest("off"))
+		if got := provider.ImageInputForModel("agnes-3.0-flash"); got != int(catalog.SupportNo) {
+			t.Fatalf("image_input=off = %d, want %d", got, int(catalog.SupportNo))
+		}
+		store.SetOverride("image_input", stringPtrForRuntimeTest("auto"))
+		if got := provider.ImageInputForModel("agnes-3.0-flash"); got != int(catalog.SupportUnknown) {
+			t.Fatalf("image_input=auto = %d, want %d", got, int(catalog.SupportUnknown))
+		}
+	})
+}
+
 func TestDeepseekListsProviderSpecificModelMetadata(t *testing.T) {
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

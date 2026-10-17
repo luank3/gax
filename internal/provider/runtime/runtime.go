@@ -1301,6 +1301,16 @@ func filterEffortLevels(provider *Provider, model string, levels []string) []str
 }
 
 func (provider *Provider) ImageInputForModel(model string) int {
+	if provider != nil && provider.store != nil {
+		if override := provider.store.String("image_input"); override != nil {
+			switch strings.ToLower(strings.TrimSpace(*override)) {
+			case "on":
+				return int(catalog.SupportYes)
+			case "off":
+				return int(catalog.SupportNo)
+			}
+		}
+	}
 	entry, found := provider.ModelMetadata(model)
 	if !found {
 		return int(catalog.SupportUnknown)
@@ -1309,6 +1319,13 @@ func (provider *Provider) ImageInputForModel(model string) int {
 }
 
 func (provider *Provider) ContextWindowForModel(model string) int64 {
+	// context_limit is the manual escape hatch for models missing from models.dev
+	// (generic /models listings keep IDs with unknown capabilities by design).
+	if provider != nil && provider.store != nil {
+		if override := provider.store.Tokens("context_limit"); override > 0 {
+			return override
+		}
+	}
 	entry, _ := provider.ModelMetadata(model)
 	return entry.ContextWindow
 }
