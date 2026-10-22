@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/luank3/gax/internal/provider/codex"
+	systempath "github.com/luank3/gax/internal/system/path"
 	"github.com/luank3/gax/internal/transport"
 )
 
@@ -45,12 +47,15 @@ func TestLoadCLIAuthReadsCodexAuthFile(t *testing.T) {
 func TestLoadCLIAuthPreservesHomePathComponents(t *testing.T) {
 	home := t.TempDir() + "/missing/../home"
 	_, err := codex.LoadCLIAuth(home)
-	if err == nil || !strings.Contains(err.Error(), "("+home+"/.codex/auth.json)") {
+	if err == nil || !strings.Contains(err.Error(), "("+systempath.Join(home, ".codex/auth.json")+")") {
 		t.Fatalf("LoadCLIAuth() error = %v; want original HOME path components", err)
 	}
 }
 
 func TestLoadCLIAuthUsesLiteralTildeWhenHomeIsMissing(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", "")
+	}
 	t.Setenv("HOME", "")
 	_, err := codex.LoadCLIAuth("")
 	if err == nil || !strings.Contains(err.Error(), "(~/.codex/auth.json)") {
@@ -197,7 +202,7 @@ func TestQueryUsageProactivelyRefreshesAndPersistsRotatedGaxTokens(t *testing.T)
 		t.Fatalf("rotated tokens not persisted: auth=%+v err=%v", updated, err)
 	}
 	info, err := os.Stat(filepath.Join(stateHome, "gax", "auth.json"))
-	if err != nil || info.Mode().Perm() != 0600 {
+	if err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0600) {
 		t.Fatalf("credential store permissions = %v, err=%v; want 0600", info.Mode().Perm(), err)
 	}
 }

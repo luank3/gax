@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -60,7 +61,7 @@ func TestLogoutManagedRemovesCodexAndRevokesStoredRefreshToken(t *testing.T) {
 		t.Fatalf("logout damaged other credentials: %s", updated)
 	}
 	info, err := os.Stat(storePath)
-	if err != nil || info.Mode().Perm() != 0600 {
+	if err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0600) {
 		t.Fatalf("credential file permissions = %v, err=%v", info, err)
 	}
 }

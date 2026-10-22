@@ -38,7 +38,7 @@ func TestDiscoverPrefersTheNearestSkillAndFallsBackToBuiltins(t *testing.T) {
 	if !ok || override.Description != "project override" || override.Body != "" {
 		t.Fatalf("a discovered skill should shadow the built-in: %+v", override)
 	}
-	if got := byName["guide"].DisplayPath; got != "~/.agents/skills/guide/SKILL.md" {
+	if got := byName["guide"].DisplayPath; got != filepath.FromSlash("~/.agents/skills/guide/SKILL.md") {
 		t.Fatalf("shared skill display path = %q", got)
 	}
 	if got := byName["deploy"].Description; got != "deploy helper" {

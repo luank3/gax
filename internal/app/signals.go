@@ -1,3 +1,5 @@
+//go:build !windows
+
 package app
 
 import (
@@ -67,3 +69,5 @@ func reraiseTerminationSignal(signals chan os.Signal, received os.Signal) {
 	}
 	os.Exit(128 + int(syscall.SIGINT))
 }
+
+func notifyPauseSignals(signals chan os.Signal) { signal.Notify(signals, syscall.SIGUSR1) }

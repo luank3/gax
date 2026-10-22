@@ -10,7 +10,6 @@ import (
 
 	systemfs "github.com/luank3/gax/internal/system/fs"
 	systempath "github.com/luank3/gax/internal/system/path"
-
 	"github.com/luank3/gax/internal/transport"
 )
 
@@ -250,7 +249,7 @@ func isDone(done <-chan struct{}) bool {
 }
 
 func defaultCachePath() string {
-	path, ok := systempath.XDGGaxPath(os.Getenv("XDG_CACHE_HOME"), os.Getenv("HOME"), ".cache", "catalog.json")
+	path, ok := systempath.XDGGaxPath(os.Getenv("XDG_CACHE_HOME"), systempath.Home(), ".cache", "catalog.json")
 	if !ok {
 		return ""
 	}

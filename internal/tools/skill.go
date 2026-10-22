@@ -2,11 +2,11 @@ package tools
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/luank3/gax/internal/provider"
 	"github.com/luank3/gax/internal/skill"
+	systempath "github.com/luank3/gax/internal/system/path"
 )
 
 func skillDefinition() provider.ToolDefinition {
@@ -38,7 +38,7 @@ func (registry *Registry) runSkill(arguments string, _ int, _ DisplaySink) Resul
 		}
 		name = strings.TrimSpace(value)
 	}
-	entries := skill.Discover(skill.Options{Home: os.Getenv("HOME"), CWD: registry.bashWorkingDirectory()})
+	entries := skill.Discover(skill.Options{Home: systempath.Home(), CWD: registry.bashWorkingDirectory()})
 	if name == "" {
 		return Result{Text: skillListing(entries)}
 	}

@@ -166,7 +166,7 @@ func validatePresetPromptFile(value string) error {
 	path := spec
 	switch {
 	case strings.HasPrefix(spec, "~"):
-		path = systempath.ExpandHome(spec, os.Getenv("HOME"))
+		path = systempath.ExpandHome(spec, systempath.Home())
 	case strings.HasPrefix(spec, "/"):
 		path = spec
 	default:
@@ -485,7 +485,7 @@ func resolveLinkTarget(path string) (string, error) {
 }
 
 func xdgGaxPath(environment, homeRelative, relative string) (string, error) {
-	path, ok := systempath.XDGGaxPath(os.Getenv(environment), os.Getenv("HOME"), homeRelative, relative)
+	path, ok := systempath.XDGGaxPath(os.Getenv(environment), systempath.Home(), homeRelative, relative)
 	if !ok {
 		return "", fmt.Errorf("cannot resolve config path without %s or HOME", environment)
 	}

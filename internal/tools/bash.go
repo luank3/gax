@@ -378,6 +378,7 @@ type commandTask struct {
 	name          string
 	command       string
 	cmd           *exec.Cmd
+	process       *commandProcess
 	capture       *commandCapture
 	started       time.Time
 	done          chan struct{}
@@ -486,8 +487,8 @@ func (manager *taskManager) list() []TaskSnapshot {
 			Elapsed: end.Sub(task.started),
 		}
 		if exitError, ok := waitErr.(*exec.ExitError); ok {
-			if status, ok := exitError.Sys().(syscall.WaitStatus); ok && status.Signaled() {
-				snapshot.TermSignal = int(status.Signal())
+			if signal := commandSignal(task, exitError); signal != 0 {
+				snapshot.TermSignal = int(signal)
 			} else if exitCode := exitError.ExitCode(); exitCode >= 0 {
 				snapshot.ExitCode = exitCode
 			}
@@ -837,8 +838,8 @@ func (registry *Registry) startCommand(command string, display DisplaySink, rawO
 	cmd.Dir = registry.options.WorkDir
 	cmd.Env = registry.childEnvironment()
 	cmd.Stdout, cmd.Stderr = writer, writer
-	cmd.SysProcAttr = bashProcessAttributes()
-	if err := cmd.Start(); err != nil {
+	process, err := startCommandProcess(cmd)
+	if err != nil {
 		_ = reader.Close()
 		_ = writer.Close()
 		capture.closeRemove()
@@ -846,12 +847,13 @@ func (registry *Registry) startCommand(command string, display DisplaySink, rawO
 	}
 	_ = writer.Close()
 	task := &commandTask{
-		command: command, cmd: cmd, capture: capture, started: time.Now(), done: make(chan struct{}),
+		command: command, cmd: cmd, process: process, capture: capture, started: time.Now(), done: make(chan struct{}),
 		manager: registry.tasks, rawOutput: rawOutput,
 	}
 	registry.trackChild(task)
 	capture.setOverflowHandler(func() { killTaskGroup(task, syscall.SIGKILL) })
 	go func() {
+		defer process.close()
 		waitResult := make(chan error, 1)
 		go func() { waitResult <- cmd.Wait() }()
 		pipeDone := make(chan struct{})
@@ -1128,15 +1130,10 @@ func terminateTask(task *commandTask, grace time.Duration) {
 }
 
 func killTaskGroup(task *commandTask, signal syscall.Signal) bool {
-	if task == nil || task.cmd == nil || task.cmd.Process == nil {
+	if task == nil || task.cmd == nil || task.cmd.Process == nil || task.process == nil {
 		return false
 	}
-	if err := syscall.Kill(-task.cmd.Process.Pid, signal); err == nil {
-		return true
-	} else if !errors.Is(err, syscall.ESRCH) {
-		_ = task.cmd.Process.Kill()
-	}
-	return false
+	return task.process.kill(task.cmd, signal)
 }
 
 func (registry *Registry) runTaskWait(arguments string, _ int, display DisplaySink) Result {
@@ -1612,8 +1609,8 @@ func commandStatus(task *commandTask) string {
 	}
 	var exitError *exec.ExitError
 	if errors.As(err, &exitError) {
-		if status, ok := exitError.Sys().(syscall.WaitStatus); ok && status.Signaled() {
-			return fmt.Sprintf("killed (signal %d)", status.Signal())
+		if signal := commandSignal(task, exitError); signal != 0 {
+			return fmt.Sprintf("killed (signal %d)", signal)
 		}
 		return fmt.Sprintf("finished (exit %d)", exitError.ExitCode())
 	}
@@ -1629,8 +1626,8 @@ func commandExitSuffix(task *commandTask) string {
 	}
 	var exitError *exec.ExitError
 	if errors.As(err, &exitError) {
-		if status, ok := exitError.Sys().(syscall.WaitStatus); ok && status.Signaled() {
-			return fmt.Sprintf("signal %d", status.Signal())
+		if signal := commandSignal(task, exitError); signal != 0 {
+			return fmt.Sprintf("signal %d", signal)
 		}
 		return fmt.Sprintf("exit %d", exitError.ExitCode())
 	}

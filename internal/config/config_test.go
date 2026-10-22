@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -323,7 +324,7 @@ func TestPersistStateAtomicallyWritesNestedKeysAndUpdatesStore(t *testing.T) {
 		t.Fatalf("persisted state lost nested update or unrelated value: %s", data)
 	}
 	info, err := os.Stat(path)
-	if err != nil || info.Mode().Perm() != 0600 {
+	if err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0600) {
 		t.Fatalf("state mode = %v, err=%v; want 0600", info, err)
 	}
 	entries, err := os.ReadDir(filepath.Dir(path))
@@ -354,7 +355,7 @@ func TestPersistDoesNotChangeExistingDirectoryPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := info.Mode().Perm(); got != 0710 {
+	if got := info.Mode().Perm(); runtime.GOOS != "windows" && got != 0710 {
 		t.Fatalf("existing state directory mode = %04o, want 0710", got)
 	}
 }

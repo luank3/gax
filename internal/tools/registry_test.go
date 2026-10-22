@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -115,7 +116,7 @@ func TestReadValidationAndLongLineElision(t *testing.T) {
 	if !strings.Contains(result.Text, "bytes elided]") || len(result.Text) > 600 {
 		t.Fatalf("long line was not elided: len=%d output=%q", len(result.Text), result.Text)
 	}
-	for _, args := range []string{`{"path":"` + path + `","offset":null}`, `{"path":"` + path + `","limit":1.0}`, `{"path":"` + path + `","limit":0}`} {
+	for _, args := range []string{jsonArgs(map[string]any{"path": path, "offset": nil}), `{"path":` + strconv.Quote(path) + `,"limit":1.0}`, jsonArgs(map[string]any{"path": path, "limit": 0})} {
 		result = registry.Run("read", args, 1)
 		if !strings.Contains(result.Text, "must be") {
 			t.Fatalf("invalid line argument %s = %q", args, result.Text)
@@ -293,7 +294,7 @@ func TestExecuteRelativizesFileToolPathsInsideWorkingDirectory(t *testing.T) {
 	if result.Output == nil || !strings.Contains(*result.Output, relative) || strings.Contains(*result.Output, absolute) {
 		t.Fatalf("execution path was not made relative to the working directory: %#v", result)
 	}
-	if got := stringValue(call.Arguments); !strings.Contains(got, absolute) {
+	if got := stringValue(call.Arguments); got != jsonArgs(map[string]any{"path": absolute}) {
 		t.Fatalf("path preprocessing modified the original conversation call: %q", got)
 	}
 }
@@ -336,7 +337,7 @@ func TestToolPresentationUsesPreprocessedDisplayArguments(t *testing.T) {
 		t.Fatal(err)
 	}
 	registry := New(Options{})
-	bashArguments := jsonArgs(map[string]any{"command": "cd " + cwd + " && printf ok"})
+	bashArguments := jsonArgs(map[string]any{"command": "cd '" + filepath.ToSlash(cwd) + "' && printf ok"})
 	bashCall := conversation.Item{ToolName: conversation.String("bash"), Arguments: conversation.String(bashArguments)}
 	if got := registry.Presentation(bashCall).Argument; got != "printf ok" {
 		t.Fatalf("displayed bash argument = %q, want the no-op cd prefix stripped", got)

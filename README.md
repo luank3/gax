@@ -2,7 +2,7 @@
 
 # gax
 
-**A minimalist coding agent in your terminal. One static binary, no runtime dependencies.**
+**A minimalist coding agent in your terminal. One native binary, no third-party Go dependencies.**
 
 [![CI](https://github.com/luank3/gax/actions/workflows/ci.yml/badge.svg)](https://github.com/luank3/gax/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -17,8 +17,8 @@ it in [`docs/superpowers/plans`](docs/superpowers/plans).
 
 ## Key features
 
-- **One static binary** — no runtime dependencies and no third-party Go modules. Starts
-  instantly and keeps a small footprint, leaving RAM for local models.
+- **One cgo-free binary** — no third-party Go modules. Windows command execution uses Git Bash.
+  Starts instantly and keeps a small footprint, leaving RAM for local models.
 - **Local models are first-class** — point gax at a running `llama-server` or `ollama serve` and
   it discovers the served models; llama.cpp also reports its loaded context, output, image, and
   effort capabilities, so no custom provider block is needed for the default setup.
@@ -43,9 +43,9 @@ With a Go toolchain (1.25 or newer):
 go install github.com/luank3/gax/cmd/gax@latest
 ```
 
-Prebuilt archives for Linux and macOS (amd64, arm64) are attached to
-[releases](https://github.com/luank3/gax/releases). Unpack the `gax` binary into any directory
-on your `PATH`.
+Release targets include Linux, macOS, and Windows (amd64, arm64). Archives are attached to
+[releases](https://github.com/luank3/gax/releases); Windows archives use ZIP. Unpack `gax`
+(or `gax.exe`) into any directory on your `PATH`.
 
 From source:
 
@@ -55,6 +55,30 @@ cd gax
 make build          # the binary is now at ./bin/gax
 make install        # go install into GOPATH/bin
 ```
+
+## Windows
+
+Use Windows 10/11 with Windows Terminal and [Git for Windows](https://gitforwindows.org/).
+Run `gax.exe` from PowerShell, cmd, or Git Bash; the agent's `bash` tool always executes
+Bash commands, not PowerShell syntax. Bash is discovered beside `git.exe`, on `PATH`, or
+in standard Git installation directories. Set `bash.shell` (`GAX_BASH_SHELL`) for a custom path.
+Use forward-slash paths inside Bash commands (for example, `'C:/work/my project'`);
+file tools accept native Windows paths. MinTTY-style pipe terminals use plain line input;
+use Windows Terminal for the full interactive editor.
+
+Build from PowerShell without Make:
+
+```powershell
+$env:CGO_ENABLED = '0'
+go build -trimpath -o bin/gax.exe ./cmd/gax
+```
+
+Configuration and sessions keep the layout below, using `%USERPROFILE%` when `HOME` is
+unset. XDG overrides are honored. Private files inherit Windows directory ACLs; keep
+config/state/temp directories in your user profile or another access-restricted location.
+Clipboard text/images use Windows PowerShell's built-in clipboard APIs. Optional `fzf`
+completion still requires `fzf`; external editors must be invocable from Git Bash.
+Windows has no SIGUSR1 pause signal; use Escape interactively instead.
 
 ## Connect a provider
 

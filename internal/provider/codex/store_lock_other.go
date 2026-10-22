@@ -1,4 +1,4 @@
-//go:build !linux && !darwin && !freebsd && !openbsd && !netbsd && !dragonfly
+//go:build !windows && !linux && !darwin && !freebsd && !openbsd && !netbsd && !dragonfly
 
 package codex
 

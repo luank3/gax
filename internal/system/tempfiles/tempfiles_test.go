@@ -3,6 +3,7 @@ package tempfiles
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -42,12 +43,12 @@ func TestCreateUsesPrivateTrackedFilesAndCleanupRemovesThem(t *testing.T) {
 		t.Fatal(err)
 	}
 	directoryInfo, err := os.Stat(filepath.Dir(plainPath))
-	if err != nil || directoryInfo.Mode().Perm() != 0o700 {
+	if err != nil || (runtime.GOOS != "windows" && directoryInfo.Mode().Perm() != 0o700) {
 		t.Fatalf("private directory mode = %v, err=%v", directoryInfo, err)
 	}
 	for _, path := range []string{plainPath, imagePath} {
 		info, err := os.Stat(path)
-		if err != nil || info.Mode().Perm() != 0o600 {
+		if err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o600) {
 			t.Fatalf("file %q mode = %v, err=%v", path, info, err)
 		}
 	}
@@ -214,6 +215,9 @@ func TestCleanupForgetsExternallyRemovedActiveDirectory(t *testing.T) {
 }
 
 func TestInvalidUTF8TMPDIRFallsBackToTmp(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows environment values are UTF-16; native temp fallback is covered separately")
+	}
 	isolateTempfiles(t)
 	t.Setenv("TMPDIR", "/tmp/invalid-"+string([]byte{0xff}))
 	file, path, err := Create("fallback-", "")

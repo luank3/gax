@@ -69,7 +69,7 @@ type UsageReport struct {
 // LoadCLIAuth reads credentials borrowed from <home>/.codex/auth.json.
 func LoadCLIAuth(home string) (Auth, error) {
 	if home == "" {
-		home = os.Getenv("HOME")
+		home = systempath.Home()
 	}
 	path := systempath.ExpandHome("~/.codex/auth.json", home)
 	body, err := systemfs.ReadFile(path)

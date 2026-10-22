@@ -1,11 +1,11 @@
-//go:build linux || darwin || freebsd || openbsd || netbsd || dragonfly
+//go:build windows || linux || darwin || freebsd || openbsd || netbsd || dragonfly
 
 package codex
 
 import (
 	"os"
-	"syscall"
 
+	systemfs "github.com/luank3/gax/internal/system/fs"
 	systempath "github.com/luank3/gax/internal/system/path"
 )
 
@@ -21,12 +21,12 @@ func lockAuthStore(path string) (func(), error) {
 		_ = file.Close()
 		return nil, err
 	}
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+	if err := systemfs.Lock(file, true, false); err != nil {
 		_ = file.Close()
 		return nil, err
 	}
 	return func() {
-		_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+		_ = systemfs.Unlock(file)
 		_ = file.Close()
 	}, nil
 }

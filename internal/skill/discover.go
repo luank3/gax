@@ -151,7 +151,7 @@ func collect(root, home string, found map[string]Entry) {
 
 // configSkillsPath resolves ~/.config/gax/skills.
 func configSkillsPath() (string, bool) {
-	return systempath.XDGGaxPath(os.Getenv("XDG_CONFIG_HOME"), os.Getenv("HOME"), ".config", "skills")
+	return systempath.XDGGaxPath(os.Getenv("XDG_CONFIG_HOME"), systempath.Home(), ".config", "skills")
 }
 
 func description(data []byte) string {

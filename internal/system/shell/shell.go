@@ -1,8 +1,11 @@
+//go:build !windows
+
 // Package shell resolves executable shells using POSIX PATH rules.
 package shell
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -53,3 +56,9 @@ func executableRegularFile(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.Mode().IsRegular() && info.Mode()&0o111 != 0
 }
+
+// Default returns the shell used for POSIX terminal helper commands.
+func Default() string { return "/bin/sh" }
+
+// FindCommand resolves a terminal helper executable.
+func FindCommand(name string) string { path, _ := exec.LookPath(name); return path }

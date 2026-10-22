@@ -8,12 +8,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/luank3/gax/internal/agent"
 	"github.com/luank3/gax/internal/config"
 	"github.com/luank3/gax/internal/conversation"
 	terminalocale "github.com/luank3/gax/internal/system/locale"
+	systemshell "github.com/luank3/gax/internal/system/shell"
 	"github.com/luank3/gax/internal/system/spawn"
 	terminalvt "github.com/luank3/gax/internal/terminal/vtresolve"
 	coretools "github.com/luank3/gax/internal/tools"
@@ -82,7 +84,11 @@ func showHistoryWithTools(state *agent.Session, showReasoning bool, registry *co
 
 func renderWithPager(command string, stdout, stderr io.Writer, render func(io.Writer)) {
 	reader, writer := io.Pipe()
-	child := exec.Command("sh", "-c", command)
+	shell := "sh"
+	if runtime.GOOS == "windows" {
+		shell = systemshell.Default()
+	}
+	child := exec.Command(shell, "-c", command)
 	child.Stdin = reader
 	child.Stdout = stdout
 	child.Stderr = stderr
@@ -109,13 +115,13 @@ func resolvePager() (string, error) {
 		if head == "" {
 			return "", fmt.Errorf("$PAGER (%s) not found — fix it, or unset it to use a fallback", configured)
 		}
-		if _, err := exec.LookPath(head); err != nil {
+		if systemshell.FindCommand(head) == "" {
 			return "", fmt.Errorf("$PAGER (%s) not found — fix it, or unset it to use a fallback", configured)
 		}
 		return addLessColorFlag(configured, head, end), nil
 	}
 	for _, candidate := range []string{"less", "more"} {
-		if _, err := exec.LookPath(candidate); err == nil {
+		if systemshell.FindCommand(candidate) != "" {
 			return candidate, nil
 		}
 	}

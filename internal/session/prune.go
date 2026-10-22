@@ -6,8 +6,9 @@ import (
 	"io/fs"
 	"os"
 	"sync"
-	"syscall"
 	"time"
+
+	systemfs "github.com/luank3/gax/internal/system/fs"
 )
 
 const pruneInterval = 24 * time.Hour
@@ -29,27 +30,20 @@ func RetentionCutoff(retentionDays int) time.Time {
 // Touch refreshes a selected session's modification time while attempting a shared lock, so
 // another process's pruner sees the activity before it considers unlinking the file.
 func Touch(path string) error {
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	file, err := systemfs.OpenForTouch(path)
 	if err != nil {
 		return err
 	}
-	file := os.NewFile(uintptr(fd), path)
-	if file == nil {
-		_ = syscall.Close(fd)
-		return errors.New("cannot open session file")
-	}
 	defer file.Close()
-	_ = syscall.Flock(fd, syscall.LOCK_SH)
+	_ = systemfs.Lock(file, false, false)
 	info, err := file.Stat()
 	if err != nil {
 		return err
 	}
-	if !info.Mode().IsRegular() || !hasLinks(info) {
+	if !info.Mode().IsRegular() || !systemfs.HasLinks(file, info) {
 		return errors.New("session path is not a linked regular file")
 	}
-	now := time.Now()
-	timestamp := syscall.NsecToTimeval(now.UnixNano())
-	return syscall.Futimes(fd, []syscall.Timeval{timestamp, timestamp})
+	return systemfs.TouchFile(file, time.Now())
 }
 
 // PruneBefore synchronously removes expired session files across all cwd buckets. It leaves
@@ -86,21 +80,21 @@ func StartPrune(retentionDays int, excludePath string) {
 		_ = root.Close()
 		return
 	}
-	if err := syscall.Flock(int(marker.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err := systemfs.Lock(marker, true, true); err != nil {
 		_ = marker.Close()
 		_ = root.Close()
 		return
 	}
 	markerInfo, err := marker.Stat()
 	if err != nil {
-		_ = syscall.Flock(int(marker.Fd()), syscall.LOCK_UN)
+		_ = systemfs.Unlock(marker)
 		_ = marker.Close()
 		_ = root.Close()
 		return
 	}
 	now := time.Now()
 	if markerInfo.Size() > 0 && now.Sub(markerInfo.ModTime()) < pruneInterval {
-		_ = syscall.Flock(int(marker.Fd()), syscall.LOCK_UN)
+		_ = systemfs.Unlock(marker)
 		_ = marker.Close()
 		_ = root.Close()
 		return
@@ -302,11 +296,11 @@ func pruneSessionFile(projectRoot *os.Root, name string, cutoff time.Time, exclu
 		return
 	}
 	defer file.Close()
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err := systemfs.Lock(file, true, true); err != nil {
 		return
 	}
 	locked, err := file.Stat()
-	if err != nil || !locked.Mode().IsRegular() || !hasLinks(locked) ||
+	if err != nil || !locked.Mode().IsRegular() || !systemfs.HasLinks(file, locked) ||
 		!locked.ModTime().Before(cutoff) || !os.SameFile(entry, locked) {
 		return
 	}
@@ -318,9 +312,4 @@ func pruneSessionFile(projectRoot *os.Root, name string, cutoff time.Time, exclu
 		return
 	}
 	_ = projectRoot.Remove(name)
-}
-
-func hasLinks(info os.FileInfo) bool {
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	return ok && stat.Nlink > 0
 }

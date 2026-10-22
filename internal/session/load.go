@@ -9,10 +9,10 @@ import (
 	"io"
 	"os"
 	"strings"
-	"syscall"
 	"unicode/utf8"
 
 	"github.com/luank3/gax/internal/conversation"
+	systemfs "github.com/luank3/gax/internal/system/fs"
 )
 
 type Meta struct {
@@ -136,14 +136,9 @@ func Load(path string) ([]conversation.Item, Meta, error) {
 }
 
 func readLines(path string, consume func([]byte) error) error {
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	file, err := systemfs.OpenNoFollow(path, os.O_RDONLY, 0)
 	if err != nil {
 		return err
-	}
-	file := os.NewFile(uintptr(fd), path)
-	if file == nil {
-		syscall.Close(fd)
-		return errors.New("cannot open session file")
 	}
 	defer file.Close()
 	info, err := file.Stat()

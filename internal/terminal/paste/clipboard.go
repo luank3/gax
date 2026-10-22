@@ -63,6 +63,9 @@ func captureClipboardText(ctx context.Context) (string, bool) {
 }
 
 func readClipboardText(ctx context.Context) ([]byte, bool) {
+	if text, ok := platformClipboardText(ctx); ok {
+		return text, true
+	}
 	if text, ok := runClipboardCommand(ctx, maxClipboardText, "pbpaste"); ok {
 		return text, true
 	}
@@ -83,6 +86,9 @@ func readClipboardText(ctx context.Context) ([]byte, bool) {
 }
 
 func readClipboardImage(ctx context.Context) ([]byte, bool) {
+	if image, ok := platformClipboardImage(ctx); ok {
+		return image, true
+	}
 	if runtime.GOOS == "darwin" {
 		return readDarwinClipboardImage(ctx)
 	}

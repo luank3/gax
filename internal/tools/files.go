@@ -514,7 +514,7 @@ func (registry *Registry) runEdit(arguments string, _ int, _ DisplaySink) Result
 }
 
 func expandHome(path string) string {
-	return systempath.ExpandHome(path, os.Getenv("HOME"))
+	return systempath.ExpandHome(path, systempath.Home())
 }
 
 func relativizeToolPath(arguments string) string {

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	terminalocale "github.com/luank3/gax/internal/system/locale"
+	systemshell "github.com/luank3/gax/internal/system/shell"
 	"github.com/luank3/gax/internal/system/spawn"
 )
 
@@ -36,7 +37,7 @@ func EditBuffer(text string, stdin io.Reader, stdout, stderr io.Writer) (string,
 		return "", false, err
 	}
 	commandLine := command + " " + shellQuote(path)
-	process := exec.Command("/bin/sh", "-c", commandLine)
+	process := exec.Command(systemshell.Default(), "-c", commandLine)
 	process.Stdin = stdin
 	process.Stdout = stdout
 	process.Stderr = stderr
@@ -80,7 +81,7 @@ func resolveEditor() (string, error) {
 		return configured, nil
 	}
 	for _, candidate := range fallbackEditors {
-		if _, err := exec.LookPath(candidate); err == nil {
+		if systemshell.FindCommand(candidate) != "" {
 			return candidate, nil
 		}
 	}
@@ -99,15 +100,13 @@ func shellHeadResolves(command string) bool {
 			if head == "" {
 				return false
 			}
-			_, err := exec.LookPath(head)
-			return err == nil
+			return systemshell.FindCommand(head) != ""
 		}
 		if strings.ContainsRune(shellSyntax, value) {
 			return true
 		}
 	}
-	_, err := exec.LookPath(command)
-	return err == nil
+	return systemshell.FindCommand(command) != ""
 }
 
 func shellQuote(text string) string { return "'" + strings.ReplaceAll(text, "'", "'\\''") + "'" }

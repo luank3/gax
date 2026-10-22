@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/luank3/gax/internal/config"
@@ -12,6 +11,7 @@ import (
 	"github.com/luank3/gax/internal/provider/registry"
 	"github.com/luank3/gax/internal/provider/runtime"
 	"github.com/luank3/gax/internal/slash"
+	systempath "github.com/luank3/gax/internal/system/path"
 	terminalpaste "github.com/luank3/gax/internal/terminal/paste"
 	terminalpicker "github.com/luank3/gax/internal/terminal/picker"
 	"github.com/luank3/gax/internal/transport"
@@ -171,7 +171,7 @@ func chooseCodexMethod(title, detail, status string, stdin io.Reader, stdout, st
 }
 
 func authDirectories(store *config.Store) (home, stateHome string) {
-	home, _ = os.UserHomeDir()
+	home = systempath.Home()
 	if value, exists := store.LookupEnv("XDG_STATE_HOME"); exists {
 		stateHome = value
 	}

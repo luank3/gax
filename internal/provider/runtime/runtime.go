@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +19,7 @@ import (
 	mockprovider "github.com/luank3/gax/internal/provider/mock"
 	"github.com/luank3/gax/internal/provider/openrouter"
 	"github.com/luank3/gax/internal/provider/registry"
+	systempath "github.com/luank3/gax/internal/system/path"
 	"github.com/luank3/gax/internal/transport"
 )
 
@@ -310,15 +310,15 @@ func (resolver *Resolver) Resolve(id string) (*Provider, error) {
 	}
 	provider.Endpoint = provider.BaseURL + provider.Wire.Path()
 	if definition.Hooks&registry.HookLoadDefaults != 0 && definition.ID == "codex" {
-		home, _ := os.UserHomeDir()
+		home := systempath.Home()
 		provider.DefaultModel, provider.DefaultEffort = codex.LoadDefaults(home)
 	}
 
 	if definition.Hooks&registry.HookAuthSource != 0 {
 		if definition.ID == "codex" {
-			home, homeErr := os.UserHomeDir()
+			home := systempath.Home()
 			stateHome, _ := resolver.store.LookupEnv("XDG_STATE_HOME")
-			if homeErr != nil && stateHome == "" {
+			if home == "" && stateHome == "" {
 				provider.Availability = Availability{State: AvailabilityMissingCredential, Reason: "could not determine the home directory"}
 				return provider, nil
 			}

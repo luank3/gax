@@ -1,10 +1,12 @@
 GO ?= go
 BIN_DIR ?= bin
-BINARY := $(BIN_DIR)/gax
+BINARY := $(BIN_DIR)/gax$(if $(filter windows,$(shell $(GO) env GOOS)),.exe)
 
 # gax is cgo-free, so the binaries build static with CGO_ENABLED=0. The race detector needs cgo, so
 # only the race target turns it back on.
 CGO ?= 0
+TEST_PACKAGES ?= ./...
+TEST_FLAGS ?=
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/luank3/gax/internal/version.Value=$(VERSION)
@@ -24,7 +26,7 @@ install:
 	$(STATIC_ENV) $(GO) install -trimpath -ldflags '$(LDFLAGS)' ./cmd/gax
 
 test:
-	$(TEST_ENV) $(STATIC_ENV) $(GO) test ./...
+	$(TEST_ENV) $(STATIC_ENV) $(GO) test $(TEST_FLAGS) $(TEST_PACKAGES)
 
 test-race:
 	$(TEST_ENV) env CGO_ENABLED=1 $(GO) test -race -count=1 ./...

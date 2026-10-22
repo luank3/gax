@@ -1,6 +1,7 @@
 package path_test
 
 import (
+	"runtime"
 	"testing"
 
 	systempath "github.com/luank3/gax/internal/system/path"
@@ -130,6 +131,10 @@ func TestDirMatchesPOSIXParentRulesWithoutCleaning(t *testing.T) {
 }
 
 func TestXDGGaxPathPreservesFormatting(t *testing.T) {
+	t.Setenv("HOME", "")
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", "")
+	}
 	for _, test := range []struct {
 		base, home, homeRelative, relative, want string
 		ok                                       bool

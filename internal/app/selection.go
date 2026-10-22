@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 
 	"github.com/luank3/gax/internal/agent"
 	"github.com/luank3/gax/internal/cli"
@@ -135,10 +134,10 @@ func loadResumePath(path string, options cli.Options, store *config.Store) (*ses
 
 func loadStore(stderr io.Writer) (*config.Store, error) {
 	store := config.New(config.DefaultSettings())
-	if path, ok := systempath.XDGGaxPath(os.Getenv("XDG_CONFIG_HOME"), os.Getenv("HOME"), ".config", "config.json"); ok {
+	if path, ok := systempath.XDGGaxPath(os.Getenv("XDG_CONFIG_HOME"), systempath.Home(), ".config", "config.json"); ok {
 		data, truncated, err := systemfs.ReadFileCapped(path, config.MaxTierFileBytes)
 		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+			if !missingStoreFile(path, err) {
 				store.RejectConfigFile()
 				writeWarningDiagnostic(stderr, "ignoring unreadable config at %s: %v", path, err)
 			}
@@ -149,10 +148,10 @@ func loadStore(stderr io.Writer) (*config.Store, error) {
 			writeWarningDiagnostic(stderr, "ignoring malformed config at %s (expected a JSON object)", path)
 		}
 	}
-	if path, ok := systempath.XDGGaxPath(os.Getenv("XDG_STATE_HOME"), os.Getenv("HOME"), ".local/state", "state.json"); ok {
+	if path, ok := systempath.XDGGaxPath(os.Getenv("XDG_STATE_HOME"), systempath.Home(), ".local/state", "state.json"); ok {
 		data, truncated, err := systemfs.ReadFileCapped(path, config.MaxTierFileBytes)
 		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+			if !missingStoreFile(path, err) {
 				writeWarningDiagnostic(stderr, "ignoring unreadable state at %s: %v", path, err)
 			}
 		} else if truncated {

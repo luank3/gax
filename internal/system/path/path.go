@@ -8,7 +8,7 @@ import (
 
 // Join appends suffix to base, trimming boundary slashes while preserving inner components such as
 // "missing/../target" exactly as the path join does.
-func Join(base, suffix string) string {
+func posixJoin(base, suffix string) string {
 	baseLength := len(base)
 	for baseLength > 1 && base[baseLength-1] == '/' {
 		baseLength--
@@ -24,7 +24,7 @@ func Join(base, suffix string) string {
 }
 
 // ExpandHome expands only a bare tilde or the ~/ prefix. Named-user forms remain literal.
-func ExpandHome(value, home string) string {
+func posixExpandHome(value, home string) string {
 	if value == "" || value[0] != '~' || len(value) > 1 && value[1] != '/' {
 		return value
 	}
@@ -38,7 +38,7 @@ func ExpandHome(value, home string) string {
 }
 
 // CollapseHome replaces an exact HOME path or descendant with a tilde path.
-func CollapseHome(value, home string) string {
+func posixCollapseHome(value, home string) string {
 	if home == "" {
 		return value
 	}
@@ -69,7 +69,7 @@ func CollapseHome(value, home string) string {
 
 // Relativize returns path relative to cwd only when path is an absolute descendant without any
 // parent components. The cwd itself and unrelated paths are rejected.
-func Relativize(value, cwd string) (string, bool) {
+func posixRelativize(value, cwd string) (string, bool) {
 	if value == "" || cwd == "" || value[0] != '/' || cwd[0] != '/' || hasParentComponent(value) {
 		return "", false
 	}
@@ -105,7 +105,7 @@ func hasParentComponent(value string) bool {
 }
 
 // ClimbToParent returns the directory's parent and whether it moved. The root remains unchanged.
-func ClimbToParent(directory string) (string, bool) {
+func posixClimbToParent(directory string) (string, bool) {
 	slash := strings.LastIndexByte(directory, '/')
 	if slash < 0 {
 		return directory, false
@@ -120,7 +120,7 @@ func ClimbToParent(directory string) (string, bool) {
 }
 
 // Dir returns a POSIX-style parent path without normalizing dot components.
-func Dir(value string) string {
+func posixDir(value string) string {
 	if value == "" {
 		return "."
 	}
@@ -145,7 +145,7 @@ func Dir(value string) string {
 
 // XDGGaxPath mirrors the XDG path construction and reports false when neither the XDG
 // base nor HOME can resolve a location.
-func XDGGaxPath(xdgBase, home, homeRelative, relative string) (string, bool) {
+func posixXDGGaxPath(xdgBase, home, homeRelative, relative string) (string, bool) {
 	if xdgBase != "" {
 		return fmt.Sprintf("%s/gax/%s", xdgBase, relative), true
 	}

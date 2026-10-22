@@ -65,6 +65,9 @@ func isTmuxSession() bool {
 }
 
 func copyWithNativeHelper(ctx context.Context, text string) bool {
+	if copyPlatformClipboard(ctx, text) {
+		return true
+	}
 	if runClipboardWriter(ctx, text, "pbcopy") {
 		return true
 	}

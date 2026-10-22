@@ -2,6 +2,8 @@ package tools
 
 import (
 	"encoding/json"
+	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -166,10 +168,14 @@ func resolveBashCDTarget(token string, quote bashPathQuote, cwd, home string) (s
 		return expansion + token[prefixLength:], true
 	}
 
-	if len(token) == 0 || token[0] != '/' {
+	windowsDrive := runtime.GOOS == "windows" && len(token) > 2 && token[1] == ':' && token[2] == '/' && filepath.IsAbs(token)
+	if len(token) == 0 || token[0] != '/' && !windowsDrive {
 		return "", false
 	}
 	for index := 0; index < len(token); index++ {
+		if windowsDrive && index == 1 {
+			continue
+		}
 		if !isBashTokenSafe(token[index], quote) {
 			return "", false
 		}
@@ -220,11 +226,18 @@ func unquotedBashExpansionSafe(value string) bool {
 }
 
 func bashPathsEqual(left, right string) bool {
+	if runtime.GOOS == "windows" {
+		left = filepath.ToSlash(left)
+		right = filepath.ToSlash(right)
+	}
 	for len(left) > 1 && strings.HasSuffix(left, "/") {
 		left = left[:len(left)-1]
 	}
 	for len(right) > 1 && strings.HasSuffix(right, "/") {
 		right = right[:len(right)-1]
+	}
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(left, right)
 	}
 	return left == right
 }

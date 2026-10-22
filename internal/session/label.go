@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"syscall"
 
+	systemfs "github.com/luank3/gax/internal/system/fs"
 	terminalwidth "github.com/luank3/gax/internal/terminal/width"
 )
 
@@ -27,13 +27,8 @@ type PickerLabel struct {
 // incomplete records are ignored so one damaged session does not prevent other sessions loading.
 func ReadPickerLabel(path string, maxCells int) PickerLabel {
 	var label PickerLabel
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NONBLOCK|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	file, err := systemfs.OpenNoFollow(path, os.O_RDONLY, 0)
 	if err != nil {
-		return label
-	}
-	file := os.NewFile(uintptr(fd), path)
-	if file == nil {
-		_ = syscall.Close(fd)
 		return label
 	}
 	defer file.Close()

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -103,6 +104,9 @@ func TestStateKeepsBranchWhenHeadLookupFails(t *testing.T) {
 }
 
 func TestRunGitRejectsOutputOverLimit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fixture requires executable POSIX scripts")
+	}
 	for _, test := range []struct {
 		name      string
 		outputLen int

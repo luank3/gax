@@ -2,6 +2,7 @@ package tools
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -43,7 +44,7 @@ func TestBashCompressesRecognizedCommandOutput(t *testing.T) {
 	registry := compressRegistry(t)
 	defer registry.Close()
 	dir := compressFixture(t)
-	result := registry.Run("bash", jsonArgs(map[string]any{"command": "ls -l " + dir}), 1)
+	result := registry.Run("bash", jsonArgs(map[string]any{"command": "ls -l " + "'" + filepath.ToSlash(dir) + "'"}), 1)
 	if !strings.Contains(result.Text, "cmd/") || !strings.Contains(result.Text, "main.go") {
 		t.Fatalf("compressed listing = %q", result.Text)
 	}
@@ -62,7 +63,7 @@ func TestBashCompressionIsOffByDefaultInPlainOptions(t *testing.T) {
 	registry := New(Options{})
 	defer registry.Close()
 	dir := compressFixture(t)
-	result := registry.Run("bash", jsonArgs(map[string]any{"command": "ls -l " + dir}), 1)
+	result := registry.Run("bash", jsonArgs(map[string]any{"command": "ls -l " + "'" + filepath.ToSlash(dir) + "'"}), 1)
 	if !strings.Contains(result.Text, "drwx") {
 		t.Fatalf("an unconfigured registry compressed the listing: %q", result.Text)
 	}
@@ -77,7 +78,7 @@ func TestBashCompressionHonorsTheSetting(t *testing.T) {
 	registry := NewFromConfig(store)
 	defer registry.Close()
 	dir := compressFixture(t)
-	result := registry.Run("bash", jsonArgs(map[string]any{"command": "ls -l " + dir}), 1)
+	result := registry.Run("bash", jsonArgs(map[string]any{"command": "ls -l " + "'" + filepath.ToSlash(dir) + "'"}), 1)
 	if !strings.Contains(result.Text, "drwx") {
 		t.Fatalf("bash.compress=off still compressed the listing: %q", result.Text)
 	}
@@ -88,9 +89,9 @@ func TestBashCompressionSkipsCommandsItCannotOwn(t *testing.T) {
 	defer registry.Close()
 	dir := compressFixture(t)
 	for _, command := range []string{
-		"ls -l " + dir + " | head -3",
-		"ls -l " + dir + " > /dev/null",
-		"ls -l " + dir + " && true",
+		"ls -l " + "'" + filepath.ToSlash(dir) + "'" + " | head -3",
+		"ls -l " + "'" + filepath.ToSlash(dir) + "'" + " > /dev/null",
+		"ls -l " + "'" + filepath.ToSlash(dir) + "'" + " && true",
 	} {
 		result := registry.Run("bash", jsonArgs(map[string]any{"command": command}), 1)
 		if strings.Contains(result.Text, "(1 filtered)") {
@@ -113,7 +114,7 @@ func TestBashCompressionKeepsFullOutputRecoverable(t *testing.T) {
 	if err := os.WriteFile(path, []byte(builder.String()), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	result := registry.Run("bash", jsonArgs(map[string]any{"command": "cat " + path}), 1)
+	result := registry.Run("bash", jsonArgs(map[string]any{"command": "cat " + "'" + filepath.ToSlash(path) + "'"}), 1)
 	if strings.Contains(result.Text, "// filler comment line") {
 		t.Fatalf("cat kept comment-only lines: %q", result.Text[:min(len(result.Text), 256)])
 	}
@@ -147,7 +148,7 @@ func TestBashCompressionLeavesTheLiveDisplayRaw(t *testing.T) {
 	call := conversation.Item{
 		Kind: conversation.KindToolCall, CallID: conversation.String("bash-1"),
 		ToolName:  conversation.String("bash"),
-		Arguments: conversation.String(jsonArgs(map[string]any{"command": "ls -l " + dir})),
+		Arguments: conversation.String(jsonArgs(map[string]any{"command": "ls -l " + "'" + filepath.ToSlash(dir) + "'"})),
 	}
 	var displayed strings.Builder
 	execution := registry.ExecuteWithDisplay(call, 1, func(data []byte) error {
@@ -166,7 +167,7 @@ func TestBashRawArgumentReturnsVerbatimOutput(t *testing.T) {
 	registry := compressRegistry(t)
 	defer registry.Close()
 	dir := compressFixture(t)
-	result := registry.Run("bash", jsonArgs(map[string]any{"command": "ls -l " + dir, "raw": true}), 1)
+	result := registry.Run("bash", jsonArgs(map[string]any{"command": "ls -l " + "'" + filepath.ToSlash(dir) + "'", "raw": true}), 1)
 	if !strings.Contains(result.Text, "drwx") {
 		t.Fatalf("raw:true did not return the command's own output: %q", result.Text)
 	}
@@ -183,6 +184,9 @@ func TestBashRawArgumentReturnsVerbatimOutput(t *testing.T) {
 }
 
 func TestBashRawArgumentAppliesToACollectedTask(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("Go executable unavailable for subprocess fixture")
+	}
 	store := config.New(config.DefaultSettings())
 	store.SetEnvironment(nil)
 	if err := store.LoadConfig([]byte(`{"bash.background_yield":"10ms","task.wait_timeout":"5s"}`)); err != nil {
@@ -207,6 +211,9 @@ func TestBashRawArgumentAppliesToACollectedTask(t *testing.T) {
 }
 
 func TestBashCompressionNamesTheFullOutputOfACollectedTask(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("Go executable unavailable for subprocess fixture")
+	}
 	store := config.New(config.DefaultSettings())
 	store.SetEnvironment(nil)
 	if err := store.LoadConfig([]byte(`{"bash.background_yield":"10ms","task.wait_timeout":"60s"}`)); err != nil {

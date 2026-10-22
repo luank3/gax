@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/luank3/gax/internal/agent"
@@ -53,6 +52,8 @@ func Run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 	if stderr == nil {
 		stderr = io.Discard
 	}
+	restoreOutput := prepareTerminalOutput(stdout, stderr)
+	defer restoreOutput()
 	if terminalocale.InitializeProcess() {
 		writeWarningDiagnostic(stderr, "no UTF-8 locale found; non-ASCII text will be misread and misaligned")
 	}
@@ -375,7 +376,7 @@ func Run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 	var pauseRequested atomic.Bool
 	if options.OneShot {
 		pauseSignals = make(chan os.Signal, 1)
-		signal.Notify(pauseSignals, syscall.SIGUSR1)
+		notifyPauseSignals(pauseSignals)
 		defer signal.Stop(pauseSignals)
 	}
 	takePauseSignal := func() bool {

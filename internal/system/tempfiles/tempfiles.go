@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -105,13 +106,16 @@ func Cleanup() error {
 }
 
 func validFragment(fragment string) bool {
-	return utf8.ValidString(fragment) && !strings.ContainsRune(fragment, '/')
+	return utf8.ValidString(fragment) && !strings.ContainsRune(fragment, '/') && (runtime.GOOS != "windows" || !strings.ContainsRune(fragment, '\\'))
 }
 
 func ensureDirectoryLocked() (string, error) {
 	tmpdir := os.Getenv("TMPDIR")
 	if tmpdir == "" || !utf8.ValidString(tmpdir) {
 		tmpdir = "/tmp"
+		if runtime.GOOS == "windows" {
+			tmpdir = os.TempDir()
+		}
 	}
 	if files.directory != "" && files.tmpdir == tmpdir {
 		return files.directory, nil

@@ -78,7 +78,7 @@ func BuildSystemPrompt(store *config.Store, model string, options PromptOptions)
 		}
 	}
 	if options.Home == "" {
-		options.Home = os.Getenv("HOME")
+		options.Home = systempath.Home()
 	}
 	baseValue := configValue(store, "system_prompt")
 	if baseValue != nil && *baseValue == "(none)" {
@@ -392,7 +392,7 @@ func presetJSON(store *config.Store, name string) json.RawMessage {
 }
 
 func promptConfigPath(relative string) (string, bool) {
-	return systempath.XDGGaxPath(os.Getenv("XDG_CONFIG_HOME"), os.Getenv("HOME"), ".config", relative)
+	return systempath.XDGGaxPath(os.Getenv("XDG_CONFIG_HOME"), systempath.Home(), ".config", relative)
 }
 
 func collapseHome(path, home string) string {
@@ -409,7 +409,7 @@ func expandPromptValue(value *string, fallback string) (string, []string) {
 	spec := (*value)[1:]
 	path := spec
 	if strings.HasPrefix(spec, "~") {
-		path = systempath.ExpandHome(spec, os.Getenv("HOME"))
+		path = systempath.ExpandHome(spec, systempath.Home())
 	} else if !strings.HasPrefix(spec, "/") {
 		if resolved, ok := promptConfigPath(spec); ok {
 			path = resolved

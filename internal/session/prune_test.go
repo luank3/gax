@@ -2,8 +2,11 @@ package session
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -65,6 +68,9 @@ func TestPruneBeforeLeavesUnrelatedFilesAndSymlinksAlone(t *testing.T) {
 	}
 	link := filepath.Join(bucket, "2000-01-01T00-00-00Z_00000000-0000-4000-8000-000000000001.jsonl")
 	if err := os.Symlink(target, link); err != nil {
+		if runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(1314)) {
+			t.Skipf("symlink privilege unavailable: %v", err)
+		}
 		t.Fatal(err)
 	}
 	oldTime := time.Now().Add(-31 * 24 * time.Hour)
@@ -103,6 +109,9 @@ func TestPruneBeforeDoesNotFollowProjectBucketSymlink(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(outside, bucket); err != nil {
+		if runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(1314)) {
+			t.Skipf("symlink privilege unavailable: %v", err)
+		}
 		t.Fatal(err)
 	}
 	if err := PruneBefore(time.Now().Add(-30*24*time.Hour), ""); err != nil {
@@ -217,6 +226,9 @@ func TestSessionReadersAndWritersRejectSessionSymlinks(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(target, path); err != nil {
+		if runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(1314)) {
+			t.Skipf("symlink privilege unavailable: %v", err)
+		}
 		t.Fatal(err)
 	}
 	if _, err := ResumeLog(path, Selection{}, 0); err == nil {

@@ -20,6 +20,7 @@ import (
 	"github.com/luank3/gax/internal/conversation"
 	"github.com/luank3/gax/internal/diag"
 	"github.com/luank3/gax/internal/provider"
+	systempath "github.com/luank3/gax/internal/system/path"
 	systemshell "github.com/luank3/gax/internal/system/shell"
 	"github.com/luank3/gax/internal/system/tempfiles"
 	"github.com/luank3/gax/internal/web"
@@ -514,7 +515,7 @@ func (registry *Registry) ExecuteWithDisplayContext(ctx context.Context, call co
 	toolName := stringValue(call.ToolName)
 	arguments := stringValue(call.Arguments)
 	if toolName == "bash" && registry != nil {
-		arguments = preprocessBashArguments(arguments, registry.bashWorkingDirectory(), os.Getenv("HOME"))
+		arguments = preprocessBashArguments(arguments, registry.bashWorkingDirectory(), systempath.Home())
 	}
 	if toolName == "read" || toolName == "write" || toolName == "edit" {
 		arguments = relativizeToolPath(arguments)
@@ -600,7 +601,7 @@ func (registry *Registry) Presentation(call conversation.Item) ToolPresentation 
 	arguments := stringValue(call.Arguments)
 	switch name {
 	case "bash":
-		arguments = preprocessBashArguments(arguments, registry.bashWorkingDirectory(), os.Getenv("HOME"))
+		arguments = preprocessBashArguments(arguments, registry.bashWorkingDirectory(), systempath.Home())
 	case "read", "write", "edit":
 		arguments = relativizeToolPath(arguments)
 	}

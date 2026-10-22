@@ -6,10 +6,10 @@ import (
 	"io"
 	"os"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/luank3/gax/internal/conversation"
+	systemfs "github.com/luank3/gax/internal/system/fs"
 	terminalgit "github.com/luank3/gax/internal/system/git"
 	systempath "github.com/luank3/gax/internal/system/path"
 	"github.com/luank3/gax/internal/version"
@@ -392,30 +392,25 @@ func (log *Log) writeHeader() error {
 }
 
 func openSessionFile(path string, create bool) (*os.File, error) {
-	flags := syscall.O_RDWR | syscall.O_APPEND | syscall.O_CLOEXEC | syscall.O_NOFOLLOW
+	flags := os.O_RDWR | os.O_APPEND
 	if create {
-		flags = syscall.O_WRONLY | syscall.O_CREAT | syscall.O_TRUNC | syscall.O_CLOEXEC | syscall.O_NOFOLLOW
+		flags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 	}
-	fd, err := syscall.Open(path, flags, 0o600)
+	file, err := systemfs.OpenNoFollow(path, flags, 0o600)
 	if err != nil {
 		return nil, err
-	}
-	file := os.NewFile(uintptr(fd), path)
-	if file == nil {
-		_ = syscall.Close(fd)
-		return nil, errors.New("cannot open session file")
 	}
 	if err := file.Chmod(0o600); err != nil {
 		file.Close()
 		return nil, err
 	}
-	locked := syscall.Flock(int(file.Fd()), syscall.LOCK_SH) == nil
+	locked := systemfs.Lock(file, false, false) == nil
 	info, err := file.Stat()
 	if err != nil {
 		_ = file.Close()
 		return nil, err
 	}
-	if !info.Mode().IsRegular() || locked && !hasLinks(info) {
+	if !info.Mode().IsRegular() || locked && !systemfs.HasLinks(file, info) {
 		_ = file.Close()
 		return nil, errors.New("session file was removed or is not regular")
 	}

@@ -36,7 +36,11 @@ func TestFindUsesOnlyAbsolutePATHEntries(t *testing.T) {
 }
 
 func TestFindAcceptsExecutableConfiguredPath(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "custom-shell")
+	name := "custom-shell"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	path := filepath.Join(t.TempDir(), name)
 	if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}

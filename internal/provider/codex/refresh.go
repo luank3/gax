@@ -290,12 +290,7 @@ func writeAuthStore(path string, root map[string]json.RawMessage) error {
 	if err := os.Rename(tempPath, path); err != nil {
 		return err
 	}
-	directoryFile, err := os.Open(directory)
-	if err != nil {
-		return err
-	}
-	defer directoryFile.Close()
-	return directoryFile.Sync()
+	return systemfs.SyncDirectory(directory)
 }
 
 func refreshErrorMessage() error {

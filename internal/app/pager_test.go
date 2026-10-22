@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -207,7 +208,11 @@ func TestShowHistoryResolvesModelCursorControlsBeforePaging(t *testing.T) {
 
 func TestResolvePagerAddsLessRawColorFlag(t *testing.T) {
 	root := t.TempDir()
-	path := filepath.Join(root, "less")
+	name := "less"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	path := filepath.Join(root, name)
 	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
 		t.Fatal(err)
 	}

@@ -15,6 +15,9 @@ func OpenURL(value string) {
 }
 
 func openerCommand(goos, value string) (string, []string) {
+	if goos == "windows" {
+		return "rundll32.exe", []string{"url.dll,FileProtocolHandler", value}
+	}
 	if goos == "darwin" {
 		return "open", []string{value}
 	}

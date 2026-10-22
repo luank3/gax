@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"syscall"
 	"time"
 
 	"github.com/luank3/gax/internal/conversation"
+	systemfs "github.com/luank3/gax/internal/system/fs"
 	systempath "github.com/luank3/gax/internal/system/path"
 )
 
@@ -105,14 +105,9 @@ func createForkFile(path string) (*os.File, error) {
 	if err := os.Chmod(directory, 0o700); err != nil {
 		return nil, err
 	}
-	fd, err := syscall.Open(path, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_EXCL|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0o600)
+	file, err := systemfs.OpenNoFollow(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return nil, err
-	}
-	file := os.NewFile(uintptr(fd), path)
-	if file == nil {
-		_ = syscall.Close(fd)
-		return nil, errors.New("cannot create fork session file")
 	}
 	if err := file.Chmod(0o600); err != nil {
 		_ = file.Close()

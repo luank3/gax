@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	systempath "github.com/luank3/gax/internal/system/path"
 )
@@ -27,7 +29,7 @@ func StateRoot() (string, error) {
 }
 
 func statePath(relative string) (string, error) {
-	path, ok := systempath.XDGGaxPath(os.Getenv("XDG_STATE_HOME"), os.Getenv("HOME"), ".local/state", relative)
+	path, ok := systempath.XDGGaxPath(os.Getenv("XDG_STATE_HOME"), systempath.Home(), ".local/state", relative)
 	if !ok {
 		return "", errors.New("cannot resolve XDG state directory without HOME or XDG_STATE_HOME")
 	}
@@ -57,11 +59,19 @@ func EncodeCWD(cwd string) string {
 		hash *= 1099511628211
 	}
 	relative := strings.TrimLeft(cwd, "/")
+	if runtime.GOOS == "windows" {
+		relative = strings.NewReplacer(`\`, "-", ":", "-", "<", "-", ">", "-", `"`, "-", "|", "-", "?", "-", "*", "-").Replace(relative)
+	}
 	if relative == "" {
 		relative = "root"
 	}
 	if len(relative) > 79 {
 		relative = relative[:79]
+		if runtime.GOOS == "windows" {
+			for !utf8.ValidString(relative) {
+				relative = relative[:len(relative)-1]
+			}
+		}
 	}
 	slug := strings.ReplaceAll(relative, "/", "-")
 	return fmt.Sprintf("%s.%016x", slug, hash)

@@ -3,11 +3,16 @@ package browser
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"testing"
 	"time"
 )
 
 func TestOpenURLHandsTheURLToThePlatformOpener(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fixture requires executable POSIX scripts")
+	}
 	directory := t.TempDir()
 	recordedURL := filepath.Join(directory, "url.txt")
 	release := filepath.Join(directory, "release")
@@ -58,13 +63,18 @@ func TestPlatformCommandMatchesRecordedPlatform(t *testing.T) {
 		goos    string
 		command string
 	}{
+		{goos: "windows", command: "rundll32.exe"},
 		{goos: "darwin", command: "open"},
 		{goos: "linux", command: "xdg-open"},
 		{goos: "freebsd", command: "xdg-open"},
 		{goos: "openbsd", command: "xdg-open"},
 	} {
 		command, args := openerCommand(test.goos, "https://example.test")
-		if command != test.command || len(args) != 1 || args[0] != "https://example.test" {
+		wantArgs := []string{"https://example.test"}
+		if test.goos == "windows" {
+			wantArgs = []string{"url.dll,FileProtocolHandler", "https://example.test"}
+		}
+		if command != test.command || !slices.Equal(args, wantArgs) {
 			t.Errorf("openerCommand(%q) = %q %q", test.goos, command, args)
 		}
 	}

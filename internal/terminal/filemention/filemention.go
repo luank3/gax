@@ -9,11 +9,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 
 	"github.com/luank3/gax/internal/system/locale"
 	systempath "github.com/luank3/gax/internal/system/path"
+	systemshell "github.com/luank3/gax/internal/system/shell"
 	"github.com/luank3/gax/internal/system/spawn"
 )
 
@@ -89,7 +89,7 @@ func expandHome(path string) string {
 	if path != "~" && !strings.HasPrefix(path, "~/") {
 		return path
 	}
-	home := os.Getenv("HOME")
+	home := systempath.Home()
 	if home == "" {
 		return path
 	}
@@ -108,13 +108,13 @@ func Available() bool {
 // Pick launches the modal selector and returns a selected regular file path. Cancellation is not
 // an error; launch, output, and stale-selection failures are reported to the caller.
 func Pick(queryText string) (string, bool, error) {
-	if runtime.GOOS == "windows" {
-		return "", false, errors.New("@file completion requires a POSIX shell")
+	if systemshell.Default() == "" {
+		return "", false, errors.New("@file completion requires Git Bash installed")
 	}
 	if !Available() {
 		return "", false, errors.New("@file completion needs fzf installed")
 	}
-	command := exec.CommandContext(context.Background(), "/bin/sh", "-c", BuildCommand(queryText))
+	command := exec.CommandContext(context.Background(), systemshell.Default(), "-c", BuildCommand(queryText))
 	command.Env = forceUTF8ChildEnvironment(os.Environ())
 	command.Stdin = os.Stdin
 	command.Stderr = os.Stderr

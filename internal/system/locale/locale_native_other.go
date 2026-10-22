@@ -1,4 +1,4 @@
-//go:build !cgo || (!linux && !darwin && !freebsd && !openbsd && !netbsd && !dragonfly)
+//go:build !windows && (!cgo || (!linux && !darwin && !freebsd && !openbsd && !netbsd && !dragonfly))
 
 package locale
 
