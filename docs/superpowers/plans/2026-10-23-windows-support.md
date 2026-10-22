@@ -57,7 +57,7 @@ Files: .github/workflows/ci.yml; .goreleaser.yaml; Makefile; README.md.
 - `make lint test-race` passes on Linux with inherited provider endpoint/credential/trace/transcript overrides removed. An initial baseline failure in `TestRunREPLPresetUsesProviderDefaultAndDisplaysPresetErrors` was caused by ambient GAX_OPENAI_BASE_URL; no unrelated production/test change was made for it.
 - Full Windows amd64 suite passes via `GOOS=windows make test TEST_FLAGS='-exec=/tmp/gax-windows-exec -count=1 -timeout=120s'`. The wrapper is local verification infrastructure, not a shipped dependency. Native console injection verifies Unicode input, editor/modal mode handoff, Escape pause/abort and stop/join; Job Object tests verify grandchild termination on kill and handle close.
 - Cgo-free Make builds pass for linux/darwin/windows × amd64/arm64; Windows vet passes. `bin/gax.exe` is the Windows amd64 artifact. Its native `--version` and isolated mock one-shot invocation both succeed.
-- Windows-native CI and GoReleaser ZIP configuration are added but have not been run remotely or published.
+- Windows-native CI and GoReleaser ZIP configuration were added in the initial implementation; release packaging has not been published. The first remote CI result and its formatting follow-up are recorded below.
 
 ## Verification limits and deliberate platform differences
 - Windows arm64 is cross-compiled, not runtime-tested here. A visual Windows Terminal smoke check remains recommended before release.
@@ -65,4 +65,18 @@ Files: .github/workflows/ci.yml; .goreleaser.yaml; Makefile; README.md.
 - Native clipboard helpers use built-in Windows PowerShell in STA mode. Automated Windows tests avoid modifying the host clipboard. An initial legacy clipboard fixture accidentally wrote `latest answer` to the host clipboard before being isolated; this was disclosed during implementation.
 - Windows private-file access relies on inherited profile/directory ACLs rather than Unix mode bits. Keep custom config/state/temp roots access-restricted. Directory flushing is not available through Windows directory handles; replacement file contents are flushed before rename.
 - Git Bash commands retain POSIX quoting and use forward-slash paths. No PowerShell/cmd tool syntax or SIGUSR1 emulation is introduced. Full interactive editing requires a native Windows console/Windows Terminal; MinTTY-style pipes fall back to plain line input.
-- Review was performed inline without subagents; no commits or branches were created, and the pre-existing untracked codegraph documents were left untouched.
+- Review was performed inline without subagents; no commits or branches were created during the initial implementation, and the pre-existing untracked codegraph documents were left untouched. The user subsequently authorized commit/push as `e8c3181`.
+
+## CI follow-up: preserve Go source line endings
+
+The first remote run for `e8c3181`, https://github.com/luank3/gax/actions/runs/39828577659,
+passed Linux/macOS tests and all six cross-builds, but Windows stopped at `fmt-check`
+before running tests. The committed source is gofmt-clean; a checkout with
+`core.autocrlf=true` reproduces the failure by converting all 346 Go files to CRLF.
+
+- [x] Reproduce the Windows checkout formatting failure in a temporary export using `git -c core.autocrlf=true checkout-index`, then run the existing Make `fmt-check` target against it.
+- [x] Add `.gitattributes` with `*.go text eol=lf`; do not change application source or global Git configuration.
+- [x] Repeat the checkout simulation: zero Go files contain CRLF and `make fmt-check` passes, both in the export and the working tree.
+- [x] Run `make lint test-race` with the same isolated environment as the initial verification; all checks pass.
+
+Remote CI confirmation is pending a run containing this LF-checkout rule.
