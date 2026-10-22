@@ -79,4 +79,27 @@ before running tests. The committed source is gofmt-clean; a checkout with
 - [x] Repeat the checkout simulation: zero Go files contain CRLF and `make fmt-check` passes, both in the export and the working tree.
 - [x] Run `make lint test-race` with the same isolated environment as the initial verification; all checks pass.
 
-Remote CI confirmation is pending a run containing this LF-checkout rule.
+Run `f7a77e2` (https://github.com/luank3/gax/actions/runs/39830489256) confirmed the LF
+rule fixes `fmt-check` and Windows vet. It then exposed the test failures addressed below.
+
+## CI follow-up: embedded assets and portable test fixtures
+
+- [x] Reproduce embedded skill failures from a `core.autocrlf=true` export: Markdown is embedded verbatim, so CRLF breaks frontmatter and exact tool-output assertions.
+- [x] Extend `.gitattributes` with `*.md text eol=lf`; keep embedded documents identical across checkouts rather than adding runtime normalization.
+- [x] Reproduce both app-output failures with `TERM=xterm-256color`, `COLORTERM=truecolor`, and automatic theme selection after a preceding app run.
+- [x] Pin and restore the palette for the Markdown-output unit test; pin `GAX_THEME=off` and restore the previous palette for the recorded banner-spacing test. Keep production auto-theme behavior unchanged.
+- [x] Add regular-file and symlink subcases to the write-permission test, reproduce the unsupported `0750` assertion on native Windows without requiring symlink privilege, then compare against the mode reported after chmod. Verify updated contents as well as supported permissions.
+- [x] Verify the original Windows permission failure now passes for regular files; symlink coverage passes on Linux and remains capability-dependent on native Windows.
+- [x] Repeat the simulated Windows checkout: Go/Markdown files remain LF, formatting passes, and embedded skill/read/tool tests pass.
+- [x] Run the complete native Windows suite and vet against that export with `TERM=xterm-256color`, `COLORTERM=truecolor`, and `GAX_THEME` unset (default auto detection); all checks pass.
+- [x] Run `make lint test-race` with inherited provider endpoint/credential/trace/transcript overrides removed; all checks pass.
+- [x] Run Linux and Windows amd64 cgo-free Make builds; both pass.
+
+The local Windows wrapper defers temporary executable cleanup until after the suite so
+transient Windows image locks cannot turn passing tests into harness failures. A first
+expanded simulation explicitly set `GAX_THEME=auto`, which incorrectly changed a config
+source-tier assertion from `default` to `env`; the final simulation leaves it unset,
+matching the CI runner. No production change was made for these harness differences.
+
+No application code or production theme behavior is changed in this follow-up. Remote CI
+confirmation requires a subsequent commit/push.

@@ -200,27 +200,47 @@ func TestWriteCreatesAndUpdatesFiles(t *testing.T) {
 }
 
 func TestWriteFollowsDanglingSymlinkAndRespectsPermissions(t *testing.T) {
-	root := t.TempDir()
-	actual := filepath.Join(root, "actual.txt")
-	link := filepath.Join(root, "alias.txt")
-	if err := os.Symlink(actual, link); err != nil {
-		t.Skipf("symlink unavailable: %v", err)
-	}
-	registry := New(Options{})
-	result := registry.Run("write", jsonArgs(map[string]any{"path": link, "content": "first\n"}), 1)
-	if !strings.Contains(result.Text, "created "+link) {
-		t.Fatalf("write through dangling link = %q", result.Text)
-	}
-	if info, err := os.Lstat(link); err != nil || info.Mode()&os.ModeSymlink == 0 {
-		t.Fatalf("write replaced symlink: info=%v err=%v", info, err)
-	}
-	if err := os.Chmod(actual, 0o750); err != nil {
-		t.Fatal(err)
-	}
-	registry.Run("write", jsonArgs(map[string]any{"path": link, "content": "second\n"}), 1)
-	info, err := os.Stat(actual)
-	if err != nil || info.Mode().Perm() != 0o750 {
-		t.Fatalf("updated mode = %v, err=%v", info, err)
+	for _, test := range []struct {
+		name    string
+		symlink bool
+	}{{name: "regular"}, {name: "symlink", symlink: true}} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			actual := filepath.Join(root, "actual.txt")
+			link := actual
+			if test.symlink {
+				link = filepath.Join(root, "alias.txt")
+				if err := os.Symlink(actual, link); err != nil {
+					t.Skipf("symlink unavailable: %v", err)
+				}
+			}
+			registry := New(Options{})
+			result := registry.Run("write", jsonArgs(map[string]any{"path": link, "content": "first\n"}), 1)
+			if !strings.Contains(result.Text, "created "+link) {
+				t.Fatalf("write through dangling link = %q", result.Text)
+			}
+			if test.symlink {
+				if info, err := os.Lstat(link); err != nil || info.Mode()&os.ModeSymlink == 0 {
+					t.Fatalf("write replaced symlink: info=%v err=%v", info, err)
+				}
+			}
+			if err := os.Chmod(actual, 0o750); err != nil {
+				t.Fatal(err)
+			}
+			// Windows exposes the read-only attribute, not Unix execute/group permission bits.
+			before, err := os.Stat(actual)
+			if err != nil {
+				t.Fatal(err)
+			}
+			registry.Run("write", jsonArgs(map[string]any{"path": link, "content": "second\n"}), 1)
+			info, err := os.Stat(actual)
+			if err != nil || info.Mode().Perm() != before.Mode().Perm() {
+				t.Fatalf("updated mode = %v, err=%v; want %#o", info, err, before.Mode().Perm())
+			}
+			if content, err := os.ReadFile(link); err != nil || string(content) != "second\n" {
+				t.Fatalf("updated contents = %q, err=%v; want second\\n", content, err)
+			}
+		})
 	}
 }
 

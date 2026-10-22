@@ -1635,6 +1635,9 @@ func TestRunDefersAutoCompactionAndContinuesAtEmptySubmit(t *testing.T) {
 }
 
 func TestAssistantAnswerUsesMarkdownOnlyForTerminals(t *testing.T) {
+	previous := terminaltheme.Current()
+	t.Cleanup(func() { terminaltheme.Configure(previous.Name(), previous.TintName()) })
+	terminaltheme.Configure("ansi", "teal")
 	store := config.New(config.DefaultSettings())
 	store.SetEnvironment(func(string) (string, bool) { return "", false })
 	var ttyOutput strings.Builder
@@ -2017,6 +2020,9 @@ func TestRunREPLResumePickerSeparatorMatchesRecordedOutput(t *testing.T) {
 }
 
 func TestRunREPLNewBannerSpacingMatchesRecordedOutput(t *testing.T) {
+	previous := terminaltheme.Current()
+	t.Cleanup(func() { terminaltheme.Configure(previous.Name(), previous.TintName()) })
+	t.Setenv("GAX_THEME", "off")
 	t.Setenv("HOME", filepath.Join(t.TempDir(), "home"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "config"))
 	t.Setenv("XDG_STATE_HOME", filepath.Join(t.TempDir(), "state"))
