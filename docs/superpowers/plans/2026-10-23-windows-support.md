@@ -103,3 +103,63 @@ matching the CI runner. No production change was made for these harness differen
 
 No application code or production theme behavior is changed in this follow-up. Remote CI
 confirmation requires a subsequent commit/push.
+
+## Windows Terminal color and native scrollback regressions
+
+Reported after `v0.2.0-rc.1`: native Windows Terminal shells lose all palette colors and
+wheel/trackpad input does not scroll, although dragging the terminal scrollbar works.
+
+Investigation confirmed a native shell environment with `WT_SESSION` but no `TERM` or
+`COLORTERM`; the auto theme therefore selected `off`. The raw-mode mask also retained
+`ENABLE_MOUSE_INPUT` while disabling Quick Edit. Microsoft's console host translates
+that combination into mouse reporting (`SetConsoleInputModeImpl`,
+https://github.com/microsoft/terminal/blob/main/src/host/getset.cpp), while gax only
+handles keyboard records and discards mouse records.
+
+- [x] Trace theme detection, shared Windows raw mode, and native console mouse reporting.
+- [x] Add failing theme cases for Windows Terminal without TERM, NO_COLOR, TERM=dumb, explicit TERM, and light-background hints.
+- [x] Add native regression checks that raw prompt and interrupt-watcher modes disable mouse reporting, preserve Ctrl+C policy, and restore original flags.
+- [x] Recognize WT_SESSION when TERM is absent, without overriding explicit theme/TERM/NO_COLOR choices.
+- [x] Disable mouse reporting in shared Windows raw mode rather than consuming or translating wheel events in gax.
+- [x] Update the Windows design record and Unreleased changelog fixes.
+- [x] Run native Windows tests/vet, `make lint test-race`, and Windows amd64/arm64 builds.
+
+Verification record:
+- Before the fixes, `TestAutoThemeRecognizesWindowsTerminal` failed the native/light cases
+  with `off`; native ARM64 raw-mode checks failed with mouse reporting still enabled
+  (`0x1b0` / `0x1b1`). Both regressions pass after the changes.
+- Linux `make lint test-race` passes with inherited provider endpoint/credential/trace/
+  transcript overrides removed, as in the earlier verification.
+- Native Windows amd64 and ARM64 vet pass. The full ARM64 suite passes; the full amd64
+  suite passes with `-p=1`. Both use `make test` with the deferred-cleanup Windows exec
+  wrapper, `-count=1 -timeout=120s`, `WT_SESSION` set, and `TERM`, `COLORTERM`, `NO_COLOR`,
+  and `GAX_THEME` unset. Focused ARM64 console/theme/editor/picker tests also pass,
+  including isolated-console prompt, modal, interrupt and exact-restoration checks.
+- The first parallel amd64 suite hit the pre-existing 250 ms wall-clock assertion in
+  `TestBashKillsOrphanedChildrenWhenShellExits`. A repeat on an unchanged `git archive HEAD`
+  export reproduced nine failures in twenty runs (250–311 ms), independently of these
+  fixes. No unrelated process code or timing assertions were changed.
+- Cgo-free Windows amd64/ARM64 Make builds pass and both executables run `--version`
+  natively as `v0.2.0-rc.1-dirty`. Local artifacts are `bin/gax.exe` (amd64) and
+  `bin/gax-windows-arm64.exe`; copies for manual Windows Terminal checks are in
+  `C:\Users\Admin\AppData\Local\Temp\gax-terminal-fix-LfXG5e6p` as `gax-amd64.exe`
+  and `gax-arm64.exe`. These are unpublished local builds, not replacement RC assets.
+- Inline self-review found no additional issues in this patch; no subagents, commits,
+  pushes, tags, or releases were created. The untracked codegraph documents remain untouched.
+
+The user confirmed that colors and scrolling work in Windows Terminal with the patched
+build. This is manual confirmation, separate from the automated console-mode checks;
+individual mouse/trackpad devices were not separately enumerated. The published RC
+tag/assets remain unchanged.
+
+## Release follow-up: v0.2.0-rc.2
+
+The user authorized committing/pushing these fixes and chose a new `v0.2.0-rc.2` tag
+rather than replacing `v0.2.0-rc.1`. The first RC and its published assets stay immutable.
+
+- Finalize the RC2 changelog with both Windows Terminal fixes and backfill the omitted RC1
+  entry from its pinned commit range and published release metadata.
+- Fresh pre-commit `make lint test-race` passes with the same isolated environment.
+- Push the reviewed fix commit, require CI success, then push a signed annotated RC2 tag.
+- Verify the release workflow, prerelease status, six platform archives, checksums, and
+  packaged executable versions; keep `v0.1.0` as the latest stable release.

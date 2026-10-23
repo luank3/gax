@@ -209,11 +209,14 @@ func detect(lookup func(string) (string, bool)) string {
 		return "off"
 	}
 	term, _ := lookup("TERM")
-	if term == "" || term == "dumb" {
+	// Native Windows Terminal shells advertise WT_SESSION rather than TERM.
+	session, _ := lookup("WT_SESSION")
+	windowsTerminal := term == "" && session != ""
+	if term == "" && !windowsTerminal || term == "dumb" {
 		return "off"
 	}
 	colorterm, _ := lookup("COLORTERM")
-	if !strings.Contains(term, "256color") && colorterm == "" {
+	if !windowsTerminal && !strings.Contains(term, "256color") && colorterm == "" {
 		return "ansi"
 	}
 	colorfgbg, _ := lookup("COLORFGBG")

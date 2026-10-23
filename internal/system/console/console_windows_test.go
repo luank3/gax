@@ -80,6 +80,10 @@ func TestRawRestoresConsoleAndReadsNativeKeys(t *testing.T) {
 	if err := syscall.GetConsoleMode(syscall.Handle(in.Fd()), &beforeInput); err != nil {
 		t.Fatal(err)
 	}
+	beforeInput |= 0x10 | 0x40 | 0x80 // mouse input, Quick Edit, extended flags
+	if err := setMode(in, beforeInput); err != nil {
+		t.Fatal(err)
+	}
 	if err := syscall.GetConsoleMode(syscall.Handle(out.Fd()), &beforeOutput); err != nil {
 		t.Fatal(err)
 	}
@@ -97,6 +101,9 @@ func TestRawRestoresConsoleAndReadsNativeKeys(t *testing.T) {
 	_ = syscall.GetConsoleMode(syscall.Handle(in.Fd()), &current)
 	if current&7 != 0 {
 		t.Errorf("Raw() input mode = %#x, want echo/line/processed disabled", current)
+	}
+	if current&0x10 != 0 {
+		t.Errorf("Raw(processed=false) input mode = %#x, want mouse reporting disabled for native scrolling", current)
 	}
 	Flush(in)
 	record := inputRecord{Type: 1}
@@ -142,9 +149,13 @@ func TestRawRestoresConsoleAndReadsNativeKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mode, err = Raw(in, out, false)
+	mode, err = Raw(in, out, true)
 	if err != nil {
 		t.Fatal(err)
+	}
+	_ = syscall.GetConsoleMode(syscall.Handle(in.Fd()), &current)
+	if current&0x10 != 0 || current&1 == 0 {
+		t.Errorf("Raw(processed=true) input mode = %#x, want mouse reporting disabled and Ctrl+C processing enabled", current)
 	}
 	RestoreAll()
 	mode.Restore()

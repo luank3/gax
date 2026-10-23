@@ -108,6 +108,32 @@ func TestAutoThemeAndInvalidValues(t *testing.T) {
 	}
 }
 
+func TestAutoThemeRecognizesWindowsTerminal(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		environment map[string]string
+		want        string
+	}{
+		{name: "native shell", environment: map[string]string{"WT_SESSION": "session"}, want: "dark"},
+		{name: "light background", environment: map[string]string{"WT_SESSION": "session", "COLORFGBG": "0;15"}, want: "light"},
+		{name: "no color", environment: map[string]string{"WT_SESSION": "session", "NO_COLOR": "1"}, want: "off"},
+		{name: "dumb terminal", environment: map[string]string{"WT_SESSION": "session", "TERM": "dumb"}, want: "off"},
+		{name: "explicit terminal", environment: map[string]string{"WT_SESSION": "session", "TERM": "xterm"}, want: "ansi"},
+		{name: "missing terminal", environment: map[string]string{}, want: "off"},
+		{name: "empty session", environment: map[string]string{"WT_SESSION": ""}, want: "off"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			palette, warnings := New("auto", "teal", func(key string) (string, bool) {
+				value, ok := test.environment[key]
+				return value, ok
+			})
+			if palette.Name() != test.want || len(warnings) != 0 {
+				t.Errorf("New(auto, %v) = %q, warnings %v; want %q, no warnings", test.environment, palette.Name(), warnings, test.want)
+			}
+		})
+	}
+}
+
 // Configure warns once per offending value for the life of the process, so each run of this test
 // needs values that no earlier run has used.
 var warningDedupeSequence atomic.Int64

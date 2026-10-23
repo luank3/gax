@@ -7,6 +7,23 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0-rc.2] - 2026-10-23
+
+### Fixed
+
+- Restore automatic palette colors in native Windows Terminal shells that set `WT_SESSION`
+  without `TERM`, while respecting explicit terminal and color settings.
+- Keep native Windows Terminal wheel/trackpad scrollback available during prompts, pickers,
+  and running turns by disabling console mouse reporting.
+
+## [0.2.0-rc.1] - 2026-10-22
+
+### Added
+
+- Native Windows support on amd64 and arm64 using Git for Windows Bash, with Unicode console
+  editing, process-tree cleanup, session/auth locking, Windows paths, and clipboard helpers.
+- Windows CI coverage and release ZIPs alongside the Linux/macOS tarballs and checksums.
+
 ### Changed
 
 - The build is cgo-free by contract: `make build`, `make install`, `make vet`, and the test targets
@@ -16,6 +33,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   upstream commit the port started from; release builds still inject the tag through `-ldflags`.
 - gax no longer tracks a hax baseline. The README, AGENTS.md, and CONTRIBUTING.md describe gax as
   its own agent that was ported from hax, and the specs index is written against the current sources.
+
+### Fixed
+
+- Honor `context_limit` and `image_input` overrides for models absent from the catalog.
+- Keep Go and embedded Markdown sources LF on Windows, and make palette and permission test
+  fixtures independent of terminal defaults and Unix-only filesystem assumptions.
 
 ## [0.1.0] - 2026-10-12
 
@@ -66,4 +89,7 @@ Initial release: a minimalist terminal-native coding agent written in Go, ported
 - The test suite passes on macOS: it had never run there, because `go vet` failed on a helper
   defined only in a Linux-tagged test file.
 
+[Unreleased]: https://github.com/luank3/gax/compare/v0.2.0-rc.2...HEAD
+[0.2.0-rc.2]: https://github.com/luank3/gax/releases/tag/v0.2.0-rc.2
+[0.2.0-rc.1]: https://github.com/luank3/gax/releases/tag/v0.2.0-rc.1
 [0.1.0]: https://github.com/luank3/gax/releases/tag/v0.1.0
