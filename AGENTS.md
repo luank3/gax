@@ -24,7 +24,7 @@ matching spec in `docs/superpowers/specs` before deciding.
 | `internal/provider/{codex,deepseek,openrouter,opencodego,mock}` | Provider hooks: auth, model metadata, account usage. |
 | `internal/provider/{client,config}` | Wire dispatch and the `providers.<name>` configuration vocabulary. |
 | `internal/tools` | Built-in tools (`read`, `edit`, `write`, `bash`, `task_wait`, `web_fetch`, `web_search`, `skill`) and background tasks. |
-| `internal/web` | HTTP fetching, HTML-to-text conversion, and the search backends behind the web tools (you.com first, then brave, octen, exa, firecrawl, tinyfish, with the DuckDuckGo crawl as the fallback; a gax addition; upstream has none). |
+| `internal/web` | HTTP fetching, HTML-to-text conversion, and the search backends behind the web tools (you.com first, then brave, octen, exa, firecrawl, tinyfish, keenable, with the DuckDuckGo crawl as the fallback; a gax addition; upstream has none). |
 | `internal/bashcompress` | Compresses recognized shell commands' output for the model (`ls`, `cat`, `grep`, `git`, test runners, linters, `docker ps`) — a gax addition; upstream has none. |
 | `internal/config` | Setting registry, layered resolution, persistence, presets. |
 | `internal/session` | Session logs, resume, fork, prune, prompt history. |

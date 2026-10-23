@@ -30,16 +30,18 @@ const fetchAccept = "text/html,application/xhtml+xml,application/xml;q=0.9,appli
 // Client carries the HTTP policy shared by the web tools: one connection pool, one identity, and
 // the endpoints a test replaces with its own server.
 type Client struct {
-	HTTP               *http.Client
-	UserAgent          string
-	BraveEndpoint      string
-	YouEndpoint        string
-	YouMCPEndpoint     string
-	OctenEndpoint      string
-	ExaEndpoint        string
-	FirecrawlEndpoint  string
-	TinyFishEndpoint   string
-	HTMLSearchEndpoint string
+	HTTP                   *http.Client
+	UserAgent              string
+	BraveEndpoint          string
+	YouEndpoint            string
+	YouMCPEndpoint         string
+	OctenEndpoint          string
+	ExaEndpoint            string
+	FirecrawlEndpoint      string
+	TinyFishEndpoint       string
+	KeenableEndpoint       string
+	KeenablePublicEndpoint string
+	HTMLSearchEndpoint     string
 }
 
 // DefaultClient is the process-wide client; it follows redirects and honors the proxy environment.
@@ -48,16 +50,18 @@ var DefaultClient = NewClient()
 
 func NewClient() *Client {
 	return &Client{
-		HTTP:               &http.Client{},
-		UserAgent:          "gax/" + version.Value + " (+https://github.com/luank3/gax)",
-		BraveEndpoint:      "https://api.search.brave.com/res/v1/web/search",
-		YouEndpoint:        "https://ydc-index.io/v1/search",
-		YouMCPEndpoint:     "https://api.you.com/mcp?profile=free",
-		OctenEndpoint:      "https://api.octen.ai/search",
-		ExaEndpoint:        "https://api.exa.ai/search",
-		FirecrawlEndpoint:  "https://api.firecrawl.dev/v2/search",
-		TinyFishEndpoint:   "https://api.search.tinyfish.ai",
-		HTMLSearchEndpoint: "https://html.duckduckgo.com/html/",
+		HTTP:                   &http.Client{},
+		UserAgent:              "gax/" + version.Value + " (+https://github.com/luank3/gax)",
+		BraveEndpoint:          "https://api.search.brave.com/res/v1/web/search",
+		YouEndpoint:            "https://ydc-index.io/v1/search",
+		YouMCPEndpoint:         "https://api.you.com/mcp?profile=free",
+		OctenEndpoint:          "https://api.octen.ai/search",
+		ExaEndpoint:            "https://api.exa.ai/search",
+		FirecrawlEndpoint:      "https://api.firecrawl.dev/v2/search",
+		TinyFishEndpoint:       "https://api.search.tinyfish.ai",
+		KeenableEndpoint:       "https://api.keenable.ai/v1/search",
+		KeenablePublicEndpoint: "https://api.keenable.ai/v1/search/public",
+		HTMLSearchEndpoint:     "https://html.duckduckgo.com/html/",
 	}
 }
 

@@ -32,6 +32,7 @@ const (
 	BackendExa        = "exa"
 	BackendFirecrawl  = "firecrawl"
 	BackendTinyFish   = "tinyfish"
+	BackendKeenable   = "keenable"
 	BackendDuckDuckGo = "duckduckgo"
 )
 
@@ -44,15 +45,14 @@ const htmlSearchAccept = "text/html,application/xhtml+xml,application/xml;q=0.9,
 // SearchProviders lists the backends automatic selection tries, in order: you.com is the default
 // provider, both with its key and — through its keyless free profile — without any key, so it
 // leads the list; the first backend with a configured key answers.
-var SearchProviders = []string{BackendYou, BackendBrave, BackendOcten, BackendExa, BackendFirecrawl, BackendTinyFish}
+var SearchProviders = []string{BackendYou, BackendBrave, BackendOcten, BackendExa, BackendFirecrawl, BackendTinyFish, BackendKeenable}
 
 // SearchBackends lists every backend web.search_provider accepts: SearchProviders plus the
 // keyless DuckDuckGo crawl, which normally answers only as the fallback.
 var SearchBackends = append(append([]string{}, SearchProviders...), BackendDuckDuckGo)
 
-// CredentialEnv names the environment variable holding a backend's key, for diagnostics. Every
-// backend but you.com needs one; you.com's key raises its limits and its absence falls back to the
-// keyless free MCP profile, and DuckDuckGo needs none.
+// CredentialEnv names the environment variable holding a backend's key, for diagnostics.
+// You.com, Firecrawl and Keenable also offer keyless search; DuckDuckGo needs no key.
 func CredentialEnv(provider string) string {
 	switch provider {
 	case BackendBrave:
@@ -67,6 +67,8 @@ func CredentialEnv(provider string) string {
 		return "FIRECRAWL_API_KEY"
 	case BackendTinyFish:
 		return "TINYFISH_API_KEY"
+	case BackendKeenable:
+		return "KEENABLE_API_KEY"
 	}
 	return ""
 }
@@ -86,6 +88,8 @@ func backendLabel(provider string) string {
 		return "Firecrawl"
 	case BackendTinyFish:
 		return "TinyFish"
+	case BackendKeenable:
+		return "Keenable"
 	case BackendDuckDuckGo:
 		return "DuckDuckGo"
 	}
@@ -113,6 +117,7 @@ type Keys struct {
 	Exa       string
 	Firecrawl string
 	TinyFish  string
+	Keenable  string
 }
 
 func (keys Keys) of(provider string) string {
@@ -129,6 +134,8 @@ func (keys Keys) of(provider string) string {
 		return keys.Firecrawl
 	case BackendTinyFish:
 		return keys.TinyFish
+	case BackendKeenable:
+		return keys.Keenable
 	}
 	return ""
 }
@@ -194,6 +201,8 @@ func (client *Client) searchBackend(ctx context.Context, provider, query string,
 		return client.searchFirecrawl(ctx, query, count, options)
 	case BackendTinyFish:
 		return client.searchTinyFish(ctx, query, count, options)
+	case BackendKeenable:
+		return client.searchKeenable(ctx, query, count, options)
 	case BackendDuckDuckGo:
 		return client.searchDuckDuckGo(ctx, query, count, options)
 	default:
@@ -500,6 +509,56 @@ func (client *Client) searchTinyFish(ctx context.Context, query string, count in
 		results = addResult(results, count, entry.Title, entry.URL, entry.Snippet)
 	}
 	return finishSearch(BackendTinyFish, results)
+}
+
+func (client *Client) searchKeenable(ctx context.Context, query string, count int, options SearchOptions) (Report, error) {
+	key := strings.TrimSpace(options.Keys.Keenable)
+	endpoint := orDefault(client.KeenableEndpoint, DefaultClient.KeenableEndpoint)
+	headers := []string{"Accept: application/json"}
+	if key != "" {
+		headers = append(headers, "X-API-Key: "+key)
+	} else {
+		endpoint = orDefault(client.KeenablePublicEndpoint, DefaultClient.KeenablePublicEndpoint)
+		headers = append(headers, "X-Keenable-Title: gax")
+	}
+	body, status, err := client.postJSON(ctx, endpoint, map[string]any{
+		"query":              query,
+		"max_results":        count,
+		"snippet_max_length": MaxSnippetChars,
+	}, headers, options.Limits)
+	if err != nil {
+		return Report{}, err
+	}
+	// Keenable reports malformed keys with 400, not just 401/403.
+	if key != "" && status == http.StatusBadRequest {
+		return Report{}, settledf("the Keenable API rejected the request (HTTP 400) — check KEENABLE_API_KEY and the query")
+	}
+	if key == "" && (status == http.StatusUnauthorized || status == http.StatusForbidden) {
+		return Report{}, fmt.Errorf("the Keenable public search returned HTTP %d", status)
+	}
+	if err := statusFailure(BackendKeenable, status); err != nil {
+		return Report{}, err
+	}
+	var payload struct {
+		Results []struct {
+			Title       string `json:"title"`
+			URL         string `json:"url"`
+			Description string `json:"description"`
+			Snippet     string `json:"snippet"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return Report{}, errors.New("the Keenable API response is not valid JSON")
+	}
+	var results []Result
+	for _, entry := range payload.Results {
+		snippet := entry.Snippet
+		if strings.TrimSpace(snippet) == "" {
+			snippet = entry.Description
+		}
+		results = addResult(results, count, entry.Title, entry.URL, snippet)
+	}
+	return finishSearch(BackendKeenable, results)
 }
 
 // settledError marks a failure a fallback would only paper over: the user has to fix a credential,

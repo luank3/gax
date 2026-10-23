@@ -30,9 +30,9 @@ func webSearchDefinition() provider.ToolDefinition {
 	return provider.ToolDefinition{
 		Name: "web_search",
 		Description: "Search the web and return ranked results with titles, URLs, and snippets. Searches through the " +
-			"backend `web.search_provider` names — you, brave, octen, exa, firecrawl, tinyfish, or duckduckgo — " +
-			"or through You.com (its free profile without a key) when another backend has no key. A backend that " +
-			"cannot answer falls back to DuckDuckGo. Read a promising result with `web_fetch`.",
+			"backend named by `web.search_provider`: you, brave, octen, exa, firecrawl, tinyfish, keenable, or duckduckgo. " +
+			"Keenable also offers a keyless public endpoint. Automatic selection uses configured keys or You.com's " +
+			"free profile. A backend that cannot answer falls back to DuckDuckGo. Read a promising result with `web_fetch`.",
 		Params: []provider.ToolParam{
 			{Name: "query", Type: "string", Required: true, Description: "Search query."},
 			{Name: "count", Type: "integer", Minimum: 1, Description: "Maximum results to return (default 5, maximum 10)."},
@@ -241,6 +241,7 @@ func (registry *Registry) webSearchKeys() web.Keys {
 		Exa:       key(web.BackendExa),
 		Firecrawl: key(web.BackendFirecrawl),
 		TinyFish:  key(web.BackendTinyFish),
+		Keenable:  key(web.BackendKeenable),
 	}
 }
 

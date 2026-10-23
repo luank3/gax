@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -323,6 +324,74 @@ func TestWebSearchKeySettingsMatchTheBackends(t *testing.T) {
 	}
 	if want := "auto|" + strings.Join(web.SearchBackends, "|"); choice.Choices != want {
 		t.Fatalf("web.search_provider choices = %q, want %q", choice.Choices, want)
+	}
+}
+
+func TestWebSearchUsesKeenable(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		provider  string
+		configKey string
+		envKey    string
+	}{
+		{name: "configured key auto selects", configKey: "keen-config-secret"},
+		{name: "environment key auto selects", envKey: "keen-env-secret"},
+		{name: "explicit public endpoint", provider: "keenable"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			headers := make(chan http.Header, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				headers <- r.Header.Clone()
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"results":[{"title":"Go timeouts","url":"https://example.com/guide","snippet":"Use a deadline."}]}`)
+			}))
+			t.Cleanup(server.Close)
+			client := &web.Client{HTTP: server.Client(), KeenableEndpoint: server.URL, KeenablePublicEndpoint: server.URL}
+			store := config.New(config.DefaultSettings())
+			store.SetEnvironment(func(name string) (string, bool) {
+				return test.envKey, name == "KEENABLE_API_KEY" && test.envKey != ""
+			})
+			settings := map[string]string{"web.keenable_api_key": test.configKey}
+			if test.provider != "" {
+				settings["web.search_provider"] = test.provider
+			}
+			encoded, err := json.Marshal(settings)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := store.LoadConfig(encoded); err != nil {
+				t.Fatal(err)
+			}
+			registry := newWebTestRegistry(t, client, Options{})
+			registry.store = store
+			result := registry.Run("web_search", jsonArgs(map[string]any{"query": "golang timeout"}), 1)
+			want := "1. Go timeouts\n   https://example.com/guide\n   Use a deadline.\n\n[1 results · keenable]"
+			if result.Text != want {
+				t.Fatalf("web_search(keenable) = %q, want %q", result.Text, want)
+			}
+			header := <-headers
+			key := test.configKey + test.envKey
+			if header.Get("X-API-Key") != key || key == "" && header.Get("X-Keenable-Title") != "gax" {
+				t.Errorf("web_search(keenable) headers = %v; want the configured key or public app title", header)
+			}
+			if strings.Contains(result.Text, "secret") {
+				t.Errorf("web_search(keenable) leaked a credential: %q", result.Text)
+			}
+		})
+	}
+}
+
+func TestWebSearchKeenableSettings(t *testing.T) {
+	settings := make(map[string]config.Setting)
+	for _, setting := range config.DefaultSettings() {
+		settings[setting.Key] = setting
+	}
+	key, ok := settings["web.keenable_api_key"]
+	if !ok || key.EnvVar != "KEENABLE_API_KEY" || !key.Secret {
+		t.Errorf("web.keenable_api_key = %+v, present=%v; want secret KEENABLE_API_KEY setting", key, ok)
+	}
+	if choices := settings["web.search_provider"].Choices; !strings.Contains("|"+choices+"|", "|keenable|") {
+		t.Errorf("web.search_provider choices = %q, want keenable", choices)
 	}
 }
 

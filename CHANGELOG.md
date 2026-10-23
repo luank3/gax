@@ -7,6 +7,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Keenable search via `web.search_provider=keenable`, with `KEENABLE_API_KEY` (or
+  `web.keenable_api_key`) for keyed access and a public endpoint when no key is configured.
+  Existing default search selection and DuckDuckGo fallback are unchanged.
+
 ### Fixed
 
 - Preserve multiline pastes on Windows by enabling VT input so the console passes

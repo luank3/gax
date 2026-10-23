@@ -143,15 +143,17 @@ func (recorder *searchRecorder) jsonBody(t *testing.T) map[string]any {
 // searchTestClient points every backend at one test server, so a test sees which backend answered.
 func searchTestClient(server *httptest.Server) *web.Client {
 	return &web.Client{
-		HTTP:               server.Client(),
-		BraveEndpoint:      server.URL + "/brave",
-		YouEndpoint:        server.URL + "/you",
-		YouMCPEndpoint:     server.URL + "/you-mcp",
-		OctenEndpoint:      server.URL + "/octen",
-		ExaEndpoint:        server.URL + "/exa",
-		FirecrawlEndpoint:  server.URL + "/firecrawl",
-		TinyFishEndpoint:   server.URL + "/tinyfish",
-		HTMLSearchEndpoint: server.URL + "/crawl",
+		HTTP:                   server.Client(),
+		BraveEndpoint:          server.URL + "/brave",
+		YouEndpoint:            server.URL + "/you",
+		YouMCPEndpoint:         server.URL + "/you-mcp",
+		OctenEndpoint:          server.URL + "/octen",
+		ExaEndpoint:            server.URL + "/exa",
+		FirecrawlEndpoint:      server.URL + "/firecrawl",
+		TinyFishEndpoint:       server.URL + "/tinyfish",
+		KeenableEndpoint:       server.URL + "/keenable",
+		KeenablePublicEndpoint: server.URL + "/keenable-public",
+		HTMLSearchEndpoint:     server.URL + "/crawl",
 	}
 }
 
@@ -184,6 +186,9 @@ func newSearchTestServer(t *testing.T) (*web.Client, *searchRecorder) {
 		case "/tinyfish":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = io.WriteString(w, tinyFishResults)
+		case "/keenable", "/keenable-public":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, keenableResults)
 		case "/crawl":
 			w.Header().Set("Content-Type", "text/html")
 			_, _ = io.WriteString(w, crawlResults)
@@ -210,6 +215,8 @@ func withKey(keys web.Keys, provider, key string) web.Keys {
 		keys.Firecrawl = key
 	case web.BackendTinyFish:
 		keys.TinyFish = key
+	case web.BackendKeenable:
+		keys.Keenable = key
 	}
 	return keys
 }
@@ -246,6 +253,9 @@ func TestSearchSelectsTheBackend(t *testing.T) {
 		{name: "exa", options: web.SearchOptions{Keys: keysFor(web.BackendExa, "exa-secret")}, backend: web.BackendExa, wantPath: "/exa"},
 		{name: "firecrawl", options: web.SearchOptions{Keys: keysFor(web.BackendFirecrawl, "fc-secret")}, backend: web.BackendFirecrawl, wantPath: "/firecrawl"},
 		{name: "tinyfish", options: web.SearchOptions{Keys: keysFor(web.BackendTinyFish, "tiny-secret")}, backend: web.BackendTinyFish, wantPath: "/tinyfish"},
+		{name: "keenable key outranks keyless you", options: web.SearchOptions{Keys: keysFor(web.BackendKeenable, "keen-secret")}, backend: web.BackendKeenable, wantPath: "/keenable"},
+		{name: "existing key priority is unchanged", options: web.SearchOptions{Keys: withKey(keysFor(web.BackendKeenable, "keen-secret"), web.BackendTinyFish, "tiny-secret")}, backend: web.BackendTinyFish, wantPath: "/tinyfish"},
+		{name: "explicit public keenable overrides other keys", options: web.SearchOptions{Provider: web.BackendKeenable, Keys: keysFor(web.BackendBrave, "brave-secret")}, backend: web.BackendKeenable, wantPath: "/keenable-public"},
 		{
 			name:     "no key falls back to the free you.com search",
 			options:  web.SearchOptions{},
@@ -829,7 +839,7 @@ func TestSearchRequiresAKeyAndAKnownProvider(t *testing.T) {
 		t.Fatalf("keyless octen error = %v", err)
 	}
 	_, err = client.Search(context.Background(), "q", web.SearchOptions{Provider: "gopher"})
-	want := `unknown web search provider "gopher" (choose you, brave, octen, exa, firecrawl, tinyfish, duckduckgo)`
+	want := `unknown web search provider "gopher" (choose you, brave, octen, exa, firecrawl, tinyfish, keenable, duckduckgo)`
 	if err == nil || err.Error() != want {
 		t.Fatalf("unknown provider error = %v, want %q", err, want)
 	}

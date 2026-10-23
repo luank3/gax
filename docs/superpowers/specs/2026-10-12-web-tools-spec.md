@@ -3,7 +3,7 @@
 ## Scope
 
 `internal/web` owns the HTTP client, the HTML-to-text converter, and the search backends (you,
-brave, octen, exa, firecrawl, tinyfish, with the DuckDuckGo crawl as the fallback);
+brave, octen, exa, firecrawl, tinyfish, keenable, with the DuckDuckGo crawl as the fallback);
 `internal/tools/web.go` owns argument validation, the `web.*` and `no_web` settings, and the text
 the model reads. Inputs are `web_fetch`'s `url` and `strip` and `web_search`'s `query` and `count`;
 outputs are a body with a summary line or numbered results with `[%d results · %s]`.
@@ -134,6 +134,31 @@ Non-goal: JavaScript execution and cookies, so a client-rendered page yields the
 - **Rejected:** Trusting a text block alone; the reply arrives as `text/event-stream` with an
   informational `notifications/message` frame first, so the reader takes the first frame carrying a
   `result` or an `error`.
+
+---
+
+### Select Keenable's keyed or public endpoint
+
+- **Rule:** `keenable` uses `POST https://api.keenable.ai/v1/search` with `X-API-Key` when
+  `web.keenable_api_key` / `KEENABLE_API_KEY` is set. Without a key, explicit selection uses
+  `/v1/search/public` with required `X-Keenable-Title: gax`. The body carries `query`,
+  `max_results` and `snippet_max_length: 400`; the service's default search mode is unchanged.
+- **Selection:** Append Keenable after TinyFish in the keyed automatic order; do not replace the
+  default You.com free profile or probe the public endpoint during automatic key selection.
+- **Results:** Prefer a nonempty `snippet`, falling back to `description`, through the existing
+  sanitation, count and snippet bounds. Empty listings remain settled errors.
+- **Failures:** Malformed keys (HTTP 400), rejected/revoked keys (401/403), and exhausted credit
+  (402) remain actionable keyed errors. Public access refusals and availability/JSON failures
+  may fall back to DuckDuckGo. Ignore service error bodies so reflected credentials are not
+  included in diagnostics. Both endpoints honor cancellation, timeout and response-byte limits.
+- **Source:** `internal/web/search.go` `searchKeenable`; `internal/config/settings.go`;
+  `internal/tools/web.go` `webSearchKeys`.
+- **Assertions:** `TestKeenableRequestsAndResults`, `TestKeenableFailuresAndFallback`, and
+  `TestKeenableHonorsCancellationAndByteLimit` in `internal/web/keenable_test.go`;
+  `TestSearchSelectsTheBackend` in `internal/web/search_test.go`; `TestWebSearchUsesKeenable`
+  and `TestWebSearchKeenableSettings` in `internal/tools/web_test.go`.
+- **API references:** https://docs.keenable.ai/api-reference/search and
+  https://docs.keenable.ai/authentication.
 
 ---
 
