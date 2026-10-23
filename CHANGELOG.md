@@ -7,6 +7,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve multiline pastes on Windows by enabling VT input so the console passes
+  bracketed-paste markers through instead of treating pasted newlines as Enter.
+
 ## [0.2.0-rc.2] - 2026-10-23
 
 ### Fixed

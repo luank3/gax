@@ -163,3 +163,42 @@ rather than replacing `v0.2.0-rc.1`. The first RC and its published assets stay 
 - Push the reviewed fix commit, require CI success, then push a signed annotated RC2 tag.
 - Verify the release workflow, prerelease status, six platform archives, checksums, and
   packaged executable versions; keep `v0.1.0` as the latest stable release.
+
+## Windows multiline paste regression
+
+Reported after RC2: only the first line of a multiline Windows Terminal paste reaches the
+prompt. gax enables bracketed paste on output but explicitly disables
+`ENABLE_VIRTUAL_TERMINAL_INPUT`. ConPTY strips paste markers in that mode, leaving a bare
+carriage return that the editor treats as submission. This behavior is documented in
+https://github.com/microsoft/terminal/issues/18094 and the `Generic` CSI dispatch in
+`src/terminal/parser/InputStateMachineEngine.cpp`.
+
+- [x] Add failing native mode assertions for VT input in prompt and interrupt modes.
+- [x] Cover native-console multiline paste, newline normalization, Unicode, continued editing,
+  explicit submission, and mode restoration without reading/writing the host clipboard.
+- [x] Enable VT input in shared raw mode, retaining disabled mouse input and Quick Edit.
+- [x] Update the Windows spec/changelog and run `make lint test-race`, native Windows tests/vet,
+  and cgo-free Windows amd64/ARM64 builds.
+- [x] Provide an unpublished patched executable for manual Windows Terminal paste validation.
+
+Verification:
+- Before the fix, native ARM64 `TestRawRestoresConsoleAndReadsNativeKeys` failed for both
+  raw modes (`0x1a0` / `0x1a1`, VT input disabled), and the three newline variants in
+  `TestWindowsTTYMultilinePaste` failed its active-mode assertion. All pass after the fix.
+- The paste cases cover CRLF, LF, CR, empty lines, trailing newlines, CJK and surrogate-pair
+  emoji, existing draft text, editing after paste, final Enter, and exact input/output
+  restoration. The native test injector now emits UTF-16 pairs rather than truncating
+  supplementary characters. Existing modal/interrupt and native Unicode-key checks pass.
+- Linux `make lint test-race` passes with inherited provider endpoint/credential/trace/
+  transcript overrides removed. Full native Windows amd64 (`-p=1`) and ARM64 tests and
+  vet pass with the same environment isolation and deferred-cleanup exec wrapper as RC2.
+- Cgo-free Make builds pass for Windows amd64 and ARM64; both run `--version` natively as
+  `v0.2.0-rc.2-dirty`. Manual-check copies are `gax-amd64.exe` and `gax-arm64.exe` in
+  `C:\Users\Admin\AppData\Local\Temp\gax-paste-fix-YE352kgH`.
+- Inline self-review found no additional patch issues. Tests use isolated consoles and
+  injected key records, not the user's clipboard or a physical Windows Terminal paste.
+  The user subsequently confirmed that the patched Windows Terminal build works for
+  multiline paste; this manual confirmation is separate from the automated tests.
+
+The user authorized committing and pushing this follow-up after manual validation.
+Release tags/assets remain unchanged; a new release requires separate authorization.

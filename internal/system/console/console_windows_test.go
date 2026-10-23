@@ -105,6 +105,9 @@ func TestRawRestoresConsoleAndReadsNativeKeys(t *testing.T) {
 	if current&0x10 != 0 {
 		t.Errorf("Raw(processed=false) input mode = %#x, want mouse reporting disabled for native scrolling", current)
 	}
+	if current&0x200 == 0 {
+		t.Errorf("Raw(processed=false) input mode = %#x, want VT input enabled for bracketed paste", current)
+	}
 	Flush(in)
 	record := inputRecord{Type: 1}
 	*(*keyEvent)(unsafe.Pointer(&record.Event[0])) = keyEvent{Down: 1, Repeat: 1, Char: '界'}
@@ -156,6 +159,9 @@ func TestRawRestoresConsoleAndReadsNativeKeys(t *testing.T) {
 	_ = syscall.GetConsoleMode(syscall.Handle(in.Fd()), &current)
 	if current&0x10 != 0 || current&1 == 0 {
 		t.Errorf("Raw(processed=true) input mode = %#x, want mouse reporting disabled and Ctrl+C processing enabled", current)
+	}
+	if current&0x200 == 0 {
+		t.Errorf("Raw(processed=true) input mode = %#x, want VT input enabled", current)
 	}
 	RestoreAll()
 	mode.Restore()

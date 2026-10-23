@@ -55,8 +55,8 @@ func Raw(in, out *os.File, processed bool) (*Mode, error) {
 	if err := syscall.GetConsoleMode(syscall.Handle(in.Fd()), &saved.input); err != nil {
 		return nil, err
 	}
-	// gax reads key events only; mouse reporting would steal native wheel/trackpad scrolling.
-	input := (saved.input &^ uint32(0x2|0x4|0x10|0x40|0x200)) | 0x80 // line, echo, mouse, quick edit, VT input; extended flags
+	// VT input preserves paste markers; mouse reporting must stay off for native scrolling.
+	input := (saved.input &^ uint32(0x2|0x4|0x10|0x40)) | 0x80 | 0x200 // line, echo, mouse, quick edit; extended flags, VT input
 	if !processed {
 		input &^= 1
 	} else {
