@@ -11,9 +11,7 @@
 
 gax is a terminal-native coding agent written in Go. It began as a port of the C agent
 [hax](https://github.com/OleksandrChekhovskyi/hax) and has grown past it since: the web tools, the
-bash output compression, and the search backends are gax's own. The design record for each
-subsystem lives in [`docs/superpowers/specs`](docs/superpowers/specs), with the dated plans beside
-it in [`docs/superpowers/plans`](docs/superpowers/plans).
+bash output compression, and the search backends are gax's own.
 
 ## Key features
 
@@ -308,9 +306,6 @@ with [AGENTS.md](AGENTS.md) for the repository map and conventions.
 ## Documentation
 
 - [`docs/sessions.md`](docs/sessions.md) — session log and `--json` record formats.
-- [`docs/superpowers/plans`](docs/superpowers/plans) — the dated implementation plans and their
-  acceptance criteria.
-- [`docs/superpowers/specs`](docs/superpowers/specs) — design notes for larger subsystems.
 
 ## License
 
