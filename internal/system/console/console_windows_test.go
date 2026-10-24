@@ -19,7 +19,13 @@ func TestKeyDecoding(t *testing.T) {
 	}{
 		{"text", keyEvent{Down: 1, Repeat: 1, Char: '界'}, "界"},
 		{"up", keyEvent{Down: 1, Repeat: 1, VirtualKey: 0x26}, "\x1b[A"},
+		{"enter", keyEvent{Down: 1, Repeat: 1, VirtualKey: 0x0d, Char: '\r'}, "\r"},
+		{"shift-enter", keyEvent{Down: 1, Repeat: 1, VirtualKey: 0x0d, Char: '\r', Control: 16}, "\n"},
+		{"backspace", keyEvent{Down: 1, Repeat: 1, VirtualKey: 0x08, Char: 0x08}, "\x08"},
+		{"delete", keyEvent{Down: 1, Repeat: 1, VirtualKey: 0x2e}, "\x1b[3~"},
 		{"ctrl-left", keyEvent{Down: 1, Repeat: 1, VirtualKey: 0x25, Control: 8}, "\x1b[1;5D"},
+		{"ctrl-backspace", keyEvent{Down: 1, Repeat: 1, VirtualKey: 0x08, Char: 0x08, Control: 8}, "\x1b\x08"},
+		{"ctrl-delete", keyEvent{Down: 1, Repeat: 1, VirtualKey: 0x2e, Control: 8}, "\x1bd"},
 		{"alt-b", keyEvent{Down: 1, Repeat: 1, Char: 'b', Control: 2}, "\x1bb"},
 		{"altgr", keyEvent{Down: 1, Repeat: 1, Char: '€', Control: 1 | 8}, "€"},
 		{"release", keyEvent{Down: 0, Char: 'x'}, ""},

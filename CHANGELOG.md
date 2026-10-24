@@ -17,6 +17,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Preserve multiline pastes on Windows by enabling VT input so the console passes
   bracketed-paste markers through instead of treating pasted newlines as Enter.
+- Map native Ctrl+Backspace/Delete records to the editor's existing previous/next-word deletion
+  actions, and map Shift+Enter to an inserted newline while keeping plain Enter as submit.
+  Unmodified Backspace/Delete behavior remains unchanged.
 
 ## [0.2.0-rc.2] - 2026-10-23
 

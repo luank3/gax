@@ -56,6 +56,30 @@ func windowsTestKeys(t *testing.T, in *os.File, text string) {
 	}
 }
 
+func TestWindowsTTYShiftEnterInsertsNewline(t *testing.T) {
+	in, out := windowsTestConsole(t)
+	windowsTestKeys(t, in, "left")
+	type record struct {
+		kind                   uint16
+		_                      uint16
+		down                   int32
+		repeat, vk, scan, char uint16
+		control                uint32
+	}
+	event := record{kind: 1, down: 1, repeat: 1, vk: 0x0d, char: '\r', control: 16}
+	var written uint32
+	result, _, err := syscall.NewLazyDLL("kernel32.dll").NewProc("WriteConsoleInputW").Call(in.Fd(), uintptr(unsafe.Pointer(&event)), 1, uintptr(unsafe.Pointer(&written)))
+	if result == 0 || written != 1 {
+		t.Fatalf("WriteConsoleInputW(Shift+Enter) = %d,%v", written, err)
+	}
+	windowsTestKeys(t, in, "right\r")
+
+	text, submitted, err := ReadTTYLine(context.Background(), in, out, &Core{}, nil, "> ")
+	if err != nil || !submitted || text != "left\nright" {
+		t.Errorf("ReadTTYLine(Shift+Enter) = %q,%v,%v, want %q,true,nil", text, submitted, err, "left\nright")
+	}
+}
+
 func TestWindowsTTYEditorAndModalRestore(t *testing.T) {
 	in, out := windowsTestConsole(t)
 	var original uint32

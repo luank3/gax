@@ -63,12 +63,38 @@ func (source *Source) feedKey(key keyEvent) {
 		} else {
 			text = fmt.Sprintf("\x1b[1;%d%s", modifier, code)
 		}
-	case 0x21, 0x22, 0x2d, 0x2e:
-		code := map[uint16]int{0x21: 5, 0x22: 6, 0x2d: 2, 0x2e: 3}[key.VirtualKey]
+	case 0x0d:
+		if key.Control&16 != 0 {
+			text = "\n"
+		} else if key.Char != 0 {
+			text = string(rune(key.Char))
+			if alt {
+				text = "\x1b" + text
+			}
+		}
+	case 0x08:
+		if ctrl && !altgr {
+			text = "\x1b\x08"
+		} else if key.Char != 0 {
+			text = string(rune(key.Char))
+			if alt {
+				text = "\x1b" + text
+			}
+		}
+	case 0x21, 0x22, 0x2d:
+		code := map[uint16]int{0x21: 5, 0x22: 6, 0x2d: 2}[key.VirtualKey]
 		if modifier == 1 {
 			text = fmt.Sprintf("\x1b[%d~", code)
 		} else {
 			text = fmt.Sprintf("\x1b[%d;%d~", code, modifier)
+		}
+	case 0x2e:
+		if ctrl && !altgr {
+			text = "\x1bd"
+		} else if modifier == 1 {
+			text = "\x1b[3~"
+		} else {
+			text = fmt.Sprintf("\x1b[3;%d~", modifier)
 		}
 	case 0x09:
 		if key.Control&16 != 0 {

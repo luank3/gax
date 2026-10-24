@@ -202,3 +202,43 @@ Verification:
 
 The user authorized committing and pushing this follow-up after manual validation.
 Release tags/assets remain unchanged; a new release requires separate authorization.
+
+## Windows word-deletion shortcuts
+
+Native console key records carry modifier state separately from the character. The source previously
+forwarded Backspace as a single byte and Delete as a CSI sequence, discarding Ctrl's word-editing
+intent even though the shared editor already has previous/next-word kill actions.
+
+- [x] Add failing native key-decoding cases for Ctrl+Backspace and Ctrl+Delete, plus assertions that
+  unmodified Backspace/Delete retain their existing encodings.
+- [x] Map Ctrl+Backspace to the shared backward word-kill action and Ctrl+Delete to the shared
+  forward word-kill action; preserve AltGr and unmodified key behavior.
+- [x] Verify the emitted backspace sequence decodes to the existing backward word-kill action.
+- [x] Run native Windows tests/vet, Linux `make lint test-race`, and cgo-free Windows amd64/arm64
+  builds.
+
+Verification:
+- Native Windows ARM64 `make vet test` passes across all packages using the isolated-console runner;
+  Linux `make lint test-race` passes with provider/trace overrides unset.
+- `make build` succeeds for Windows amd64 and ARM64 with `CGO_ENABLED=0`.
+- Key tests assert native key-record encodings and shared-editor action decoding; no physical
+  Windows Terminal interaction was exercised for this keyboard shortcut change.
+
+## Windows Shift+Enter editing
+
+The shared editor inserts a newline for LF, while Return's native Windows record normally carries CR.
+The key decoder previously ignored the Shift modifier and sent CR through the submit path.
+
+- [x] Add a native key-record regression case: Shift+Return with CR must produce the editor's LF
+  input, while unmodified Return remains CR.
+- [x] Add an isolated-console editor test proving Shift+Enter inserts a newline and does not submit;
+  a later plain Enter submits the complete multiline draft.
+- [x] Map shifted `VK_RETURN` to LF in the Windows source, preserving plain Return.
+- [x] Run native Windows tests/vet, Linux `make lint test-race`, and cgo-free Windows amd64/arm64
+  builds.
+
+Verification:
+- Before the fix, `TestKeyDecoding/shift-enter` failed with CR instead of the expected LF.
+- The native Windows ARM64 full suite/vet, Linux `make lint test-race`, and both cgo-free Windows
+  builds pass. The editor regression uses an isolated console and injected key records; no physical
+  Windows Terminal interaction was done.

@@ -205,6 +205,7 @@ func TestDecodeEscapeMapsCursorEditingAndPasteSequences(t *testing.T) {
 		{"\x1bf", input.ActionMoveWordRight},
 		{"\x1bd", input.ActionKillWordForward},
 		{"\x1b\x7f", input.ActionKillWordBackAlnum},
+		{"\x1b\x08", input.ActionKillWordBackAlnum},
 		{"\x1b\r", input.ActionInsertNewline},
 		{"\x1b\x1b[D", input.ActionMoveWordLeft},
 		{"\x1b\x1b\x1b[C", input.ActionMoveWordRight},
