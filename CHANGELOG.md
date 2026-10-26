@@ -7,8 +7,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-27
+
 ### Added
 
+- Native Windows support across amd64 and arm64, including process-tree cleanup (Job Objects),
+  console VT input/output, out-of-band file locking, and path normalization.
 - Native Win32 clipboard support using direct User32/Kernel32 APIs (`CF_UNICODETEXT`, registered `PNG`,
   and `CF_DIB`/`CF_DIBV5` decoding), removing headless PowerShell subprocess latency while retaining
   it as a fallback.
@@ -17,9 +21,28 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and POSIX shells (`-c`).
 - Automatic fallback on Windows to PowerShell or CMD when Git for Windows Bash is not installed,
   with support for explicit `bash.shell` configuration to PowerShell or CMD.
+- Keenable search via `web.search_provider=keenable`, with `KEENABLE_API_KEY` (or
+  `web.keenable_api_key`) for keyed access and a public endpoint when no key is configured.
+- Windows CI coverage and release ZIPs alongside Linux/macOS tarballs and checksums.
 
 ### Fixed
 
+- Prevent deadlock in full conversation history (`Ctrl+O`) and transcript (`Ctrl+T`) views when
+  quitting the pager before all output has been consumed.
+- Pass `-R` to fallback `less` invocations when `$PAGER` is unset, and recognize `less.exe` on Windows,
+  so ANSI formatting renders styled text instead of raw escape sequences.
+- Prevent 100% CPU busy-spin in `gax --resume` and slash-command pickers on macOS and BSD by waiting
+  indefinitely in POSIX poll when no timeout is requested.
+- Preserve multiline pastes on Windows by enabling VT input so the console passes
+  bracketed-paste markers through instead of treating pasted newlines as Enter.
+- Decode terminal Ctrl+Delete and the distinct CSI-u/modifyOtherKeys Ctrl+Backspace sequences to the
+  editor's existing word-deletion actions.
+- Map native Windows Ctrl+Backspace/Delete records to those actions and Shift+Enter to an inserted
+  newline; unmodified Backspace/Delete and plain Enter behavior remain unchanged.
+- Restore automatic palette colors in native Windows Terminal shells that set `WT_SESSION`
+  without `TERM`, while respecting explicit terminal and color settings.
+- Keep native Windows Terminal wheel/trackpad scrollback available during prompts, pickers,
+  and running turns by disabling console mouse reporting.
 - Prevent a race condition in the Linux parent-death test (`TestBashProcessDiesWhenItsParentIsKilled`)
   where reaped child processes and procfs state transitions falsely reported survival.
 
@@ -134,7 +157,8 @@ Initial release: a minimalist terminal-native coding agent written in Go, ported
 - The test suite passes on macOS: it had never run there, because `go vet` failed on a helper
   defined only in a Linux-tagged test file.
 
-[Unreleased]: https://github.com/luank3/gax/compare/v0.2.0-rc.4...HEAD
+[Unreleased]: https://github.com/luank3/gax/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/luank3/gax/releases/tag/v0.2.0
 [0.2.0-rc.4]: https://github.com/luank3/gax/releases/tag/v0.2.0-rc.4
 [0.2.0-rc.3]: https://github.com/luank3/gax/releases/tag/v0.2.0-rc.3
 [0.2.0-rc.2]: https://github.com/luank3/gax/releases/tag/v0.2.0-rc.2
