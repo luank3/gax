@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -222,4 +223,40 @@ func TestResolvePagerAddsLessRawColorFlag(t *testing.T) {
 	if err != nil || got != "less -R --quit-if-one-screen" {
 		t.Fatalf("resolvePager() = %q, %v", got, err)
 	}
+}
+
+func TestResolvePagerFallbackAddsLessRawColorFlag(t *testing.T) {
+	root := t.TempDir()
+	name := "less"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	path := filepath.Join(root, name)
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", root)
+	t.Setenv("PAGER", "")
+	got, err := resolvePager()
+	if err != nil || got != "less -R" {
+		t.Fatalf("resolvePager() fallback = %q, %v, want %q", got, err, "less -R")
+	}
+}
+
+func TestAddLessColorFlagMatchesWindowsLessExecutable(t *testing.T) {
+	if got := addLessColorFlag("C:\\bin\\LESS.EXE -F", "C:\\bin\\LESS.EXE", len("C:\\bin\\LESS.EXE")); got != "C:\\bin\\LESS.EXE -R -F" {
+		t.Fatalf("addLessColorFlag() = %q", got)
+	}
+}
+
+func TestRenderWithPagerDoesNotDeadlockWhenChildExitsEarly(t *testing.T) {
+	var output, diagnostics bytes.Buffer
+	renderWithPager("exit 0", &output, &diagnostics, func(writer io.Writer) {
+		chunk := bytes.Repeat([]byte("a"), 4096)
+		for i := 0; i < 64; i++ {
+			if _, err := writer.Write(chunk); err != nil {
+				return
+			}
+		}
+	})
 }

@@ -110,6 +110,18 @@ session-log or branch files. Non-goal: `internal/slash` grammar and `internal/ap
 - **Rejected:** Streaming items straight into the pager command; a surviving `\r` lets model output
   overwrite pager lines, which the test forbids.
 
+---
+
+### Pager uses color flags and avoids early-exit deadlocks
+- **Rule:** Fallback to `less` must add `-R` so ANSI styling is rendered, match `less.exe` on Windows,
+  and write to the pager asynchronously so early child exit (such as quitting `less` before reading
+  all bytes) unblocks the pipe and does not deadlock.
+- **Source:** `internal/app/pager.go:85`: `renderWithPager` and `addLessColorFlag`.
+- **Assertion:** `TestResolvePagerFallbackAddsLessRawColorFlag`,
+  `TestAddLessColorFlagMatchesWindowsLessExecutable`, and
+  `TestRenderWithPagerDoesNotDeadlockWhenChildExitsEarly` in `internal/app/pager_test.go`.
+- **Rejected:** Synchronous writes to the pager's pipe reader, which deadlocks on early child termination.
+
 ## Gaps
 
 - `handleUndo`'s failure branch (`internal/app/history_commands.go:73`) has no test; nothing drives

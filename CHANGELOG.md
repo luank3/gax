@@ -7,6 +7,15 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Prevent deadlock in full conversation history (`Ctrl+O`) and transcript (`Ctrl+T`) views when
+  quitting the pager before all output has been consumed.
+- Pass `-R` to fallback `less` invocations when `$PAGER` is unset, and recognize `less.exe` on Windows,
+  so ANSI formatting renders styled text instead of raw escape sequences.
+- Prevent 100% CPU busy-spin in `gax --resume` and slash-command pickers on macOS and BSD by waiting
+  indefinitely in POSIX poll when no timeout is requested.
+
 ## [0.2.0-rc.3] - 2026-10-26
 
 ### Added

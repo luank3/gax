@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -102,10 +101,15 @@ func renderWithPager(command string, stdout, stderr io.Writer, render func(io.Wr
 		_, _ = io.WriteString(stdout, "\n")
 		return
 	}
-	render(writer)
-	_ = writer.Close()
-	_ = reader.Close()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer writer.Close()
+		render(writer)
+	}()
 	_ = child.Wait()
+	_ = reader.CloseWithError(io.EOF)
+	<-done
 }
 
 func resolvePager() (string, error) {
@@ -122,7 +126,7 @@ func resolvePager() (string, error) {
 	}
 	for _, candidate := range []string{"less", "more"} {
 		if systemshell.FindCommand(candidate) != "" {
-			return candidate, nil
+			return addLessColorFlag(candidate, candidate, len(candidate)), nil
 		}
 	}
 	return "", errors.New("no pager found — install less or set $PAGER")
@@ -185,7 +189,12 @@ func shellHead(command string) (string, int) {
 }
 
 func addLessColorFlag(command, head string, end int) string {
-	if filepath.Base(head) != "less" {
+	base := head
+	if slash := strings.LastIndexAny(base, "/\\"); slash >= 0 {
+		base = base[slash+1:]
+	}
+	base = strings.ToLower(base)
+	if base != "less" && base != "less.exe" {
 		return command
 	}
 	return command[:end] + " -R" + command[end:]

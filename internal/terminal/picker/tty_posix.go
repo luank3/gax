@@ -99,7 +99,7 @@ func (source ttyByteSource) ReadByteTimeout(timeout time.Duration) (byte, bool, 
 
 func pickerPollTimeoutMillis(timeout time.Duration) int {
 	if timeout <= 0 {
-		return 0
+		return -1
 	}
 	return int((timeout + time.Millisecond - 1) / time.Millisecond)
 }
