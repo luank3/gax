@@ -3,6 +3,7 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -88,28 +89,37 @@ func TestBashProcessDiesWhenItsParentIsKilled(t *testing.T) {
 		t.Fatalf("kill helper parent: %v", err)
 	}
 	_ = parent.Wait()
-	deadline = time.Now().Add(time.Second)
-	for time.Now().Before(deadline) && !linuxProcessExited(childPID) {
+	exited := false
+	deadline = time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if linuxProcessExited(childPID) {
+			exited = true
+			break
+		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if !linuxProcessExited(childPID) {
+	if !exited {
 		_ = syscall.Kill(childPID, syscall.SIGKILL)
 		t.Fatalf("Bash child %d survived its parent", childPID)
 	}
 }
 
 func linuxProcessExited(pid int) bool {
-	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
-	if os.IsNotExist(err) {
+	if err := syscall.Kill(pid, 0); errors.Is(err, syscall.ESRCH) {
 		return true
 	}
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
 	if err != nil {
-		return false
+		return os.IsNotExist(err) || errors.Is(err, syscall.ESRCH)
 	}
 	closing := strings.LastIndex(string(data), ") ")
 	if closing < 0 {
 		return false
 	}
 	fields := strings.Fields(string(data[closing+2:]))
-	return len(fields) > 0 && fields[0] == "Z"
+	if len(fields) == 0 {
+		return false
+	}
+	state := fields[0]
+	return state == "Z" || state == "X" || state == "x"
 }

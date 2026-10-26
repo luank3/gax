@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"runtime"
 	"strings"
 
@@ -87,7 +86,7 @@ func renderWithPager(command string, stdout, stderr io.Writer, render func(io.Wr
 	if runtime.GOOS == "windows" {
 		shell = systemshell.Default()
 	}
-	child := exec.Command(shell, "-c", command)
+	child := systemshell.Command(shell, command)
 	child.Stdin = reader
 	child.Stdout = stdout
 	child.Stderr = stderr

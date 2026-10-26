@@ -4,6 +4,7 @@
 package shell
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,14 +37,20 @@ func Find(name string) string {
 	return ""
 }
 
-// Resolve selects Git Bash; the Windows WSL bash launcher is not a native shell backend.
+// Resolve selects Git Bash, or falls back to PowerShell / CMD when Git Bash is unavailable.
 func Resolve(configured string) (path string, invalidConfigured bool) {
 	if configured != "" {
 		if path := Find(configured); path != "" {
 			return path, false
 		}
+		for _, ext := range []string{".exe", ".cmd", ".bat"} {
+			if path := Find(configured + ext); path != "" {
+				return path, false
+			}
+		}
 		invalidConfigured = true
 	}
+	// 1. Prefer Git Bash if installed
 	if git := Find("git.exe"); git != "" {
 		root := filepath.Dir(filepath.Dir(git))
 		for _, relative := range []string{`bin\bash.exe`, `usr\bin\bash.exe`} {
@@ -66,10 +73,27 @@ func Resolve(configured string) (path string, invalidConfigured bool) {
 			return path, invalidConfigured
 		}
 	}
+	// 2. Fallback to PowerShell (pwsh -> powershell)
+	for _, candidate := range []string{"pwsh.exe", "powershell.exe"} {
+		if path := Find(candidate); path != "" {
+			return path, invalidConfigured
+		}
+	}
+	system32 := filepath.Join(os.Getenv("SystemRoot"), "System32")
+	if path := Find(filepath.Join(system32, "WindowsPowerShell", "v1.0", "powershell.exe")); path != "" {
+		return path, invalidConfigured
+	}
+	// 3. Fallback to CMD
+	if path := Find("cmd.exe"); path != "" {
+		return path, invalidConfigured
+	}
+	if path := Find(filepath.Join(system32, "cmd.exe")); path != "" {
+		return path, invalidConfigured
+	}
 	return "", invalidConfigured
 }
 
-// Default returns the shell used for POSIX terminal helper commands.
+// Default returns the shell used for terminal helper commands.
 func Default() string {
 	path, _ := Resolve("")
 	return path
@@ -93,4 +117,30 @@ func FindCommand(name string) string {
 		}
 	}
 	return ""
+}
+
+// Command constructs an *exec.Cmd to run command through the specified shell,
+// adapting execution flags for PowerShell, CMD, or POSIX shells.
+func Command(shellPath, command string) *exec.Cmd {
+	return CommandContext(context.Background(), shellPath, command)
+}
+
+// CommandContext constructs an *exec.Cmd with context to run command through the specified shell,
+// adapting execution flags for PowerShell, CMD, or POSIX shells.
+func CommandContext(ctx context.Context, shellPath, command string) *exec.Cmd {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if shellPath == "" {
+		shellPath = Default()
+	}
+	base := strings.ToLower(filepath.Base(shellPath))
+	switch base {
+	case "cmd.exe", "cmd":
+		return exec.CommandContext(ctx, shellPath, "/d", "/s", "/c", command)
+	case "powershell.exe", "powershell", "pwsh.exe", "pwsh":
+		return exec.CommandContext(ctx, shellPath, "-NoProfile", "-NonInteractive", "-Command", command)
+	default:
+		return exec.CommandContext(ctx, shellPath, "-c", command)
+	}
 }

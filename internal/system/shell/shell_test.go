@@ -88,3 +88,13 @@ func TestResolveRejectsRelativePathShellAndReportsInvalidConfiguration(t *testin
 		t.Fatalf("Resolve() = (%q, %t), want (%q, true)", got, invalid, want)
 	}
 }
+
+func TestCommandConstructsPosixShellArgs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell command invocation")
+	}
+	cmd := Command("/bin/bash", "echo hello")
+	if cmd.Path != "/bin/bash" || len(cmd.Args) != 3 || cmd.Args[1] != "-c" || cmd.Args[2] != "echo hello" {
+		t.Fatalf("Command() = %#v", cmd)
+	}
+}

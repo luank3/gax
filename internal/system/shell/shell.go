@@ -4,6 +4,7 @@
 package shell
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -62,3 +63,19 @@ func Default() string { return "/bin/sh" }
 
 // FindCommand resolves a terminal helper executable.
 func FindCommand(name string) string { path, _ := exec.LookPath(name); return path }
+
+// Command constructs an *exec.Cmd to run command through the specified shell.
+func Command(shellPath, command string) *exec.Cmd {
+	return CommandContext(context.Background(), shellPath, command)
+}
+
+// CommandContext constructs an *exec.Cmd with context to run command through the specified shell.
+func CommandContext(ctx context.Context, shellPath, command string) *exec.Cmd {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if shellPath == "" {
+		shellPath = Default()
+	}
+	return exec.CommandContext(ctx, shellPath, "-c", command)
+}

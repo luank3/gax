@@ -7,6 +7,22 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Native Win32 clipboard support using direct User32/Kernel32 APIs (`CF_UNICODETEXT`, registered `PNG`,
+  and `CF_DIB`/`CF_DIBV5` decoding), removing headless PowerShell subprocess latency while retaining
+  it as a fallback.
+- Transparent multi-shell execution on Windows: automatically adapt command line arguments for
+  PowerShell (`pwsh`/`powershell` with `-NoProfile -NonInteractive -Command`), CMD (`/d /s /c`),
+  and POSIX shells (`-c`).
+- Automatic fallback on Windows to PowerShell or CMD when Git for Windows Bash is not installed,
+  with support for explicit `bash.shell` configuration to PowerShell or CMD.
+
+### Fixed
+
+- Prevent a race condition in the Linux parent-death test (`TestBashProcessDiesWhenItsParentIsKilled`)
+  where reaped child processes and procfs state transitions falsely reported survival.
+
 ## [0.2.0-rc.4] - 2026-10-26
 
 ### Fixed

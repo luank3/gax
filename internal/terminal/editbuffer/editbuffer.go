@@ -37,7 +37,7 @@ func EditBuffer(text string, stdin io.Reader, stdout, stderr io.Writer) (string,
 		return "", false, err
 	}
 	commandLine := command + " " + shellQuote(path)
-	process := exec.Command(systemshell.Default(), "-c", commandLine)
+	process := systemshell.Command(systemshell.Default(), commandLine)
 	process.Stdin = stdin
 	process.Stdout = stdout
 	process.Stderr = stderr

@@ -16,6 +16,7 @@ import (
 
 	"github.com/luank3/gax/internal/bashcompress"
 	"github.com/luank3/gax/internal/subagent"
+	systemshell "github.com/luank3/gax/internal/system/shell"
 	"github.com/luank3/gax/internal/system/tempfiles"
 )
 
@@ -834,7 +835,7 @@ func (registry *Registry) startCommand(command string, display DisplaySink, rawO
 		capture.closeRemove()
 		return nil, fmt.Errorf("create output pipe: %w", err)
 	}
-	cmd := exec.Command(shell, "-c", command)
+	cmd := systemshell.Command(shell, command)
 	cmd.Dir = registry.options.WorkDir
 	cmd.Env = registry.childEnvironment()
 	cmd.Stdout, cmd.Stderr = writer, writer
