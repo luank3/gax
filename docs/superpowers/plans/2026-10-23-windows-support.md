@@ -242,3 +242,28 @@ Verification:
 - The native Windows ARM64 full suite/vet, Linux `make lint test-race`, and both cgo-free Windows
   builds pass. The editor regression uses an isolated console and injected key records; no physical
   Windows Terminal interaction was done.
+
+## Shared-terminal word-deletion sequences
+
+Terminal decoders can expose Ctrl+Delete and Ctrl+Backspace as distinct escape sequences, even when
+ordinary raw Backspace bytes are ambiguous.
+
+- [x] Add failing shared-decoder tests for Ctrl+Delete (`CSI 3;5~`) and Ctrl+Backspace
+  (`CSI 127;5u`, `CSI 27;5;127~`), while preserving plain Delete (`CSI 3~`).
+- [x] Map only those distinct sequences to the existing forward/backward word-deletion actions; do
+  not enable a terminal keyboard protocol or reinterpret raw Backspace bytes.
+- [x] Update the terminal-input spec and Unreleased changelog to document the mappings and raw-byte
+  limitation.
+- [x] Run `make lint test-race` and cgo-free Linux/macOS builds.
+
+Verification:
+- New decoder cases failed before implementation (`CSI 3;5~` returned `ActionDeleteForward`; the two
+  distinct Backspace sequences returned `ActionNone`), then passed after the exact-sequence mappings
+  were added. The complete `internal/terminal/input` package passes.
+- Baseline `make test` initially failed because `GAX_OPENAI_BASE_URL` was set in the shell; rerunning
+  as `env -u GAX_OPENAI_BASE_URL make test` passes.
+- The first full race run timed out in `TestRunTTYSlashProviderPickerChainsModelAndEffortSelection`
+  and reported a cleanup race. That test passed in isolation, and a full retry of
+  `env -u GAX_OPENAI_BASE_URL make lint test-race` passed.
+- Cgo-free Linux/amd64 and macOS/arm64 `make build` commands pass.
+- This follow-up uses a user-approved isolated worktree branch; no commit or push was created.

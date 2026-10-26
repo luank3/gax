@@ -27,6 +27,21 @@ enable/disable, termios restore, and answer rendering.
 
 ---
 
+### Map word-deletion shortcuts only when the terminal distinguishes them
+
+- **Rule:** Decode `CSI 3;5~` as `ActionKillWordForward`, and `CSI 127;5u` or
+  `CSI 27;5;127~` as `ActionKillWordBackAlnum`. Keep unmodified `CSI 3~` as
+  `ActionDeleteForward`. Do not infer Ctrl+Backspace from raw `0x08` or `0x7f`, which can be the same
+  bytes as ordinary Backspace, and do not enable a terminal keyboard protocol.
+- **Source:** `internal/terminal/input/escape.go` `DecodeEscape`; raw `0x08`/`0x7f` handling in
+  `internal/terminal/input/editor.go`.
+- **Assertion:** `TestDecodeEscapeMapsCursorEditingAndPasteSequences` in
+  `internal/terminal/input/core_test.go` covers the three modified sequences and unmodified Delete.
+- **Rejected:** Treating raw Backspace as Ctrl+Backspace: terminals that emit the same byte for both
+  keys cannot be distinguished without changing ordinary Backspace behavior.
+
+---
+
 ### Clear the draft on the first Ctrl-C and exit on a second
 
 - **Rule:** With a non-empty buffer, store the text as session-only history and clear it, arming the

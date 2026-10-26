@@ -17,9 +17,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Preserve multiline pastes on Windows by enabling VT input so the console passes
   bracketed-paste markers through instead of treating pasted newlines as Enter.
-- Map native Ctrl+Backspace/Delete records to the editor's existing previous/next-word deletion
-  actions, and map Shift+Enter to an inserted newline while keeping plain Enter as submit.
-  Unmodified Backspace/Delete behavior remains unchanged.
+- Decode terminal Ctrl+Delete and the distinct CSI-u/modifyOtherKeys Ctrl+Backspace sequences to the
+  editor's existing word-deletion actions. Raw Backspace bytes remain ordinary Backspace where a
+  terminal does not distinguish Ctrl+Backspace.
+- Map native Windows Ctrl+Backspace/Delete records to those actions and Shift+Enter to an inserted
+  newline; unmodified Backspace/Delete and plain Enter behavior remain unchanged.
 
 ## [0.2.0-rc.2] - 2026-10-23
 

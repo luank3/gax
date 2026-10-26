@@ -59,8 +59,13 @@ func DecodeEscape(read ByteReader) Action {
 			}
 			return arrowAction(final, meta)
 		}
-		if string(sequence) == "200~" {
+		switch string(sequence) {
+		case "200~":
 			return ActionPasteBegin
+		case "3;5~":
+			return ActionKillWordForward
+		case "127;5u", "27;5;127~":
+			return ActionKillWordBackAlnum
 		}
 		final := sequence[len(sequence)-1]
 		if (final == '~' || final == '^' || final == '$' || final == '@') &&
