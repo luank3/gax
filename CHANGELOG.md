@@ -7,6 +7,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0-rc.3] - 2026-10-26
+
 ### Added
 
 - Keenable search via `web.search_provider=keenable`, with `KEENABLE_API_KEY` (or
@@ -105,7 +107,8 @@ Initial release: a minimalist terminal-native coding agent written in Go, ported
 - The test suite passes on macOS: it had never run there, because `go vet` failed on a helper
   defined only in a Linux-tagged test file.
 
-[Unreleased]: https://github.com/luank3/gax/compare/v0.2.0-rc.2...HEAD
+[Unreleased]: https://github.com/luank3/gax/compare/v0.2.0-rc.3...HEAD
+[0.2.0-rc.3]: https://github.com/luank3/gax/releases/tag/v0.2.0-rc.3
 [0.2.0-rc.2]: https://github.com/luank3/gax/releases/tag/v0.2.0-rc.2
 [0.2.0-rc.1]: https://github.com/luank3/gax/releases/tag/v0.2.0-rc.1
 [0.1.0]: https://github.com/luank3/gax/releases/tag/v0.1.0
