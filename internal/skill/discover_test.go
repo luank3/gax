@@ -26,6 +26,7 @@ func TestDiscoverPrefersTheNearestSkillAndFallsBackToBuiltins(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeSkill(t, filepath.Join(project, ".agents", "skills"), "customize-gax", "---\ndescription: project override\n---\n")
+	writeSkill(t, filepath.Join(project, ".agents", "skills"), "code-intelligence", "---\ndescription: custom code intel\n---\n")
 	writeSkill(t, filepath.Join(home, ".agents", "skills"), "guide", "---\ndescription: shared guide\n---\n")
 	writeSkill(t, filepath.Join(home, "config", "gax", "skills"), "deploy", "---\ndescription: deploy helper\n---\n")
 
@@ -37,6 +38,10 @@ func TestDiscoverPrefersTheNearestSkillAndFallsBackToBuiltins(t *testing.T) {
 	override, ok := byName["customize-gax"]
 	if !ok || override.Description != "project override" || override.Body != "" {
 		t.Fatalf("a discovered skill should shadow the built-in: %+v", override)
+	}
+	ciOverride, ok := byName["code-intelligence"]
+	if !ok || ciOverride.Description != "custom code intel" || ciOverride.Body != "" {
+		t.Fatalf("a discovered code-intelligence skill should shadow the built-in: %+v", ciOverride)
 	}
 	if got := byName["guide"].DisplayPath; got != filepath.FromSlash("~/.agents/skills/guide/SKILL.md") {
 		t.Fatalf("shared skill display path = %q", got)

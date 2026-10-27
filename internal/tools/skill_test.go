@@ -49,7 +49,8 @@ func TestSkillToolListsAndLoadsSkills(t *testing.T) {
 	if canonical == "" {
 		t.Fatal("registry has no working directory")
 	}
-	want := "- customize-gax: Change gax's own settings, providers, models, or presets — where config.json lives, which keys exist, what applies live, and what needs a restart. (gax:skills/customize-gax/SKILL.md)\n" +
+	want := "- code-intelligence: Explore, navigate, and search codebases using structural search (ast-grep), tags/symbols (ctags), targeted regex, and git history without whole-file reads. (gax:skills/code-intelligence/SKILL.md)\n" +
+		"- customize-gax: Change gax's own settings, providers, models, or presets — where config.json lives, which keys exist, what applies live, and what needs a restart. (gax:skills/customize-gax/SKILL.md)\n" +
 		"- deploy: deploy helper (" + filepath.Join(canonical, ".agents", "skills", "deploy", "SKILL.md") + ")"
 	if listing != want {
 		t.Fatalf("skill listing = %q, want %q", listing, want)
@@ -58,6 +59,11 @@ func TestSkillToolListsAndLoadsSkills(t *testing.T) {
 	loaded := registry.Run("skill", jsonArgs(map[string]any{"name": "deploy"}), 1).Text
 	if loaded != "---\ndescription: deploy helper\n---\nrun the deploy steps" {
 		t.Fatalf("loaded project skill = %q", loaded)
+	}
+
+	codeIntel := registry.Run("skill", jsonArgs(map[string]any{"name": "code-intelligence"}), 1).Text
+	if !strings.HasPrefix(codeIntel, "---\nname: code-intelligence") || !strings.Contains(codeIntel, "# Code Intelligence & Navigation") {
+		t.Fatalf("loaded code-intelligence skill = %q", codeIntel[:min(len(codeIntel), 200)])
 	}
 
 	builtin := registry.Run("skill", jsonArgs(map[string]any{"name": "customize-gax"}), 1).Text
@@ -70,7 +76,7 @@ func TestSkillToolReportsUnknownNamesAndBadArguments(t *testing.T) {
 	registry, _ := skillTestRegistry(t, Options{})
 
 	unknown := registry.Run("skill", jsonArgs(map[string]any{"name": "missing"}), 1).Text
-	if !strings.Contains(unknown, "unknown skill 'missing' (available: customize-gax)") {
+	if !strings.Contains(unknown, "unknown skill 'missing' (available: code-intelligence, customize-gax)") {
 		t.Fatalf("unknown skill message = %q", unknown)
 	}
 	if got := registry.Run("skill", jsonArgs(map[string]any{"name": 7}), 1).Text; got != "'name' must be a string" {
@@ -79,7 +85,7 @@ func TestSkillToolReportsUnknownNamesAndBadArguments(t *testing.T) {
 	if got := registry.Run("skill", `{bad`, 1).Text; !strings.HasPrefix(got, "invalid arguments: ") {
 		t.Fatalf("malformed arguments = %q", got)
 	}
-	if got := registry.Run("skill", jsonArgs(map[string]any{"name": "  "}), 1).Text; !strings.HasPrefix(got, "- customize-gax:") {
+	if got := registry.Run("skill", jsonArgs(map[string]any{"name": "  "}), 1).Text; !strings.HasPrefix(got, "- code-intelligence:") {
 		t.Fatalf("blank name should list skills: %q", got)
 	}
 }

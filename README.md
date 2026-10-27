@@ -201,10 +201,12 @@ Example `config.json`:
 `system_prompt_append`, and can be selected with the leading shorthand (`gax review`) or
 `--preset=review`.
 
-gax ships one skill of its own: `customize-gax`, which tells the model how to change these settings,
-providers, and presets. It is listed with the discovered skills; loading it resolves the document
-from the binary rather than the filesystem (the `gax:skills/customize-gax/SKILL.md` path, which
-`read` also accepts). A discovered skill named `customize-gax` shadows it.
+gax ships two built-in skills of its own: `code-intelligence` (which guides the model on
+structural search via optional external tools such as `ast-grep`, `ctags`, and `rg`, plus git history
+without full-file reads) and `customize-gax` (which tells the model how to change settings, providers,
+and presets). They are listed with the discovered skills; loading them resolves the documents from the
+binary rather than the filesystem (`gax:skills/<name>/SKILL.md`, which `read` also accepts). A
+discovered skill of the same name shadows the built-in.
 
 ## Sessions and output
 

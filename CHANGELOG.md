@@ -7,6 +7,14 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [Unreleased]
+
+### Added
+
+- Embedded `code-intelligence` skill (`gax:skills/code-intelligence/SKILL.md`) guiding the model on
+  structural search via `ast-grep`, `ctags`, targeted language-specific regex patterns, and git
+  provenance tracking without whole-file reads.
+
 ## [0.2.0] - 2026-10-27
 
 ### Added
