@@ -86,6 +86,12 @@ func RunLoop(ctx context.Context, options LoopOptions) LoopResult {
 		result.ErrorMessage = "agent session is unavailable"
 		return result
 	}
+	if options.ToolRegistry != nil {
+		session := options.Session
+		options.ToolRegistry.SetActiveItems(func() []conversation.Item {
+			return session.Context().Items
+		})
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}

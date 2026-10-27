@@ -56,19 +56,81 @@ func TestSkillToolListsAndLoadsSkills(t *testing.T) {
 		t.Fatalf("skill listing = %q, want %q", listing, want)
 	}
 
+	deployPath := filepath.Join(canonical, ".agents", "skills", "deploy", "SKILL.md")
 	loaded := registry.Run("skill", jsonArgs(map[string]any{"name": "deploy"}), 1).Text
-	if loaded != "---\ndescription: deploy helper\n---\nrun the deploy steps" {
-		t.Fatalf("loaded project skill = %q", loaded)
+	wantDeploy := "[skill: deploy (" + deployPath + ")]\n---\ndescription: deploy helper\n---\nrun the deploy steps"
+	if loaded != wantDeploy {
+		t.Fatalf("loaded project skill = %q, want %q", loaded, wantDeploy)
 	}
 
 	codeIntel := registry.Run("skill", jsonArgs(map[string]any{"name": "code-intelligence"}), 1).Text
-	if !strings.HasPrefix(codeIntel, "---\nname: code-intelligence") || !strings.Contains(codeIntel, "# Code Intelligence & Navigation") {
+	if !strings.HasPrefix(codeIntel, "[skill: code-intelligence (gax:skills/code-intelligence/SKILL.md)]\n---\nname: code-intelligence") || !strings.Contains(codeIntel, "# Code Intelligence & Navigation") {
 		t.Fatalf("loaded code-intelligence skill = %q", codeIntel[:min(len(codeIntel), 200)])
 	}
 
 	builtin := registry.Run("skill", jsonArgs(map[string]any{"name": "customize-gax"}), 1).Text
-	if !strings.HasPrefix(builtin, "---\nname: customize-gax") || !strings.Contains(builtin, "| `no_skills` |") {
+	if !strings.HasPrefix(builtin, "[skill: customize-gax (gax:skills/customize-gax/SKILL.md)]\n---\nname: customize-gax") || !strings.Contains(builtin, "| `no_skills` |") {
 		t.Fatalf("loaded built-in skill = %q", builtin[:min(len(builtin), 200)])
+	}
+}
+
+func TestSkillToolGuardsActiveContextReuseAndReloadsWhenChangedOrCompacted(t *testing.T) {
+	registry, project := skillTestRegistry(t, Options{})
+	skillsDir := filepath.Join(project, ".agents", "skills")
+	writeTestSkill(t, skillsDir, "deploy", "---\ndescription: deploy helper\n---\nrun the deploy steps\n")
+
+	canonical := registry.bashWorkingDirectory()
+	deployPath := filepath.Join(canonical, ".agents", "skills", "deploy", "SKILL.md")
+
+	var active []conversation.Item
+	registry.SetActiveItems(func() []conversation.Item {
+		return active[conversation.ContextFloor(active):]
+	})
+
+	callArgs := jsonArgs(map[string]any{"name": "deploy"})
+	first := registry.Run("skill", callArgs, 1).Text
+	wantFull := "[skill: deploy (" + deployPath + ")]\n---\ndescription: deploy helper\n---\nrun the deploy steps"
+	if first != wantFull {
+		t.Fatalf("first load = %q, want %q", first, wantFull)
+	}
+
+	// Partial / catalog / error results do not trigger the guard.
+	listing := registry.Run("skill", `{}`, 1).Text
+	active = append(active, conversation.Item{
+		Kind: conversation.KindToolResult, ToolName: conversation.String("skill"), Output: conversation.String(listing),
+	})
+	if got := registry.Run("skill", callArgs, 1).Text; got != wantFull {
+		t.Fatalf("load after listing only = %q, want full document", got)
+	}
+
+	// Recording the full skill result in active conversation triggers the reuse guard.
+	active = append(active, conversation.Item{
+		Kind: conversation.KindToolResult, ToolName: conversation.String("skill"), Output: conversation.String(first),
+	})
+	wantAlready := "[skill: deploy (" + deployPath + ") — already loaded in active conversation; continue following the instructions above without reloading]"
+	if got := registry.Run("skill", callArgs, 1).Text; got != wantAlready {
+		t.Fatalf("second load in active context = %q, want %q", got, wantAlready)
+	}
+
+	// Modifying the skill content on disk invalidates the reuse match and reloads the new document.
+	writeTestSkill(t, skillsDir, "deploy", "---\ndescription: deploy helper\n---\nrun the updated deploy steps\n")
+	wantUpdated := "[skill: deploy (" + deployPath + ")]\n---\ndescription: deploy helper\n---\nrun the updated deploy steps"
+	if got := registry.Run("skill", callArgs, 1).Text; got != wantUpdated {
+		t.Fatalf("load after content change = %q, want %q", got, wantUpdated)
+	}
+	active = append(active, conversation.Item{
+		Kind: conversation.KindToolResult, ToolName: conversation.String("skill"), Output: conversation.String(wantUpdated),
+	})
+	if got := registry.Run("skill", callArgs, 1).Text; got != wantAlready {
+		t.Fatalf("repeat load of updated content = %q, want %q", got, wantAlready)
+	}
+
+	// Compaction advances the context floor past the full skill output, so the next load returns the full body again.
+	active = append(active, conversation.Item{
+		Kind: conversation.KindUser, Origin: conversation.OriginCompactSeed, Text: conversation.String("summary mentioning deploy"),
+	})
+	if got := registry.Run("skill", callArgs, 1).Text; got != wantUpdated {
+		t.Fatalf("load after compaction = %q, want %q", got, wantUpdated)
 	}
 }
 

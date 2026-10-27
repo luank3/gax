@@ -225,10 +225,12 @@ The agent ships these built-in tools: `read`, `edit`, `write`, `bash`, `task_wai
 `gax -p "<task>"` can be run through `bash` to delegate to a subagent with clean context. Besides
 files, `read` accepts the `gax:skills/<name>/SKILL.md` paths of the skills built into the binary.
 
-`skill` loads a skill by name, so the system prompt lists each skill with its description but
-without the path of its document: the model loads the one whose description matches instead of
-composing a path. `no_skills` (or `--bare`) drops both the listing and the tool, and a discovered
-skill shadows a built-in of the same name.
+`skill` loads a skill by name with a `[skill: <name> (<source>)]` header, so the system prompt
+lists each skill with its description but without the path of its document: the model loads the one
+whose description matches instead of composing a path, and reuses a skill already present in the
+active conversation without reloading its full body unless its content changes or leaves active
+context after compaction or `/undo`. `no_skills` (or `--bare`) drops both the listing and the tool,
+and a discovered skill shadows a built-in of the same name.
 
 `web_fetch` retrieves a URL and converts an HTML response to plain text unless the model passes
 `strip: false` for the raw body; `web_search` returns ranked titles, URLs, and snippets. You.com is

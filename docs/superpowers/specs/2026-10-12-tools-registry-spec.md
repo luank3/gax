@@ -112,7 +112,7 @@
 - **Source:** `internal/tools/registry.go:837` (`builtInDefinitions`).
 - **Assertion:** `TestBuiltInToolDefinitions` in `internal/tools/registry_test.go:18`.
 - **Rejected:** Advertising `skill` while refusing it at execution.
-  `TestSkillToolDefinitionsAndDisable` (internal/tools/skill_test.go:97) requires the definition
+  `TestSkillToolDefinitionsAndDisable` (internal/tools/skill_test.go:171) requires the definition
   itself to be gone.
 
 ## Gaps

@@ -131,6 +131,11 @@ func buildEnvironmentSuffix(store *config.Store, model string, options PromptOpt
 	return joinPromptSections(parts), warnings
 }
 
+const skillsPromptPreamble = "# Skills\n\n" +
+	"Use relevant skills throughout the task. Before loading one, check whether its complete instructions are already included in the active conversation, either as a successful skill result or as explicitly supplied skill content. If they are present, keep following them without calling `skill` again.\n\n" +
+	"A follow-up message, \"continue\", or a workflow phase change does not by itself require another load. Load again only when the full document is no longer available, its source or content changed, or a refresh is explicitly requested. A catalogue entry or a summary mentioning a skill is not its complete instructions. Using or invoking a skill means applying it; it does not always require another tool call.\n\n" +
+	"Load a skill with the `skill` tool when a task matches its description:\n\n"
+
 // buildSkills lists what a session can load. The path stays out: the skill tool resolves a skill
 // by name, so the prompt does not spend tokens on a path the model would only echo back.
 func buildSkills(options PromptOptions) string {
@@ -139,7 +144,7 @@ func buildSkills(options PromptOptions) string {
 		return ""
 	}
 	var out strings.Builder
-	out.WriteString("# Skills\n\nLoad a skill with the `skill` tool when a task matches its description:\n\n")
+	out.WriteString(skillsPromptPreamble)
 	for _, entry := range entries {
 		if entry.Description != "" {
 			fmt.Fprintf(&out, "- %s: %s\n", entry.Name, entry.Description)

@@ -7,13 +7,15 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [Unreleased]
-
 ### Added
 
 - Embedded `code-intelligence` skill (`gax:skills/code-intelligence/SKILL.md`) guiding the model on
   structural search via `ast-grep`, `ctags`, targeted language-specific regex patterns, and git
   provenance tracking without whole-file reads.
+- Active-conversation skill reuse policy in the `# Skills` prompt section and `skill` tool
+  description, an explicit `[skill: <name> (<source>)]` document header, and a runtime guard in
+  `skill` that avoids appending duplicate full skill bodies already present in active context while
+  reloading when content changes or leaves active context after compaction or `/undo`.
 
 ## [0.2.0] - 2026-10-27
 

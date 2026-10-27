@@ -68,15 +68,16 @@
 
 ---
 
-### Skill listing omits paths
+### Skill listing omits paths and includes reuse guidance
 
-- **Rule:** Under `# Skills`, emit the literal line
-  `Load a skill with the \`skill\` tool when a task matches its description:` and one
+- **Rule:** Under `# Skills`, emit the reuse preamble (`skillsPromptPreamble`), the literal line
+  `Load a skill with the \`skill\` tool when a task matches its description:`, and one
   `- <name>: <description>` bullet per entry, never a path.
-- **Source:** `internal/agent/prompt.go:136` `buildSkills`.
+- **Source:** `internal/agent/prompt.go:141` `buildSkills`.
 - **Assertion:** `TestBuildSystemPromptListsSkillsWithoutPaths` in
   `internal/agent/prompt_test.go:182`.
-- **Rejected:** Listing `entry.Path` so the model opens the document itself.
+- **Rejected:** Listing `entry.Path` so the model opens the document itself, or omitting the
+  active-conversation reuse rule across continuations.
 
 ---
 

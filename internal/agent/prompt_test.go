@@ -196,6 +196,12 @@ func TestBuildSystemPromptListsSkillsWithoutPaths(t *testing.T) {
 	}
 	store := promptTestStore(t, `{"system_prompt":"base","no_env":true,"no_agents_md":true,"no_subagents":true,"no_tasks":true}`)
 	result := BuildSystemPrompt(store, "", PromptOptions{CWD: project, Home: home})
+	if !strings.Contains(result.Text, "Use relevant skills throughout the task. Before loading one, check whether its complete instructions are already included in the active conversation, either as a successful skill result or as explicitly supplied skill content. If they are present, keep following them without calling `skill` again.") {
+		t.Fatalf("skill section omits reuse guidance: %q", result.Text)
+	}
+	if !strings.Contains(result.Text, "A follow-up message, \"continue\", or a workflow phase change does not by itself require another load. Load again only when the full document is no longer available, its source or content changed, or a refresh is explicitly requested. A catalogue entry or a summary mentioning a skill is not its complete instructions. Using or invoking a skill means applying it; it does not always require another tool call.") {
+		t.Fatalf("skill section omits continuation/summary reuse guidance: %q", result.Text)
+	}
 	if !strings.Contains(result.Text, "Load a skill with the `skill` tool when a task matches its description:") {
 		t.Fatalf("skill section does not point at the tool: %q", result.Text)
 	}

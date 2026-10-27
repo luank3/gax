@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/luank3/gax/internal/agent"
@@ -669,5 +670,91 @@ func TestRunLoopObservesNoCallsForToolFreeTurn(t *testing.T) {
 	})
 	if result.Outcome != agent.LoopComplete || seen != 0 {
 		t.Fatalf("tool-free turn reported calls: result=%+v seen=%d", result, seen)
+	}
+}
+
+func TestRunLoopReusesActiveSkillAcrossContinuesAndReloadsAfterUndo(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
+	project := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(project, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	skillDir := filepath.Join(project, ".agents", "skills", "deploy")
+	if err := os.MkdirAll(skillDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\ndescription: deploy helper\n---\nrun the deploy steps\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	toolRegistry := coretools.New(coretools.Options{WorkDir: project})
+	defer toolRegistry.Close()
+
+	state := agent.NewSession()
+	state.Tools = toolRegistry.Definitions()
+	args, err := json.Marshal(map[string]string{"name": "deploy"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	turn := 0
+	stream := agent.StreamFunc(func(_ context.Context, _ *transport.Client, _ *runtime.Provider, _ string,
+		_ coreprovider.Context, _ client.StreamOptions, _ func() bool, callback func(conversation.Event),
+	) (transport.Response, error) {
+		turn++
+		switch turn {
+		case 1, 3, 5:
+			id := "skill-call"
+			callback(conversation.Event{Kind: conversation.EventToolCallStart, ID: conversation.String(id), Name: "skill"})
+			callback(conversation.Event{Kind: conversation.EventToolCallDelta, ID: conversation.String(id), Delta: string(args)})
+			callback(conversation.Event{Kind: conversation.EventToolCallEnd, ID: conversation.String(id)})
+		default:
+			callback(conversation.Event{Kind: conversation.EventTextDelta, Text: "done"})
+		}
+		callback(conversation.Event{Kind: conversation.EventDone})
+		return transport.Response{StatusCode: 200}, nil
+	})
+
+	state.AddUser("deploy the app")
+	firstRun := agent.RunLoop(context.Background(), agent.LoopOptions{Session: state, Stream: stream, ToolRegistry: toolRegistry})
+	if firstRun.Outcome != agent.LoopComplete {
+		t.Fatalf("first run outcome = %v", firstRun.Outcome)
+	}
+
+	state.AddContinuation()
+	secondRun := agent.RunLoop(context.Background(), agent.LoopOptions{Session: state, Stream: stream, ToolRegistry: toolRegistry})
+	if secondRun.Outcome != agent.LoopComplete {
+		t.Fatalf("second run outcome = %v", secondRun.Outcome)
+	}
+
+	var outputs []string
+	for _, item := range state.Items {
+		if item.Kind == conversation.KindToolResult && item.Output != nil {
+			outputs = append(outputs, *item.Output)
+		}
+	}
+	if len(outputs) != 2 {
+		t.Fatalf("tool result count = %d, want 2", len(outputs))
+	}
+	if outputs[0] == outputs[1] || !strings.Contains(outputs[1], "already loaded in active conversation") {
+		t.Fatalf("expected second load to return reuse notice: first=%q second=%q", outputs[0], outputs[1])
+	}
+
+	// Retiring the whole history removes the loaded skill from active context, so the next load returns the full body again.
+	state.Retire(0)
+	state.AddUser("deploy again")
+	thirdRun := agent.RunLoop(context.Background(), agent.LoopOptions{Session: state, Stream: stream, ToolRegistry: toolRegistry})
+	if thirdRun.Outcome != agent.LoopComplete {
+		t.Fatalf("third run outcome = %v", thirdRun.Outcome)
+	}
+	var thirdOutput string
+	for _, item := range state.Items {
+		if item.Kind == conversation.KindToolResult && item.Output != nil {
+			thirdOutput = *item.Output
+		}
+	}
+	if thirdOutput != outputs[0] {
+		t.Fatalf("load after Retire(0) = %q, want full body %q", thirdOutput, outputs[0])
 	}
 }

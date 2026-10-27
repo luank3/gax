@@ -115,6 +115,8 @@ type Registry struct {
 	active      map[int]*commandTask
 	selectionMu sync.RWMutex
 	selection   childSelection
+	itemsMu     sync.RWMutex
+	activeItems func() []conversation.Item
 	shellMu     sync.Mutex
 	shellWarned bool
 	diagnostics io.Writer
@@ -174,6 +176,31 @@ func (registry *Registry) SetSelection(provider string, model, effort *string) {
 	registry.selectionMu.Lock()
 	registry.selection = selection
 	registry.selectionMu.Unlock()
+}
+
+// SetActiveItems registers a callback returning the active conversation items from the current
+// compaction floor to the end of history. The skill tool uses it to avoid reloading an unchanged
+// skill document that is already present in the active conversation.
+func (registry *Registry) SetActiveItems(fn func() []conversation.Item) {
+	if registry == nil {
+		return
+	}
+	registry.itemsMu.Lock()
+	registry.activeItems = fn
+	registry.itemsMu.Unlock()
+}
+
+func (registry *Registry) currentActiveItems() []conversation.Item {
+	if registry == nil {
+		return nil
+	}
+	registry.itemsMu.RLock()
+	fn := registry.activeItems
+	registry.itemsMu.RUnlock()
+	if fn == nil {
+		return nil
+	}
+	return fn()
 }
 
 // SetDiagnosticWriter routes shell-configuration warnings through the owning application.

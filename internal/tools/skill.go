@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/luank3/gax/internal/conversation"
 	"github.com/luank3/gax/internal/provider"
 	"github.com/luank3/gax/internal/skill"
 	systempath "github.com/luank3/gax/internal/system/path"
@@ -14,8 +15,10 @@ func skillDefinition() provider.ToolDefinition {
 		Name: "skill",
 		Description: "Load a skill by name: the system prompt lists the available skills with their descriptions. " +
 			"Loading one puts its document of instructions in context for the rest of the session, to be followed " +
-			"with the other tools (read, edit, write, bash). Call this with no arguments to list the skills again " +
-			"with the paths of their documents.",
+			"with the other tools (read, edit, write, bash). Before loading a skill, check whether its complete " +
+			"instructions are already present in the active conversation; if so, keep following them without " +
+			"calling `skill` again. Call this with no arguments to list the skills again with the paths of their " +
+			"documents.",
 		Params: []provider.ToolParam{
 			{Name: "name", Type: "string", Description: "Skill to load. Omit to list the available skills."},
 		},
@@ -50,9 +53,48 @@ func (registry *Registry) runSkill(arguments string, _ int, _ DisplaySink) Resul
 		if err != nil {
 			return Result{Text: fmt.Sprintf("error loading skill '%s': %s", name, err)}
 		}
-		return Result{Text: sanitizeUTF8(strings.TrimRight(body, "\n"))}
+		fullDocument := formatSkillDocument(entry, body)
+		if skillAlreadyInActiveContext(registry.currentActiveItems(), fullDocument) {
+			return Result{Text: formatSkillAlreadyLoaded(entry)}
+		}
+		return Result{Text: fullDocument}
 	}
 	return Result{Text: fmt.Sprintf("unknown skill '%s' (%s)", name, availableSkills(entries))}
+}
+
+func formatSkillDocument(entry skill.Entry, body string) string {
+	source := entry.DisplayPath
+	if source == "" {
+		source = entry.Path
+	}
+	cleaned := sanitizeUTF8(strings.TrimRight(body, "\n"))
+	return fmt.Sprintf("[skill: %s (%s)]\n%s", entry.Name, source, cleaned)
+}
+
+func formatSkillAlreadyLoaded(entry skill.Entry) string {
+	source := entry.DisplayPath
+	if source == "" {
+		source = entry.Path
+	}
+	return fmt.Sprintf("[skill: %s (%s) — already loaded in active conversation; continue following the instructions above without reloading]", entry.Name, source)
+}
+
+func skillAlreadyInActiveContext(items []conversation.Item, fullDocument string) bool {
+	if fullDocument == "" || len(items) == 0 {
+		return false
+	}
+	for _, item := range items {
+		if item.Kind != conversation.KindToolResult || item.Output == nil {
+			continue
+		}
+		if item.ToolName != nil && *item.ToolName != "skill" {
+			continue
+		}
+		if *item.Output == fullDocument {
+			return true
+		}
+	}
+	return false
 }
 
 // skillListing mirrors the listing the system prompt used to carry: one line per skill, with the
