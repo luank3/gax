@@ -9,6 +9,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Stability policy for documented configuration, session logs, and `--json` output, including
+  expectations for pre-1.0 compatibility and migration notices.
 - Embedded `code-intelligence` skill (`gax:skills/code-intelligence/SKILL.md`) guiding the model on
   structural search via `ast-grep`, `ctags`, targeted language-specific regex patterns, and git
   provenance tracking without whole-file reads.
