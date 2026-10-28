@@ -3,6 +3,32 @@
 gax writes two newline-delimited JSON streams: the **session log** it records on disk, and the
 **`--json` output** it streams on stdout in one-shot runs.
 
+## Stability policy
+
+gax is pre-1.0, but its documented configuration, session logs, and `--json` output are intended
+for continued use across releases.
+
+- **Patch releases** should not intentionally break documented formats or configuration. Security
+  and correctness fixes may require exceptions; these will be noted in the changelog.
+- **Minor releases** may make breaking changes when necessary. The changelog will describe the
+  impact and any migration steps.
+- **Additive changes** may occur in any release: new configuration keys, JSON fields, record kinds,
+  or values. JSON consumers should tolerate unknown fields and handle unknown record kinds or values
+  defensively.
+
+**Sessions and JSON:** The `session` header currently carries format `version: 1`. gax aims to keep
+sessions from earlier releases readable. If an incompatible session or JSON format change is
+necessary, the header version will change and the release notes will describe compatibility and
+migration. Older gax versions are not guaranteed to read data written by newer versions; keep a
+backup before downgrading or migrating important sessions. The version field does not currently
+promise automatic migration or rejection of newer formats.
+
+**Configuration:** Documented settings and environment variables should remain usable across
+upgrades. If a setting is renamed or removed, the changelog will explain the replacement or migration.
+
+**Outside this policy:** Human-readable terminal output, diagnostic wording, undocumented fields,
+and external provider behavior may change without format compatibility guarantees.
+
 ## Session logs
 
 Sessions are stored per working directory:

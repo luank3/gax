@@ -149,7 +149,8 @@ view, Ctrl-C interrupts the running turn, Ctrl-D exits.
 
 ## Configuration
 
-Configuration is optional. Files follow the XDG layout:
+Configuration is optional. The [stability policy](docs/sessions.md#stability-policy) covers
+documented configuration, session logs, and `--json` output. Files follow the XDG layout:
 
 | Path | Purpose |
 | --- | --- |
