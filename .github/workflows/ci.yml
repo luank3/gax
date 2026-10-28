@@ -22,6 +22,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Check Go module policy
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sh scripts/check-go-mod-test.sh
+          sh scripts/check-go-mod.sh
       - run: make fmt-check
       - run: make vet
       - run: make test-race

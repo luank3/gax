@@ -1604,6 +1604,42 @@ func TestRunTTYSlashProviderPickerSwitchesProvider(t *testing.T) {
 	}
 }
 
+func TestClosePTYAfterRunStopsActiveREPL(t *testing.T) {
+	prepareTTYAppEnv(t, "http://127.0.0.1:1")
+	master, slave := openTestPTY(t)
+	capture := &ptyCapture{}
+	captureDone := make(chan struct{})
+	go func() {
+		capture.read(master)
+		close(captureDone)
+	}()
+	runDone := make(chan struct{})
+	go func() {
+		defer close(runDone)
+		Run(nil, slave, true, slave, io.Discard)
+	}()
+	defer closePTYAfterRun(t, master, slave, runDone, captureDone)
+	waitPTYEditorReadyCount(t, capture, 1, 3*time.Second)
+}
+
+func closePTYAfterRun(t *testing.T, master, slave *os.File, runDone, captureDone <-chan struct{}) {
+	t.Helper()
+	_ = master.Close()
+	// Closing the master does not interrupt its blocked read; slave output wakes the capture.
+	_, _ = slave.Write([]byte{0})
+	select {
+	case <-runDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("PTY REPL did not stop after closing the master")
+	}
+	_ = slave.Close()
+	select {
+	case <-captureDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("PTY capture did not stop after closing the master")
+	}
+}
+
 func TestRunTTYSlashProviderPickerChainsModelAndEffortSelection(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if serveTTYModelProbe(w, r) {
@@ -1628,13 +1664,20 @@ func TestRunTTYSlashProviderPickerChainsModelAndEffortSelection(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", configRoot)
 
 	master, slave := openTestPTY(t)
-	defer master.Close()
-	defer slave.Close()
 	capture := &ptyCapture{}
-	go capture.read(master)
+	captureDone := make(chan struct{})
+	go func() {
+		capture.read(master)
+		close(captureDone)
+	}()
 	finished := make(chan int, 1)
+	runDone := make(chan struct{})
+	defer closePTYAfterRun(t, master, slave, runDone, captureDone)
 	var stderr strings.Builder
-	go func() { finished <- Run(nil, slave, true, slave, &stderr) }()
+	go func() {
+		defer close(runDone)
+		finished <- Run(nil, slave, true, slave, &stderr)
+	}()
 	waitPTYOutput(t, capture, "> ", 2*time.Second)
 	if _, err := master.Write([]byte("/provider\r")); err != nil {
 		t.Fatal(err)
@@ -1648,11 +1691,16 @@ func TestRunTTYSlashProviderPickerChainsModelAndEffortSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitPTYOutput(t, capture, "test · test-model", 3*time.Second)
+	waitPTYEditorReadyCount(t, capture, 2, 3*time.Second)
+	sessionOutputCount := strings.Count(stripPTYANSI(capture.string()), "test · test-model") + 1
 	if _, err := master.Write([]byte("/session\r")); err != nil {
 		t.Fatal(err)
 	}
-	waitPTYOutput(t, capture, "test · test-model", 3*time.Second)
-	_, _ = master.Write([]byte{0x04})
+	waitPTYOutputCount(t, capture, "test · test-model", sessionOutputCount, 3*time.Second)
+	waitPTYEditorReadyCount(t, capture, 3, 3*time.Second)
+	if _, err := master.Write([]byte{0x04}); err != nil {
+		t.Fatal(err)
+	}
 	select {
 	case code := <-finished:
 		if code != 0 {

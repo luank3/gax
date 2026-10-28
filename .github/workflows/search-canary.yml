@@ -1,0 +1,20 @@
+name: Keyless search canary
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Check keyless search backends
+        run: make test TEST_PACKAGES=./internal/web TEST_FLAGS='-tags=webcanary -run=TestSearchCanary -count=1 -v -timeout=2m'

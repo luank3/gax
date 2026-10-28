@@ -27,6 +27,20 @@ make test-race   # race-enabled test suite
 Run the suite through the Make targets: they unset `GAX_PROVIDER`, `GAX_MODEL`, `GAX_EFFORT`,
 and `GAX_PRESET`, which otherwise leak into one-shot output asserted by `internal/app` tests.
 
+### Keyless search canary
+
+The **Keyless search canary** Actions workflow is manually dispatched. To run the same checks
+locally:
+
+```sh
+make test TEST_PACKAGES=./internal/web TEST_FLAGS='-tags=webcanary -run=TestSearchCanary -count=1 -v -timeout=2m'
+```
+
+This sends the public query `golang context timeout` to You.com's keyless profile and the
+DuckDuckGo crawl, without credentials. It checks the backend that actually answered so a fallback
+does not hide a You.com failure. Failures may reflect upstream changes, throttling, or the runner's
+network; the check creates no issues. Normal tests do not run the live canary.
+
 ## Guidelines
 
 - **Standard library only.** gax has no third-party module dependencies, and pull requests that

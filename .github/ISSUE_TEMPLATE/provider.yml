@@ -1,0 +1,54 @@
+name: Provider issue
+description: Report a provider, model, or API compatibility problem.
+title: "Provider: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues are public. Do not include credentials, private prompts, session files, or other
+        sensitive information. A `GAX_TRACE` wire trace may contain prompts even when credentials
+        are redacted. Review and sanitize any excerpt before sharing it; a trace is not required.
+  - type: input
+    id: version
+    attributes:
+      label: gax version
+      description: Output of `gax --version`.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Provider and model
+    validations:
+      required: true
+  - type: input
+    id: endpoint
+    attributes:
+      label: Endpoint or wire protocol, if relevant
+      description: Omit credentials, query parameters, and private hostnames.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include relevant configuration and commands, with secrets removed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and sanitized diagnostics
+      description: Include error output or a sanitized trace excerpt if useful.
+    validations:
+      required: true

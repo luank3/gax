@@ -1,0 +1,47 @@
+name: Bug report
+description: Report a reproducible problem with gax.
+title: "Bug: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues are public. Do not include credentials, private prompts, session files, or other
+        sensitive information. Wire traces can contain prompts even when credentials are redacted;
+        inspect and remove sensitive content before sharing any excerpt.
+  - type: input
+    id: version
+    attributes:
+      label: gax version
+      description: Output of `gax --version`.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Provider and model, if relevant
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include a minimal reproduction and any relevant configuration, with secrets removed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include any relevant error output, with sensitive information removed.
+    validations:
+      required: true
