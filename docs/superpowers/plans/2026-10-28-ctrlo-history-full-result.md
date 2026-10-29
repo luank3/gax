@@ -19,7 +19,12 @@ row verbatim without head/tail caps, line truncation, or blank-line elision
 
 **Tests:** `TestShowHistoryShowsCompleteReadResult`,
 `TestShowHistoryShowsCompleteToolResultWithoutPreviewLimits`, and the existing
-`TestShowHistoryFallsBackToSummaryWhenReconstructedWriteHasNoVisibleRows` (blank lines
-are skipped so the fallback path is unchanged).
+`TestShowHistoryFallsBackToSummaryWhenReconstructedWriteHasNoVisibleRows` (the summary
+fallback remains available when no visible content is present).
+
+**Review follow-up:** Preserve blank and whitespace-only rows in full history, expand tabs
+relative to the content's eight-column stops, and track visible rows separately so an
+all-whitespace reconstructed write still shows its summary. Pager tests cover blank rows,
+tab alignment (including wide characters), and the summary fallback.
 
 **Verification:** `make lint test-race` green.

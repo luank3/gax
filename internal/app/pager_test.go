@@ -148,6 +148,36 @@ func TestShowHistoryShowsCompleteToolResultWithoutPreviewLimits(t *testing.T) {
 	}
 }
 
+func TestShowHistoryPreservesBlankToolResultRows(t *testing.T) {
+	t.Setenv("PAGER", "cat")
+	state := agent.NewSession()
+	state.Items = []conversation.Item{
+		{Kind: conversation.KindToolCall, CallID: conversation.String("c1"), ToolName: conversation.String("bash"), Arguments: conversation.String(`{"command":"true"}`)},
+		{Kind: conversation.KindToolResult, CallID: conversation.String("c1"), Output: conversation.String("first\n\n  \nsecond\n")},
+	}
+	var output, diagnostics bytes.Buffer
+	showHistory(state, false, &output, &diagnostics)
+	plain := stripANSISequences(output.String())
+	if !strings.Contains(plain, "first\n│ \n│   \n└ second") {
+		t.Fatalf("history lost blank rows: %q", plain)
+	}
+}
+
+func TestShowHistoryPreservesToolResultTabAlignment(t *testing.T) {
+	t.Setenv("PAGER", "cat")
+	state := agent.NewSession()
+	state.Items = []conversation.Item{
+		{Kind: conversation.KindToolCall, CallID: conversation.String("c1"), ToolName: conversation.String("bash"), Arguments: conversation.String(`{"command":"true"}`)},
+		{Kind: conversation.KindToolResult, CallID: conversation.String("c1"), Output: conversation.String("a\tv\n123456\tv\n界\tX\n")},
+	}
+	var output, diagnostics bytes.Buffer
+	showHistory(state, false, &output, &diagnostics)
+	plain := stripANSISequences(output.String())
+	if !strings.Contains(plain, "a       v\n│ 123456  v\n└ 界      X") {
+		t.Fatalf("history misaligned tab stops: %q", plain)
+	}
+}
+
 func TestShowHistoryReconstructsSummarizedWritePreview(t *testing.T) {
 	t.Setenv("PAGER", "cat")
 	state := agent.NewSession()
@@ -174,6 +204,7 @@ func TestShowHistoryFallsBackToSummaryWhenReconstructedWriteHasNoVisibleRows(t *
 		arguments string
 	}{
 		{name: "whitespace", arguments: `{"path":"/tmp/empty.txt","content":"   "}`},
+		{name: "blank lines", arguments: `{"path":"/tmp/empty.txt","content":"\n  \n"}`},
 		{name: "empty", arguments: `{"path":"/tmp/empty.txt","content":""}`},
 	} {
 		t.Run(test.name, func(t *testing.T) {

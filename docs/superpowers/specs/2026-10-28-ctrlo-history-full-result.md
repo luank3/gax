@@ -29,9 +29,10 @@ without head/tail caps, line truncation, or blank-line elision:
 
 - `internal/tools/registry.go`: `PreviewFull` value.
 - `internal/terminal/live/tool_render.go`: `processLine` short-circuits for
-  `PreviewFull`, emitting one settled row per non-blank line; `consumeUTF8` keeps tabs
-  literal instead of expanding to spaces and appends runes past the 4 KiB line buffer
-  instead of dropping them; `truncate` is a no-op.
+  `PreviewFull`, emitting one settled row per line, including blank lines; `consumeUTF8`
+  expands tabs to content-relative eight-column stops and appends runes past the 4 KiB line
+  buffer instead of dropping them; `truncate` is a no-op. Visible rows are tracked separately
+  for the reconstructed-write summary fallback.
 - `internal/app/history_render.go`: the full paged view sets
   `presentation.PreviewMode = coretools.PreviewFull` when there is no skipped/refused
   marker. Brief replay and live tool streaming are unchanged.
@@ -42,8 +43,10 @@ without head/tail caps, line truncation, or blank-line elision:
   the full history view.
 - `TestShowHistoryShowsCompleteToolResultWithoutPreviewLimits` — a `bash` result keeps
   its middle lines and its long line, with no `... (N more lines) ...` note.
+- `TestShowHistoryPreservesBlankToolResultRows` and
+  `TestShowHistoryPreservesToolResultTabAlignment` — blank rows and aligned tabular output
+  survive the pager rendering path.
 - `TestShowHistoryFallsBackToSummaryWhenReconstructedWriteHasNoVisibleRows` — a
-  whitespace-only reconstructed write still falls back to its summary; the new mode
-  skips blank lines so the fallback path is unchanged.
+  whitespace-only reconstructed write still falls back to its summary.
 
 `make lint test-race` is green.

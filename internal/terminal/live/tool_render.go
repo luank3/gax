@@ -34,14 +34,16 @@ type toolPreviewRenderer struct {
 	utf8Pending   []byte
 	line          []byte
 	lineVisible   bool
+	lineCells     int
 	lineTailBytes int
 	firstLine     bool
 	diff          bool
 	diffHunk      bool
 
-	pending    toolPreviewRow
-	hasPending bool
-	rows       int
+	pending     toolPreviewRow
+	hasPending  bool
+	rows        int
+	visibleRows int
 
 	headLines           int
 	headBytes           int
@@ -234,13 +236,16 @@ func (renderer *toolPreviewRenderer) consumeUTF8(data []byte, final bool) {
 			renderer.processLine(string(renderer.line), renderer.lineVisible)
 			renderer.line = renderer.line[:0]
 			renderer.lineVisible = false
+			renderer.lineCells = 0
 			renderer.lineTailBytes = 0
 			offset += size
 			continue
 		}
 		if runeValue == '\t' {
 			if renderer.mode == coretools.PreviewFull {
-				renderer.line = append(renderer.line, '\t')
+				spaces := 8 - renderer.lineCells%8
+				renderer.line = append(renderer.line, strings.Repeat(" ", spaces)...)
+				renderer.lineCells += spaces
 			} else {
 				renderer.pushTail([]byte("    "))
 				for index := 0; index < 4; index++ {
@@ -256,6 +261,9 @@ func (renderer *toolPreviewRenderer) consumeUTF8(data []byte, final bool) {
 			runeValue = '?'
 		}
 		encoded := string(runeValue)
+		if renderer.mode == coretools.PreviewFull {
+			renderer.lineCells += terminalwidth.RuneCells(runeValue)
+		}
 		if renderer.mode == coretools.PreviewFull || len(renderer.line)+len(encoded) <= toolLineBufferCap {
 			renderer.line = append(renderer.line, encoded...)
 		}
@@ -280,8 +288,8 @@ func unsafeToolRune(value rune) bool {
 
 func (renderer *toolPreviewRenderer) processLine(line string, visible bool) {
 	if renderer.mode == coretools.PreviewFull {
-		if strings.Trim(line, " \t") == "" {
-			return
+		if visible {
+			renderer.visibleRows++
 		}
 		if renderer.hasPending {
 			renderer.settlePending()
