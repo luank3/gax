@@ -828,7 +828,9 @@ func (renderer *Renderer) ToolResult(execution coretools.ToolExecution) error {
 			if fallback == nil && execution.OutputSummarizesDisplay {
 				fallback = execution.Result.Output
 			}
-			if renderer.toolPresentation.OutputStyle == coretools.OutputUnifiedDiff && renderer.toolPreview.rows == 0 &&
+			noVisibleRows := renderer.toolPreview.rows == 0 ||
+				renderer.toolPresentation.PreviewMode == coretools.PreviewFull && renderer.toolPreview.visibleRows == 0
+			if renderer.toolPresentation.OutputStyle == coretools.OutputUnifiedDiff && noVisibleRows &&
 				fallback != nil && *fallback != "" {
 				fallbackPreview := newToolPreviewRenderer(coretools.PreviewHead, coretools.OutputPlain, renderer.width, renderer.styled)
 				if err := renderer.write(fallbackPreview.Feed([]byte(*fallback))); err != nil {

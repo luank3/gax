@@ -34,14 +34,16 @@ type toolPreviewRenderer struct {
 	utf8Pending   []byte
 	line          []byte
 	lineVisible   bool
+	lineCells     int
 	lineTailBytes int
 	firstLine     bool
 	diff          bool
 	diffHunk      bool
 
-	pending    toolPreviewRow
-	hasPending bool
-	rows       int
+	pending     toolPreviewRow
+	hasPending  bool
+	rows        int
+	visibleRows int
 
 	headLines           int
 	headBytes           int
@@ -234,15 +236,22 @@ func (renderer *toolPreviewRenderer) consumeUTF8(data []byte, final bool) {
 			renderer.processLine(string(renderer.line), renderer.lineVisible)
 			renderer.line = renderer.line[:0]
 			renderer.lineVisible = false
+			renderer.lineCells = 0
 			renderer.lineTailBytes = 0
 			offset += size
 			continue
 		}
 		if runeValue == '\t' {
-			renderer.pushTail([]byte("    "))
-			for index := 0; index < 4; index++ {
-				if len(renderer.line)+1 <= toolLineBufferCap {
-					renderer.line = append(renderer.line, ' ')
+			if renderer.mode == coretools.PreviewFull {
+				spaces := 8 - renderer.lineCells%8
+				renderer.line = append(renderer.line, strings.Repeat(" ", spaces)...)
+				renderer.lineCells += spaces
+			} else {
+				renderer.pushTail([]byte("    "))
+				for index := 0; index < 4; index++ {
+					if len(renderer.line)+1 <= toolLineBufferCap {
+						renderer.line = append(renderer.line, ' ')
+					}
 				}
 			}
 			offset += size
@@ -252,7 +261,10 @@ func (renderer *toolPreviewRenderer) consumeUTF8(data []byte, final bool) {
 			runeValue = '?'
 		}
 		encoded := string(runeValue)
-		if len(renderer.line)+len(encoded) <= toolLineBufferCap {
+		if renderer.mode == coretools.PreviewFull {
+			renderer.lineCells += terminalwidth.RuneCells(runeValue)
+		}
+		if renderer.mode == coretools.PreviewFull || len(renderer.line)+len(encoded) <= toolLineBufferCap {
 			renderer.line = append(renderer.line, encoded...)
 		}
 		renderer.pushTail([]byte(encoded))
@@ -275,6 +287,17 @@ func unsafeToolRune(value rune) bool {
 }
 
 func (renderer *toolPreviewRenderer) processLine(line string, visible bool) {
+	if renderer.mode == coretools.PreviewFull {
+		if visible {
+			renderer.visibleRows++
+		}
+		if renderer.hasPending {
+			renderer.settlePending()
+		}
+		renderer.pending = toolPreviewRow{content: line, color: ansiDim}
+		renderer.hasPending = true
+		return
+	}
 	if renderer.firstLine {
 		renderer.firstLine = false
 		renderer.diff = renderer.style == coretools.OutputUnifiedDiff && strings.HasPrefix(line, "--- ")
@@ -504,6 +527,9 @@ func (renderer *toolPreviewRenderer) NoChangesMarker() string {
 }
 
 func (renderer *toolPreviewRenderer) truncate(value string) string {
+	if renderer.mode == coretools.PreviewFull {
+		return value
+	}
 	budget := renderer.width - 3
 	if renderer.width <= 7 {
 		budget = 1
