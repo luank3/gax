@@ -81,6 +81,7 @@ const (
 	PreviewHead ToolPreviewMode = iota
 	PreviewHeadTail
 	PreviewCollapsed
+	PreviewFull
 )
 
 // ToolPresentation contains user-facing metadata resolved from the original tool call.

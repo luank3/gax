@@ -7,6 +7,14 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `ctrl-o` (`view the conversation in $PAGER`) now shows the complete stored tool results
+  instead of the live preview modes used while the tools ran. A `read` result was collapsed
+  to a breadcrumb and any other result was capped to a head/tail preview that dropped
+  middle lines and truncated long lines. The paged history view now renders every stored
+  row verbatim (`PreviewFull`), leaving the live preview modes unchanged.
+
 ### Added
 
 - [Stability policy](docs/sessions.md#stability-policy) for documented configuration, session logs,

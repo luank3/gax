@@ -102,7 +102,7 @@ func TestShowHistoryRendersToolHeaderAndResultPreview(t *testing.T) {
 	}
 }
 
-func TestShowHistoryKeepsCollapsedToolOutputQuiet(t *testing.T) {
+func TestShowHistoryShowsCompleteReadResult(t *testing.T) {
 	t.Setenv("PAGER", "cat")
 	state := agent.NewSession()
 	state.Items = []conversation.Item{
@@ -114,8 +114,34 @@ func TestShowHistoryKeepsCollapsedToolOutputQuiet(t *testing.T) {
 	showHistory(state, false, &output, &diagnostics)
 	plain := stripANSISequences(output.String())
 	if !strings.Contains(plain, "[read]") || !strings.Contains(plain, "private.txt") ||
-		strings.Contains(plain, "/tmp/private.txt") || strings.Contains(plain, "PRIVATE_FILE_BODY") {
-		t.Fatalf("collapsed read history exposed the wrong details: %q", plain)
+		!strings.Contains(plain, "PRIVATE_FILE_BODY") {
+		t.Fatalf("full history omitted the read result: %q", plain)
+	}
+	if diagnostics.Len() != 0 {
+		t.Fatalf("history view reported unexpected diagnostics: %q", diagnostics.String())
+	}
+}
+
+func TestShowHistoryShowsCompleteToolResultWithoutPreviewLimits(t *testing.T) {
+	t.Setenv("PAGER", "cat")
+	longLine := "LONG_RESULT_START_" + strings.Repeat("x", 160) + "_LONG_RESULT_END"
+	state := agent.NewSession()
+	state.Items = []conversation.Item{
+		{Kind: conversation.KindToolCall, CallID: conversation.String("bash-1"), ToolName: conversation.String("bash"),
+			Arguments: conversation.String(`{"command":"printf result"}`)},
+		{Kind: conversation.KindToolResult, CallID: conversation.String("bash-1"),
+			Output: conversation.String("LINE_01\nLINE_02\nLINE_03\nLINE_04\nLINE_05\nLINE_06\nLINE_07\nLINE_08\nLINE_09\nLINE_10\n" + longLine + "\n")},
+	}
+	var output, diagnostics bytes.Buffer
+	showHistory(state, false, &output, &diagnostics)
+	plain := stripANSISequences(output.String())
+	for _, want := range []string{"LINE_01", "LINE_05", "LINE_10", longLine} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("full history omitted %q: %q", want, plain)
+		}
+	}
+	if strings.Contains(plain, "more line") {
+		t.Errorf("full history elided tool result lines: %q", plain)
 	}
 	if diagnostics.Len() != 0 {
 		t.Fatalf("history view reported unexpected diagnostics: %q", diagnostics.String())

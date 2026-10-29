@@ -156,7 +156,9 @@ func renderHistoryTool(renderer *terminalLive.Renderer, items []conversation.Ite
 			marker = "[refused: --raw, no tools advertised]"
 		}
 	}
-	if detail == historyBrief && marker == "" {
+	if detail == historyFull && marker == "" {
+		presentation.PreviewMode = coretools.PreviewFull
+	} else if detail == historyBrief && marker == "" {
 		presentation.PreviewMode = coretools.PreviewCollapsed
 	}
 	if marker != "" {

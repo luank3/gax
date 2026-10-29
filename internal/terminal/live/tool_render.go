@@ -239,10 +239,14 @@ func (renderer *toolPreviewRenderer) consumeUTF8(data []byte, final bool) {
 			continue
 		}
 		if runeValue == '\t' {
-			renderer.pushTail([]byte("    "))
-			for index := 0; index < 4; index++ {
-				if len(renderer.line)+1 <= toolLineBufferCap {
-					renderer.line = append(renderer.line, ' ')
+			if renderer.mode == coretools.PreviewFull {
+				renderer.line = append(renderer.line, '\t')
+			} else {
+				renderer.pushTail([]byte("    "))
+				for index := 0; index < 4; index++ {
+					if len(renderer.line)+1 <= toolLineBufferCap {
+						renderer.line = append(renderer.line, ' ')
+					}
 				}
 			}
 			offset += size
@@ -252,7 +256,7 @@ func (renderer *toolPreviewRenderer) consumeUTF8(data []byte, final bool) {
 			runeValue = '?'
 		}
 		encoded := string(runeValue)
-		if len(renderer.line)+len(encoded) <= toolLineBufferCap {
+		if renderer.mode == coretools.PreviewFull || len(renderer.line)+len(encoded) <= toolLineBufferCap {
 			renderer.line = append(renderer.line, encoded...)
 		}
 		renderer.pushTail([]byte(encoded))
@@ -275,6 +279,17 @@ func unsafeToolRune(value rune) bool {
 }
 
 func (renderer *toolPreviewRenderer) processLine(line string, visible bool) {
+	if renderer.mode == coretools.PreviewFull {
+		if strings.Trim(line, " \t") == "" {
+			return
+		}
+		if renderer.hasPending {
+			renderer.settlePending()
+		}
+		renderer.pending = toolPreviewRow{content: line, color: ansiDim}
+		renderer.hasPending = true
+		return
+	}
 	if renderer.firstLine {
 		renderer.firstLine = false
 		renderer.diff = renderer.style == coretools.OutputUnifiedDiff && strings.HasPrefix(line, "--- ")
@@ -504,6 +519,9 @@ func (renderer *toolPreviewRenderer) NoChangesMarker() string {
 }
 
 func (renderer *toolPreviewRenderer) truncate(value string) string {
+	if renderer.mode == coretools.PreviewFull {
+		return value
+	}
 	budget := renderer.width - 3
 	if renderer.width <= 7 {
 		budget = 1
