@@ -12,6 +12,7 @@ function App() {
   const [items, setItems] = useState([]);
   const [streamText, setStreamText] = useState('');
   const [status, setStatus] = useState('idle');
+  const [meta, setMeta] = useState({ provider: '', model: '', input: 0, output: 0, cost: 0 });
   const [prompt, setPrompt] = useState('');
   const [newPath, setNewPath] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -53,6 +54,8 @@ function App() {
       setItems(data.items || []);
       setStreamText('');
       setStatus(data.running ? 'running' : 'idle');
+      const tot = data.totals || {};
+      setMeta({ provider: data.provider || '', model: data.model || '', input: tot.InputTokens || 0, output: tot.OutputTokens || 0, cost: tot.CostTotal || 0 });
     });
     es.addEventListener('agent', (ev) => {
       const data = JSON.parse(ev.data);
@@ -62,6 +65,8 @@ function App() {
         setStatus('running');
       } else if (data.type === 'tool_started') {
         setStatus(`tool:${data.name}`);
+      } else if (data.type === 'turn_usage') {
+        setMeta((m) => ({ ...m, input: m.input + (data.input || 0), output: m.output + (data.output || 0), cost: m.cost + (data.cost || 0) }));
       } else if (data.type === 'turn_finished') {
         setStatus(data.outcome || 'idle');
         setStreamText((cur) => {
@@ -172,7 +177,11 @@ function App() {
             <span class="truncate font-semibold">{sessionId ? sessionId.slice(0, 8) : 'select or create session'}</span>
           </div>
           <div class="flex items-center gap-2 text-xs tabular-nums">
+            {meta.provider && <span class="text-[var(--text-muted)] hidden sm:inline">{meta.provider}{meta.model ? `/${meta.model}` : ''} · in:{meta.input} out:{meta.output} ${meta.cost.toFixed(4)}</span>}
             <span class="text-[var(--text-muted)]">{status}</span>
+            {sessionId && status !== 'running' && items.length > 0 && (
+              <button onClick={async () => { const r = await api.undo(sessionId); setItems(r.items || []); }} class="px-2 py-0.5 rounded border border-[var(--border)]">undo</button>
+            )}
             {sessionId && status === 'running' && (
               <button onClick={() => api.interrupt(sessionId, 'pause')} class="px-2 py-0.5 rounded border border-[var(--border)]">pause</button>
             )}
@@ -181,10 +190,17 @@ function App() {
         {err && <div class="px-3 py-1 text-xs text-[var(--danger)] border-b border-[var(--border)]">{err}</div>}
         <div class="flex-1 overflow-y-auto p-3 space-y-2">
           {items.map((it, i) => (
-            <div key={i} class={`p-2 rounded border ${it.kind === 'user' ? 'border-[var(--border)] bg-[var(--bg-surface)]' : 'border-transparent'}`}>
-              <div class="text-[10px] uppercase text-[var(--text-muted)]">{it.kind}{it.tool_name ? `:${it.tool_name}` : ''}</div>
-              <pre class="whitespace-pre-wrap break-words m-0">{it.text || it.output || it.arguments}</pre>
-            </div>
+            it.kind === 'tool_call' || it.kind === 'tool_result' ? (
+              <details key={i} class="border border-[var(--border)] rounded px-2 py-1 text-xs bg-[var(--bg-surface)]">
+                <summary class="cursor-pointer text-[var(--text-muted)]">{it.kind}{it.tool_name ? `:${it.tool_name}` : ''}</summary>
+                <pre class="whitespace-pre-wrap break-words mt-1 mb-0">{it.output || it.arguments}</pre>
+              </details>
+            ) : (
+              <div key={i} class={`p-2 rounded border ${it.kind === 'user' ? 'border-[var(--border)] bg-[var(--bg-surface)]' : 'border-transparent'}`}>
+                <div class="text-[10px] uppercase text-[var(--text-muted)]">{it.kind}</div>
+                <pre class="whitespace-pre-wrap break-words m-0">{it.text}</pre>
+              </div>
+            )
           ))}
           {streamText && (
             <div class="p-2">

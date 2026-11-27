@@ -19,4 +19,5 @@ export const api = {
   openSession: (payload) => apiFetch('/api/v1/sessions', { method: 'POST', body: JSON.stringify(payload) }),
   prompt: (id, text) => apiFetch(`/api/v1/sessions/${encodeURIComponent(id)}/prompt`, { method: 'POST', body: JSON.stringify({ text }) }),
   interrupt: (id, mode) => apiFetch(`/api/v1/sessions/${encodeURIComponent(id)}/interrupt`, { method: 'POST', body: JSON.stringify({ mode }) }),
+  undo: (id) => apiFetch(`/api/v1/sessions/${encodeURIComponent(id)}/undo`, { method: 'POST', body: '{}' }),
 };

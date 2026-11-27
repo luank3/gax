@@ -175,6 +175,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/sessions/{id}/events", s.withAuth(s.handleSessionEvents))
 	s.mux.HandleFunc("POST /api/v1/sessions/{id}/prompt", s.withOriginCheck(s.withAuth(s.handlePrompt)))
 	s.mux.HandleFunc("POST /api/v1/sessions/{id}/interrupt", s.withOriginCheck(s.withAuth(s.handleInterrupt)))
+	s.mux.HandleFunc("POST /api/v1/sessions/{id}/undo", s.withOriginCheck(s.withAuth(s.handleUndo)))
 
 	if static := ui.FS(); static != nil {
 		s.mux.Handle("/", http.FileServer(http.FS(static)))
@@ -475,9 +476,13 @@ func (s *Server) handleSessionEvents(w http.ResponseWriter, r *http.Request) {
 
 	sub := &sseSubscriber{ch: make(chan []byte, sseQueueCap)}
 	as.mu.Lock()
+	totals := as.sess.Totals()
 	snap, _ := json.Marshal(map[string]any{
-		"items":   as.sess.Items,
-		"running": as.running,
+		"items":    as.sess.Items,
+		"running":  as.running,
+		"provider": as.prov.ID(),
+		"model":    as.model,
+		"totals":   totals,
 	})
 	as.subs[sub] = struct{}{}
 	as.mu.Unlock()
@@ -564,6 +569,30 @@ func (s *Server) handleInterrupt(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
+func (s *Server) handleUndo(w http.ResponseWriter, r *http.Request) {
+	as, ok := s.getSession(r.PathValue("id"))
+	if !ok {
+		http.Error(w, "session not open", http.StatusNotFound)
+		return
+	}
+	as.mu.Lock()
+	if as.running {
+		as.mu.Unlock()
+		http.Error(w, "cannot undo while running", http.StatusConflict)
+		return
+	}
+	total := session.CountUserTurns(as.sess.Items)
+	keep := max(0, total-1)
+	as.sess.Items = session.ApplyUndo(as.sess.Items, keep)
+	if as.writer != nil {
+		_ = as.writer.AppendUndo(keep)
+	}
+	itemsCopy := append([]core.Item(nil), as.sess.Items...)
+	totals := as.sess.Totals()
+	as.mu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]any{"items": itemsCopy, "totals": totals})
+}
+
 func (s *Server) runSessionTurn(ctx context.Context, as *activeSession) {
 	defer func() {
 		as.mu.Lock()
@@ -594,6 +623,7 @@ func (s *Server) runSessionTurn(ctx context.Context, as *activeSession) {
 		MaxTurns:         int(s.opts.Store.Int("max_turns")),
 		CompactAuto:      s.opts.Store.Bool("compact.auto"),
 		CompactThreshold: s.opts.Store.Int("compact.threshold"),
+		StreamOptions:    registry.ResolveStreamOptions(as.prov.ID(), as.model, s.opts.Store, nil),
 		CheckSignal:      func() agent.Signal { return agent.Signal(as.sig.Load()) },
 		Sink: core.EventFunc(func(ev core.Event) {
 			b := encodeEventJSON(ev)
@@ -624,6 +654,8 @@ func encodeEventJSON(ev core.Event) []byte {
 		m = map[string]any{"type": "tool_started", "name": e.Name}
 	case core.ToolCallFinished:
 		m = map[string]any{"type": "tool_finished", "name": e.Name, "is_error": e.IsError}
+	case core.TurnUsage:
+		m = map[string]any{"type": "turn_usage", "input": e.Usage.Input, "output": e.Usage.Output, "cost": e.Usage.CostTotal}
 	case core.TurnFinished:
 		m = map[string]any{"type": "turn_finished", "outcome": e.Outcome, "error": e.Error}
 	default:
