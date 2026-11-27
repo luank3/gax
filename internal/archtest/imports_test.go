@@ -22,6 +22,7 @@ var packageLayer = map[string]int{
 	"catalog":      2,
 	"skill":        2,
 	"subagent":     2,
+	"transcript":   2,
 	"transport":    2,
 	"wiretrace":    2,
 	"bashcompress": 2,

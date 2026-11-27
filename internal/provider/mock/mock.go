@@ -134,12 +134,14 @@ func (c *Client) streamScript(ctx context.Context, lines []string, req provider.
 				limit, _ = strconv.ParseInt(strings.TrimPrefix(strings.TrimSpace(rest), "limit="), 10, 64)
 			}
 			if limit == 0 || estimateTokens(req) > limit {
-				// Rewind cursor so compaction recovery replays this turn once it fits.
-				c.mu.Lock()
-				if c.cursor > 0 {
-					c.cursor--
+				// Rewind cursor only for limit=N so compaction shrinks the request and retries.
+				if limit > 0 {
+					c.mu.Lock()
+					if c.cursor > 0 {
+						c.cursor--
+					}
+					c.mu.Unlock()
 				}
-				c.mu.Unlock()
 				return &provider.OverflowError{Message: "mock context length exceeded"}
 			}
 		}
