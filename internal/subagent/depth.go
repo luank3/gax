@@ -3,6 +3,7 @@ package subagent
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -39,6 +40,38 @@ func NextChildDepth(value string) int {
 		depth++
 	}
 	return depth
+}
+
+// ChildEnv returns a copy of base environment with GAX_SUBAGENT_DEPTH incremented
+// and non-empty overrides applied (removing stale duplicates).
+func ChildEnv(base []string, currentDepth string, overrides map[string]string) []string {
+	skip := make(map[string]bool, len(overrides)+1)
+	skip["GAX_SUBAGENT_DEPTH"] = true
+	for k, v := range overrides {
+		if v != "" {
+			skip[k] = true
+		}
+	}
+	out := make([]string, 0, len(base)+len(overrides)+1)
+	for _, entry := range base {
+		k, _, ok := strings.Cut(entry, "=")
+		if ok && skip[k] {
+			continue
+		}
+		out = append(out, entry)
+	}
+	out = append(out, fmt.Sprintf("GAX_SUBAGENT_DEPTH=%d", NextChildDepth(currentDepth)))
+	keys := make([]string, 0, len(overrides))
+	for k, v := range overrides {
+		if v != "" {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		out = append(out, k+"="+overrides[k])
+	}
+	return out
 }
 
 func parseDepth(value string) (int, bool) {

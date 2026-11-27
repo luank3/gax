@@ -39,4 +39,26 @@ func TestCompressFiltersAndNeverWorse(t *testing.T) {
 	if _, ok := bashcompress.Compress("ls", "a\nb\n", 0); ok {
 		t.Fatal("expected short ls not to compress")
 	}
+
+	// 5. Make build compression preserves errors
+	var makeOut strings.Builder
+	for i := 0; i < 30; i++ {
+		fmt.Fprintf(&makeOut, "cc -O2 -c src/file%d.c -o build/file%d.o\n", i, i)
+	}
+	makeOut.WriteString("src/main.c:12:5: error: undeclared identifier\n")
+	res, ok = bashcompress.Compress("make -j8", makeOut.String(), 2)
+	if !ok || !strings.Contains(res.Text, "error: undeclared identifier") {
+		t.Fatalf("expected compressed make error, got ok=%v res=%+v", ok, res)
+	}
+
+	// 6. Pip install strips download noise
+	var pipOut strings.Builder
+	for i := 0; i < 25; i++ {
+		fmt.Fprintf(&pipOut, "Collecting pkg%d\n  Downloading pkg%d-1.0.whl\n", i, i)
+	}
+	pipOut.WriteString("Successfully installed pkg0 pkg1\n")
+	res, ok = bashcompress.Compress("pip install -r requirements.txt", pipOut.String(), 0)
+	if !ok || !strings.Contains(res.Text, "Successfully installed") {
+		t.Fatalf("expected compressed pip output, got ok=%v res=%+v", ok, res)
+	}
 }

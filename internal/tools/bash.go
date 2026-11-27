@@ -57,8 +57,34 @@ func (t *bashTool) Run(ctx context.Context, arguments string, sink OutputSink) R
 	if t.reg.cwd != "" {
 		cmd.Dir = t.reg.cwd
 	}
-	nextDepth := subagent.NextChildDepth(os.Getenv("GAX_SUBAGENT_DEPTH"))
-	cmd.Env = append(os.Environ(), fmt.Sprintf("GAX_SUBAGENT_DEPTH=%d", nextDepth))
+	overrides := map[string]string{}
+	if t.reg.store != nil {
+		if p := t.reg.store.String("provider"); p != "" && p != "auto" {
+			overrides["GAX_PROVIDER"] = p
+		}
+		if m := t.reg.store.String("model"); m != "" {
+			overrides["GAX_MODEL"] = m
+		}
+		if e := t.reg.store.String("effort"); e != "" {
+			overrides["GAX_EFFORT"] = e
+		}
+		if t.reg.store.Bool("no_web") {
+			overrides["GAX_NO_WEB"] = "on"
+		}
+		if t.reg.store.Bool("no_skills") {
+			overrides["GAX_NO_SKILLS"] = "on"
+		}
+		if t.reg.store.Bool("no_tasks") {
+			overrides["GAX_NO_TASKS"] = "on"
+		}
+		if t.reg.store.Bool("no_subagents") {
+			overrides["GAX_NO_SUBAGENTS"] = "on"
+		}
+		if ns := t.reg.store.String("no_session"); ns != "" && ns != "auto" {
+			overrides["GAX_NO_SESSION"] = ns
+		}
+	}
+	cmd.Env = subagent.ChildEnv(os.Environ(), os.Getenv("GAX_SUBAGENT_DEPTH"), overrides)
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {

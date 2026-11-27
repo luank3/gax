@@ -16,6 +16,11 @@ type filterFunc func(inv Invocation, output string, exitCode int) (Result, bool)
 var filters = map[string]filterFunc{
 	"ls":             filterList(capInventory),
 	"tree":           filterList(capInventory),
+	"find":           filterList(capInventory),
+	"fd":             filterList(capInventory),
+	"du":             filterList(capInventory),
+	"df":             filterList(capInventory),
+	"ps":             filterList(capInventory),
 	"cat":            filterCat,
 	"head":           filterCat,
 	"tail":           filterCat,
@@ -41,8 +46,23 @@ var filters = map[string]filterFunc{
 	"jest":           filterTestRunner("FAIL ", "● "),
 	"vitest":         filterTestRunner("FAIL ", "❯ "),
 	"mocha":          filterTestRunner("failing", "Error:"),
+	"make":           filterBuild,
+	"cmake":          filterBuild,
+	"ninja":          filterBuild,
+	"pip":            filterPip,
+	"pip3":           filterPip,
+	"uv":             filterPip,
 	"ruff":           filterLinter,
 	"sqlfluff":       filterLinter,
+	"tsc":            filterLinter,
+	"eslint":         filterLinter,
+	"golangci-lint":  filterLinter,
+	"mypy":           filterLinter,
+	"pyright":        filterLinter,
+	"biome":          filterLinter,
+	"curl":           filterCurl,
+	"wget":           filterCurl,
+	"kubectl":        filterKubectl,
 	"docker":         filterDocker,
 	"docker-compose": filterDocker,
 }
@@ -145,7 +165,7 @@ func filterGit(inv Invocation, output string, exitCode int) (Result, bool) {
 	sub := inv.Args[0]
 	lines := splitNonEmpty(output)
 	switch sub {
-	case "status", "log", "add", "commit", "push":
+	case "status", "log", "add", "commit", "push", "branch", "tag", "stash":
 		if len(lines) <= capList {
 			return Result{}, false
 		}
@@ -156,7 +176,7 @@ func filterGit(inv Invocation, output string, exitCode int) (Result, bool) {
 		}
 		fmt.Fprintf(&b, "... (%d more lines)", len(lines)-capList)
 		return Result{Text: b.String(), Omitted: true}, true
-	case "diff":
+	case "diff", "show":
 		if len(lines) <= 80 {
 			return Result{}, false
 		}
@@ -179,8 +199,14 @@ func filterGit(inv Invocation, output string, exitCode int) (Result, bool) {
 }
 
 func filterGo(inv Invocation, output string, exitCode int) (Result, bool) {
-	if len(inv.Args) > 0 && inv.Args[0] == "test" {
+	if len(inv.Args) == 0 {
+		return Result{}, false
+	}
+	switch inv.Args[0] {
+	case "test":
 		return filterTestRunner("--- FAIL:", "FAIL\t", "panic:")(inv, output, exitCode)
+	case "build", "vet":
+		return filterLinter(inv, output, exitCode)
 	}
 	return Result{}, false
 }
@@ -231,8 +257,109 @@ func filterLinter(_ Invocation, output string, _ int) (Result, bool) {
 }
 
 func filterDocker(inv Invocation, output string, exitCode int) (Result, bool) {
-	if exitCode != 0 || len(inv.Args) == 0 || inv.Args[0] != "ps" {
+	if len(inv.Args) == 0 {
 		return Result{}, false
 	}
-	return filterList(capList)(inv, output, exitCode)
+	switch inv.Args[0] {
+	case "ps", "images":
+		return filterList(capList)(inv, output, exitCode)
+	case "build":
+		return filterBuild(inv, output, exitCode)
+	case "logs":
+		return filterCat(inv, output, exitCode)
+	}
+	return Result{}, false
+}
+
+func filterBuild(_ Invocation, output string, exitCode int) (Result, bool) {
+	lines := splitNonEmpty(output)
+	if len(lines) <= capList {
+		return Result{}, false
+	}
+	var kept []string
+	for _, l := range lines {
+		low := strings.ToLower(l)
+		if strings.Contains(low, "error") || strings.Contains(low, "warning:") ||
+			strings.Contains(l, "***") || strings.Contains(l, "FAILED") {
+			kept = append(kept, l)
+		}
+	}
+	if exitCode == 0 && len(kept) == 0 {
+		return Result{
+			Text:    fmt.Sprintf("build succeeded (%d lines; last: %s)", len(lines), lines[len(lines)-1]),
+			Omitted: true,
+		}, true
+	}
+	if len(kept) > 0 {
+		if len(kept) > capWarnings*2 {
+			kept = kept[:capWarnings*2]
+		}
+		return Result{
+			Text:    strings.Join(kept, "\n") + fmt.Sprintf("\n... (%d build lines omitted)", len(lines)-len(kept)),
+			Omitted: true,
+		}, true
+	}
+	return Result{}, false
+}
+
+func filterPip(_ Invocation, output string, exitCode int) (Result, bool) {
+	if exitCode != 0 {
+		return Result{}, false
+	}
+	lines := splitNonEmpty(output)
+	if len(lines) <= capList {
+		return Result{}, false
+	}
+	var kept []string
+	for _, l := range lines {
+		if strings.HasPrefix(l, "Collecting ") || strings.HasPrefix(l, "  Downloading ") ||
+			strings.HasPrefix(l, "  Using cached ") || strings.HasPrefix(l, "Requirement already satisfied:") {
+			continue
+		}
+		kept = append(kept, l)
+	}
+	if len(kept) == 0 {
+		return Result{Text: fmt.Sprintf("pip completed (%d lines omitted)", len(lines)), Omitted: true}, true
+	}
+	if len(kept) > capList {
+		kept = kept[len(kept)-capList:]
+	}
+	return Result{
+		Text:    strings.Join(kept, "\n") + fmt.Sprintf("\n... (%d download/cache lines omitted)", len(lines)-len(kept)),
+		Omitted: true,
+	}, true
+}
+
+func filterCurl(_ Invocation, output string, _ int) (Result, bool) {
+	lines := strings.Split(strings.ReplaceAll(output, "\r", "\n"), "\n")
+	var kept []string
+	stripped := 0
+	for _, l := range lines {
+		t := strings.TrimSpace(l)
+		if strings.HasPrefix(t, "% Total") || strings.HasPrefix(t, "Dload  Upload") ||
+			(strings.Contains(t, "%") && (strings.Contains(t, "--:--:--") || strings.Contains(t, "###"))) {
+			stripped++
+			continue
+		}
+		if t != "" {
+			kept = append(kept, l)
+		}
+	}
+	if stripped == 0 {
+		return Result{}, false
+	}
+	return Result{Text: strings.Join(kept, "\n"), Omitted: true}, true
+}
+
+func filterKubectl(inv Invocation, output string, exitCode int) (Result, bool) {
+	if exitCode != 0 || len(inv.Args) == 0 {
+		return Result{}, false
+	}
+	switch inv.Args[0] {
+	case "get":
+		return filterList(capInventory)(inv, output, exitCode)
+	case "logs", "describe":
+		return filterCat(inv, output, exitCode)
+	}
+	return Result{}, false
 }
