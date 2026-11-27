@@ -43,8 +43,11 @@ var Shipped = []Def{
 		ID: "codex", DisplayName: "Codex (ChatGPT)", API: "openai-responses",
 		BaseURL: "https://chatgpt.com/backend-api/codex", CatalogID: "openai", Pinned: true, SendCacheKey: true,
 		ExtraHeaders: map[string]string{
-			"originator": "codex_cli_rs",
-			"User-Agent": "codex_cli_rs/0.144.1 gax",
+			"originator":          "codex_cli_rs",
+			"User-Agent":          "codex_cli_rs/0.144.1 gax",
+			"OpenAI-Beta":         "responses=experimental",
+			"session-id":          "{session_id}",
+			"x-client-request-id": "{session_id}",
 		},
 	},
 	{

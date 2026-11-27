@@ -50,9 +50,7 @@ func (c *ResponsesClient) Stream(ctx context.Context, req provider.StreamRequest
 		if apiKey != "" {
 			hdr.Set("Authorization", "Bearer "+apiKey)
 		}
-		for k, v := range extra {
-			hdr.Set(k, v)
-		}
+		provider.ApplyExtraHeaders(hdr, extra, req.Options.SessionID)
 		provider.ApplyExtraHeaders(hdr, req.Options.ExtraHeaders, req.Options.SessionID)
 		return hdr
 	}
