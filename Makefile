@@ -1,58 +1,43 @@
-GO ?= go
-BIN_DIR ?= bin
-BINARY := $(BIN_DIR)/gax$(if $(filter windows,$(shell $(GO) env GOOS)),.exe)
+.PHONY: web build test test-race vet fmt fmt-check lint cross budget clean
 
-# gax is cgo-free, so the binaries build static with CGO_ENABLED=0. The race detector needs cgo, so
-# only the race target turns it back on.
-CGO ?= 0
-TEST_PACKAGES ?= ./...
-TEST_FLAGS ?=
+VERSION ?= dev
+LDFLAGS := -s -w -X main.version=$(VERSION)
+TARGETS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
 
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -s -w -X github.com/luank3/gax/internal/version.Value=$(VERSION)
+web:
+	npm install --prefix web --no-audit --no-fund
+	npm run build --prefix web
 
-# Ambient selection variables change one-shot output; app tests assert it verbatim.
-TEST_ENV := env -u GAX_PROVIDER -u GAX_MODEL -u GAX_EFFORT -u GAX_PRESET
-STATIC_ENV := env CGO_ENABLED=$(CGO)
-
-.PHONY: all build install test test-race vet fmt fmt-check lint cover clean snapshot
-
-all: build
-
-build:
-	$(STATIC_ENV) $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $(BINARY) ./cmd/gax
-
-install:
-	$(STATIC_ENV) $(GO) install -trimpath -ldflags '$(LDFLAGS)' ./cmd/gax
+build: web
+	CGO_ENABLED=0 go build -tags webui -trimpath -ldflags="$(LDFLAGS)" -o bin/gax ./cmd/gax
 
 test:
-	$(TEST_ENV) $(STATIC_ENV) $(GO) test $(TEST_FLAGS) $(TEST_PACKAGES)
+	CGO_ENABLED=0 go test ./...
 
 test-race:
-	$(TEST_ENV) env CGO_ENABLED=1 $(GO) test -race -count=1 ./...
+	CGO_ENABLED=1 go test -race -count=1 ./...
 
 vet:
-	$(STATIC_ENV) $(GO) vet ./...
+	CGO_ENABLED=0 go vet ./...
 
 fmt:
-	gofmt -l -w .
+	gofmt -w cmd internal
 
 fmt-check:
-	@changed="$$(gofmt -l .)"; \
-	if [ -n "$$changed" ]; then \
-		echo 'gofmt needed:'; \
-		echo "$$changed"; \
-		exit 1; \
-	fi
+	@test -z "$$(gofmt -l cmd internal)" || (gofmt -l cmd internal && exit 1)
 
 lint: fmt-check vet
 
-cover:
-	$(TEST_ENV) $(STATIC_ENV) $(GO) test -coverprofile=coverage.out ./...
-	$(GO) tool cover -func=coverage.out | tail -n 1
+cross: web
+	@mkdir -p bin/cross
+	@for t in $(TARGETS); do \
+		os=$${t%/*}; arch=$${t#*/}; \
+		ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -tags webui -trimpath -ldflags="$(LDFLAGS)" -o bin/cross/gax-$$os-$$arch$$ext ./cmd/gax || exit 1; \
+	done
+
+budget: cross
+	./scripts/check-budgets.sh
 
 clean:
-	rm -rf $(BIN_DIR) dist coverage.out
-
-snapshot:
-	goreleaser release --snapshot --clean
+	rm -rf bin dist

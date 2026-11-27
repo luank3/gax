@@ -1,13 +1,20 @@
 version: 2
 
-project_name: gax
+before:
+  hooks:
+    - make web
 
 builds:
-  - id: gax
-    main: ./cmd/gax
+  - main: ./cmd/gax
     binary: gax
+    tags:
+      - webui
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
     goos:
       - linux
       - darwin
@@ -15,34 +22,12 @@ builds:
     goarch:
       - amd64
       - arm64
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X github.com/luank3/gax/internal/version.Value={{ .Version }}
 
 archives:
-  - id: gax
-    formats: [tar.gz]
+  - format: tar.gz
     format_overrides:
       - goos: windows
-        formats: [zip]
-    name_template: >-
-      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
-    files:
-      - LICENSE
-      - README.md
+        format: zip
 
 checksum:
   name_template: checksums.txt
-
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^chore:"
-
-release:
-  draft: false
-  prerelease: auto

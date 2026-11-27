@@ -1,254 +1,242 @@
-// Package registry contains the shipped provider definitions and config-defined data providers.
+// Package registry defines shipped providers and resolves runtime provider
+// clients from configuration, environment credentials, and custom provider blocks.
 package registry
 
 import (
-	"encoding/json"
-	"strconv"
+	"fmt"
+	"os"
+	"path"
 	"strings"
 
 	"github.com/luank3/gax/internal/config"
-	providerconfig "github.com/luank3/gax/internal/provider/config"
-	"github.com/luank3/gax/internal/version"
+	"github.com/luank3/gax/internal/provider"
+	"github.com/luank3/gax/internal/provider/anthropic"
+	"github.com/luank3/gax/internal/provider/mock"
+	"github.com/luank3/gax/internal/provider/openai"
+	"github.com/luank3/gax/internal/transport"
 )
 
-type Hook uint32
-
-const (
-	HookParseModel Hook = 1 << iota
-	HookProbeModel
-	HookListModels
-	HookQueryUsage
-	HookModelLabel
-	HookAuthSource
-	HookLoadDefaults
-	HookDiscover
-	HookConstruct
-	HookPrepareAvailability
-)
-
-type Definition struct {
-	ID                 string
-	DisplayName        string
-	Internal           bool
-	API                string
-	BaseURL            string
-	Port               int
-	Pinned             bool
-	APIKeyEnv          string
-	CatalogID          string
-	MetadataAPI        string
-	SendCacheKey       bool
-	Cache              string
-	RequestCost        bool
-	ReasoningFormat    string
-	ReasoningRoundtrip string
-	ThinkingMode       string
-	ReasoningRequired  bool
-	StrictSignatures   bool
-	LengthHint         string
-	NoEfforts          bool
-	ExtraBody          json.RawMessage
-	ExtraHeaders       json.RawMessage
-	Probe              bool
-	UnconfiguredReason string
-	Hooks              Hook
+// Def describes a shipped or config-defined provider entry.
+type Def struct {
+	ID           string
+	DisplayName  string
+	API          string // "openai-responses", "openai-completions", "anthropic-messages", "catalog", "mock"
+	BaseURL      string
+	APIKeyEnv    string
+	CatalogID    string
+	Pinned       bool
+	Internal     bool
+	SendCacheKey bool
+	ExtraHeaders map[string]string
 }
 
-type Registry struct {
-	config    *config.Store
-	providers *providerconfig.Config
-	byID      map[string]*Definition
-	visible   []*Definition
-	warnings  []string
+// Shipped lists built-in providers in autoselect priority order.
+var Shipped = []Def{
+	{
+		ID: "codex", DisplayName: "Codex (ChatGPT)", API: "openai-responses",
+		BaseURL: "https://chatgpt.com/backend-api/codex", CatalogID: "openai", Pinned: true, SendCacheKey: true,
+	},
+	{
+		ID: "openai", DisplayName: "OpenAI", API: "openai-responses",
+		BaseURL: "https://api.openai.com/v1", APIKeyEnv: "OPENAI_API_KEY", CatalogID: "openai", Pinned: true, SendCacheKey: true,
+	},
+	{
+		ID: "anthropic", DisplayName: "Anthropic", API: "anthropic-messages",
+		BaseURL: "https://api.anthropic.com/v1", APIKeyEnv: "ANTHROPIC_API_KEY", CatalogID: "anthropic", Pinned: true,
+	},
+	{
+		ID: "openrouter", DisplayName: "OpenRouter", API: "openai-completions",
+		BaseURL: "https://openrouter.ai/api/v1", APIKeyEnv: "OPENROUTER_API_KEY", CatalogID: "openrouter", Pinned: true,
+		ExtraHeaders: map[string]string{
+			"HTTP-Referer":            "https://github.com/luank3/gax",
+			"X-Title":                 "gax",
+			"X-OpenRouter-Categories": "cli-agent",
+		},
+	},
+	{
+		ID: "opencode-zen", DisplayName: "OpenCode Zen", API: "catalog",
+		BaseURL: "https://opencode.ai/zen/v1", APIKeyEnv: "OPENCODE_API_KEY", CatalogID: "opencode", Pinned: true,
+		ExtraHeaders: map[string]string{"x-opencode-client": "gax"},
+	},
+	{
+		ID: "opencode-go", DisplayName: "OpenCode Go", API: "catalog",
+		BaseURL: "https://opencode.ai/zen/go/v1", APIKeyEnv: "OPENCODE_API_KEY", CatalogID: "opencode-go", Pinned: true,
+		ExtraHeaders: map[string]string{"x-opencode-client": "gax"},
+	},
+	{
+		ID: "deepseek", DisplayName: "DeepSeek", API: "openai-completions",
+		BaseURL: "https://api.deepseek.com", APIKeyEnv: "DEEPSEEK_API_KEY", CatalogID: "deepseek", Pinned: true,
+	},
+	{
+		ID: "llamacpp", DisplayName: "llama.cpp", API: "openai-completions",
+		BaseURL: "http://127.0.0.1:9931/v1",
+	},
+	{
+		ID: "ollama", DisplayName: "Ollama", API: "openai-completions",
+		BaseURL: "http://127.0.0.1:11434/v1",
+	},
+	{
+		ID: "openai-compatible", DisplayName: "OpenAI-compatible", API: "openai-completions",
+	},
+	{
+		ID: "anthropic-compatible", DisplayName: "Anthropic-compatible", API: "anthropic-messages",
+	},
+	{
+		ID: "mock", DisplayName: "Mock", API: "mock", Internal: true,
+	},
 }
 
-var shipped = []Definition{
-	{
-		ID: "codex", API: "openai-responses", BaseURL: "https://chatgpt.com/backend-api/codex", Pinned: true,
-		CatalogID: "openai", SendCacheKey: true,
-		ExtraBody:    json.RawMessage(`{"text":{"verbosity":"low"}}`),
-		ExtraHeaders: json.RawMessage(`{"originator":"codex_cli_rs","User-Agent":"codex_cli_rs/0.144.1 gax/` + version.Value + `"}`),
-		Hooks:        HookProbeModel | HookListModels | HookQueryUsage | HookAuthSource | HookLoadDefaults | HookPrepareAvailability,
-	},
-	{ID: "openai", API: "openai-responses", BaseURL: "https://api.openai.com/v1", Pinned: true, APIKeyEnv: "OPENAI_API_KEY", CatalogID: "openai", SendCacheKey: true},
-	{ID: "anthropic", API: "anthropic-messages", BaseURL: "https://api.anthropic.com/v1", Pinned: true, APIKeyEnv: "ANTHROPIC_API_KEY", CatalogID: "anthropic", ThinkingMode: "prefer-adaptive", StrictSignatures: true},
-	{
-		ID: "openrouter", BaseURL: "https://openrouter.ai/api/v1", Pinned: true, APIKeyEnv: "OPENROUTER_API_KEY",
-		SendCacheKey: true, Cache: "auto", RequestCost: true, ReasoningFormat: "nested",
-		ExtraHeaders: json.RawMessage(`{"X-Title":"gax","HTTP-Referer":"https://github.com/luank3/gax","X-OpenRouter-Categories":"cli-agent","x-session-id":"{session_id}"}`),
-		Hooks:        HookParseModel | HookProbeModel | HookQueryUsage,
-	},
-	{ID: "opencode-go", API: "catalog", BaseURL: "https://opencode.ai/zen/go/v1", APIKeyEnv: "OPENCODE_API_KEY", CatalogID: "opencode-go", MetadataAPI: "openai", ExtraHeaders: openCodeHeaders(), Hooks: HookQueryUsage},
-	{
-		ID: "deepseek", BaseURL: "https://api.deepseek.com", Pinned: true,
-		APIKeyEnv: "DEEPSEEK_API_KEY", CatalogID: "deepseek",
-		ReasoningRoundtrip: "reasoning_content", ReasoningRequired: true,
-		Hooks: HookParseModel | HookQueryUsage,
-	},
-	{
-		ID: "llamacpp", DisplayName: "llama.cpp", BaseURL: "http://127.0.0.1:{port}/v1",
-		ReasoningRoundtrip: "reasoning_content", ExtraBody: json.RawMessage(`{"return_progress":true}`),
-		LengthHint: "llama-server's context is full — restart it with a larger -c / --ctx-size", NoEfforts: true,
-		Hooks: HookParseModel | HookProbeModel | HookModelLabel | HookDiscover | HookPrepareAvailability,
-	},
-	{
-		ID: "ollama", BaseURL: "http://127.0.0.1:{port}/v1", Port: 11434,
-		LengthHint: "ollama's context window may be too small for the prompt — restart `ollama serve` with a larger OLLAMA_CONTEXT_LENGTH (e.g. 16384), or raise num_ctx on the model",
-		NoEfforts:  true, Probe: true,
-	},
-	{ID: "openai-compatible", UnconfiguredReason: "GAX_OPENAI_BASE_URL not set"},
-	{ID: "anthropic-compatible", API: "anthropic-messages", UnconfiguredReason: "GAX_ANTHROPIC_BASE_URL not set"},
-	{ID: "mock", Internal: true, NoEfforts: true, Hooks: HookConstruct},
-}
-
-// The OpenCode gateway pins a conversation to one backend by its session header — Go rejects
-// requests without one — and attributes usage by client.
-func openCodeHeaders() json.RawMessage {
-	return json.RawMessage(`{"x-opencode-session":"{session_id}","x-opencode-client":"gax"}`)
-}
-
-func New(store *config.Store) *Registry {
-	registry := &Registry{
-		config:    store,
-		providers: providerconfig.New(store),
-		byID:      make(map[string]*Definition),
-	}
-	for _, definition := range shipped {
-		copy := definition
-		copy.ExtraBody = append(json.RawMessage(nil), definition.ExtraBody...)
-		copy.ExtraHeaders = append(json.RawMessage(nil), definition.ExtraHeaders...)
-		registry.byID[copy.ID] = &copy
-		if !copy.Internal {
-			registry.visible = append(registry.visible, &copy)
-		}
-	}
-	if store == nil {
-		return registry
-	}
-	for _, name := range store.ObjectKeys("providers") {
-		if strings.Contains(name, ".") {
-			registry.warnings = append(registry.warnings, "ignoring custom provider "+name+": name cannot contain '.'")
+// AvailableProviders returns providers eligible for /provider and completion.
+// Unconfigured openai-compatible / anthropic-compatible are omitted (hax v0.7.0).
+func AvailableProviders(store *config.Store) []Def {
+	var out []Def
+	for _, d := range Shipped {
+		if d.Internal {
 			continue
 		}
-		if _, shipped := registry.byID[name]; shipped {
+		if d.ID == "openai-compatible" && store.String("providers.openai-compatible.base_url") == "" {
 			continue
 		}
-		definition := &Definition{ID: name}
-		registry.byID[name] = definition
-		registry.visible = append(registry.visible, definition)
-	}
-	return registry
-}
-
-func CanonicalID(name string) string {
-	if name == "llama.cpp" {
-		return "llamacpp"
-	}
-	return name
-}
-
-func (registry *Registry) Find(name string) (*Definition, bool) {
-	if registry == nil {
-		return nil, false
-	}
-	definition, ok := registry.byID[CanonicalID(name)]
-	return definition, ok
-}
-
-func (registry *Registry) All() []*Definition {
-	if registry == nil {
-		return nil
-	}
-	return append([]*Definition(nil), registry.visible...)
-}
-
-func (registry *Registry) Default() *Definition {
-	if registry == nil || len(registry.visible) == 0 {
-		return nil
-	}
-	return registry.visible[0]
-}
-
-func (registry *Registry) DisplayName(definition *Definition) string {
-	if definition == nil {
-		return ""
-	}
-	if registry != nil && registry.config != nil {
-		if value := registry.config.StringNonempty("providers." + definition.ID + ".display_name"); value != nil {
-			return *value
+		if d.ID == "anthropic-compatible" && store.String("providers.anthropic-compatible.base_url") == "" {
+			continue
 		}
+		out = append(out, d)
 	}
-	if definition.DisplayName != "" {
-		return definition.DisplayName
-	}
-	return definition.ID
-}
-
-// CatalogID returns nil when a config value explicitly opts out with an empty string.
-func (registry *Registry) CatalogID(definition *Definition) *string {
-	if definition == nil {
-		return nil
-	}
-	if registry != nil && registry.config != nil {
-		if value := registry.config.String("providers." + definition.ID + ".catalog_id"); value != nil {
-			if *value == "" {
-				return nil
+	if custom := store.RawSection("providers"); custom != nil {
+		for id := range custom {
+			if isShipped(id) || strings.Contains(id, ".") {
+				continue
 			}
-			return value
+			out = append(out, Def{ID: id, DisplayName: id, API: "openai-completions"})
 		}
 	}
-	if definition.CatalogID == "" {
-		return nil
-	}
-	value := definition.CatalogID
-	return &value
+	return out
 }
 
-func (registry *Registry) Warnings() []string {
-	if registry == nil {
-		return nil
-	}
-	return append([]string(nil), registry.warnings...)
-}
-
-// ConfigValue resolves a provider field with its definition default when present.
-func (registry *Registry) ConfigValue(definition *Definition, leaf string) *string {
-	if definition == nil || registry == nil || registry.providers == nil {
-		return nil
-	}
-	if value := registry.providers.String("providers."+definition.ID, leaf); value != nil {
-		return value
-	}
-	if value := definitionDefault(definition, leaf); value != "" {
-		return &value
-	}
-	return nil
-}
-
-func definitionDefault(definition *Definition, leaf string) string {
-	switch leaf {
-	case "api":
-		return definition.API
-	case "base_url":
-		return definition.BaseURL
-	case "port":
-		if definition.Port > 0 {
-			return strconv.Itoa(definition.Port)
+func isShipped(id string) bool {
+	for _, d := range Shipped {
+		if d.ID == id {
+			return true
 		}
-	case "api_key_env":
-		return definition.APIKeyEnv
-	case "catalog_id":
-		return definition.CatalogID
-	case "metadata_api":
-		return definition.MetadataAPI
-	case "cache":
-		return definition.Cache
-	case "reasoning_format":
-		return definition.ReasoningFormat
-	case "reasoning_roundtrip":
-		return definition.ReasoningRoundtrip
-	case "thinking_mode":
-		return definition.ThinkingMode
 	}
-	return ""
+	return false
+}
+
+// Resolve builds a provider.Client for providerID using store and httpClient.
+func Resolve(providerID, modelID, cwd string, store *config.Store, httpClient *transport.Client) (provider.Client, error) {
+	if providerID == "mock" {
+		return mock.New(store.String("providers.mock.script"), cwd)
+	}
+	var def *Def
+	for i := range Shipped {
+		if Shipped[i].ID == providerID {
+			copyDef := Shipped[i]
+			def = &copyDef
+			break
+		}
+	}
+	if def == nil {
+		def = &Def{ID: providerID, DisplayName: providerID, API: "openai-completions"}
+	}
+
+	baseURL := def.BaseURL
+	apiKey := ""
+	if def.APIKeyEnv != "" {
+		apiKey = os.Getenv(def.APIKeyEnv)
+	}
+	api := def.API
+
+	// Apply providers.<id> config block overrides when not pinned.
+	if rawProviders := store.RawSection("providers"); rawProviders != nil {
+		if block, ok := rawProviders[providerID].(map[string]any); ok {
+			if !def.Pinned {
+				if u, ok := block["base_url"].(string); ok && u != "" {
+					baseURL = u
+				}
+				if a, ok := block["api"].(string); ok && a != "" {
+					api = a
+				}
+			}
+			if envName, ok := block["api_key_env"].(string); ok && envName != "" {
+				apiKey = os.Getenv(envName)
+			}
+			if rawKey, ok := block["api_key"].(string); ok && rawKey != "" {
+				if expanded, ok := config.ExpandEnvValue(rawKey); ok {
+					apiKey = expanded
+				}
+			}
+			if modelAPIs, ok := block["model_apis"].(map[string]any); ok && modelID != "" {
+				for pattern, target := range modelAPIs {
+					if matched, _ := path.Match(pattern, modelID); matched {
+						if s, ok := target.(string); ok && s != "" {
+							api = s
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if providerID == "llamacpp" {
+		if u := store.String("providers.llamacpp.base_url"); u != "" {
+			baseURL = u
+		} else {
+			port := store.Int("providers.llamacpp.port")
+			if port <= 0 {
+				port = 9931
+			}
+			baseURL = fmt.Sprintf("http://127.0.0.1:%d/v1", port)
+		}
+		if k := store.String("providers.llamacpp.api_key"); k != "" {
+			apiKey = k
+		}
+	}
+	if providerID == "openai-compatible" {
+		baseURL = store.String("providers.openai-compatible.base_url")
+		apiKey = store.String("providers.openai-compatible.api_key")
+		if store.String("providers.openai-compatible.api") == "responses" {
+			api = "openai-responses"
+		}
+	}
+	if providerID == "anthropic-compatible" {
+		baseURL = store.String("providers.anthropic-compatible.base_url")
+		apiKey = store.String("providers.anthropic-compatible.api_key")
+	}
+
+	if baseURL == "" {
+		return nil, fmt.Errorf("provider %q has no base_url configured", providerID)
+	}
+
+	idleTimeout := store.Duration("http.idle_timeout")
+	switch api {
+	case "anthropic-messages":
+		return anthropic.NewClient(anthropic.Config{
+			ProviderID:  providerID,
+			BaseURL:     baseURL,
+			APIKey:      apiKey,
+			Version:     store.String("providers.anthropic-compatible.version"),
+			HTTP:        httpClient,
+			IdleTimeout: idleTimeout,
+			Headers:     def.ExtraHeaders,
+		}), nil
+	case "openai-responses":
+		return openai.NewResponsesClient(openai.Config{
+			ProviderID:  providerID,
+			BaseURL:     baseURL,
+			APIKey:      apiKey,
+			HTTP:        httpClient,
+			IdleTimeout: idleTimeout,
+			Headers:     def.ExtraHeaders,
+		}), nil
+	default:
+		return openai.NewChatClient(openai.Config{
+			ProviderID:  providerID,
+			BaseURL:     baseURL,
+			APIKey:      apiKey,
+			HTTP:        httpClient,
+			IdleTimeout: idleTimeout,
+			Headers:     def.ExtraHeaders,
+		}), nil
+	}
 }

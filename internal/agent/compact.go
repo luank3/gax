@@ -2,194 +2,115 @@ package agent
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 
-	"github.com/luank3/gax/internal/conversation"
-	"github.com/luank3/gax/internal/provider/client"
-	"github.com/luank3/gax/internal/provider/runtime"
-	"github.com/luank3/gax/internal/transport"
+	"github.com/luank3/gax/internal/core"
+	"github.com/luank3/gax/internal/provider"
 )
 
-const compactPrompt = "Summarize the conversation so far into a structured context checkpoint that lets the work continue without access to the full history above.\n" +
-	"\n" +
-	"CRITICAL: Respond with the summary text ONLY. Do not call any tools and do not continue the task — your entire reply is the summary.\n" +
-	"\n" +
-	"Use this exact Markdown structure, keeping every section even when empty:\n" +
-	"\n" +
-	"## Goal\n" +
-	"- [what the user is ultimately trying to accomplish]\n" +
-	"\n" +
-	"## Constraints & Preferences\n" +
-	"- [explicit user constraints, preferences, or requirements, or \"(none)\"]\n" +
-	"\n" +
-	"## Progress\n" +
-	"### Done\n" +
-	"- [completed work, or \"(none)\"]\n" +
-	"### In Progress\n" +
-	"- [work underway right now, or \"(none)\"]\n" +
-	"### Blocked\n" +
-	"- [blockers, or \"(none)\"]\n" +
-	"\n" +
-	"## Key Decisions\n" +
-	"- [decision: brief rationale, or \"(none)\"]\n" +
-	"\n" +
-	"## Files\n" +
-	"- [path: why it matters / what changed, or \"(none)\"]\n" +
-	"\n" +
-	"## Next Steps\n" +
-	"- [ordered next actions, or \"(none)\"]\n" +
-	"\n" +
-	"## Critical Context\n" +
-	"- [important technical facts, error strings, identifiers, commands, open questions, or \"(none)\"]\n" +
-	"\n" +
-	"Rules:\n" +
-	"- Be terse: bullets, not prose paragraphs.\n" +
-	"- Preserve exact file paths, function names, commands, and error strings.\n" +
-	"- Do not mention that a summary was produced or that context was compacted."
-
-const compactSeedPreamble = "The earlier part of this conversation was condensed to free up context. The summary below captures everything that happened before this point — treat it as established context and continue the work from here."
-const compactToolRejection = "[rejected] Tool calls are disabled while summarizing. Respond with the summary text only — do not call any tools."
-const compactMaxAttempts = 4
-
-type CompactOutcome uint8
-
-const (
-	CompactComplete CompactOutcome = iota
-	CompactCancelled
-	CompactProviderError
-	CompactNoSummary
-	CompactNoProvider
-	CompactNoModel
-	CompactEmpty
-)
-
-type CompactOptions struct {
-	Context       context.Context
-	Session       *Session
-	Provider      *runtime.Provider
-	HTTPClient    *transport.Client
-	Model         string
-	SessionID     *string
-	Focus         string
-	StreamOptions client.StreamOptions
-	Tick          func() bool
-	Observe       func(conversation.Event)
-	Stream        StreamFunc
-}
-
-type CompactResult struct {
-	Outcome      CompactOutcome
-	Attempts     int
-	ErrorMessage string
-}
-
-// CompactOverThreshold reports whether usage reaches a percentage of the model's context window.
-func CompactOverThreshold(contextTokens, contextLimit int64, thresholdPercent int) bool {
-	if contextTokens < 0 || contextLimit <= 0 || thresholdPercent < 1 || thresholdPercent > 100 {
+// ShouldAutoCompact reports whether current context usage warrants compaction.
+func ShouldAutoCompact(lastTokens, limit, thresholdPct int64) bool {
+	if limit <= 0 || lastTokens <= 0 {
 		return false
 	}
-	threshold := contextLimit / 100 * int64(thresholdPercent)
-	remainder := contextLimit % 100 * int64(thresholdPercent)
-	threshold += remainder / 100
-	if remainder%100 != 0 {
-		threshold++
+	if thresholdPct <= 0 {
+		thresholdPct = 85
 	}
-	return contextTokens >= threshold
+	headroom := min(int64(16000), limit/4)
+	if lastTokens >= limit-headroom {
+		return true
+	}
+	return lastTokens*100 >= limit*thresholdPct
 }
 
-// CompactConversation summarizes the current history without exposing its temporary request or
-// rejected tool calls to the live session. A successful summary becomes the new context seed.
-func CompactConversation(options CompactOptions) CompactResult {
-	result := CompactResult{}
-	if options.Provider == nil {
-		result.Outcome = CompactNoProvider
-		return result
+// Compact summarizes the active context window into a compact_seed item.
+// If the full window overflows the summarization request, it retries with a
+// shortened copy dropping older items first (hax v0.7.0).
+func Compact(ctx context.Context, sess *Session, prov provider.Client, model, focus string, auto bool, sink core.EventSink) error {
+	if sess == nil || prov == nil {
+		return fmt.Errorf("compaction requires session and provider")
 	}
-	if options.Session == nil {
-		result.Outcome = CompactEmpty
-		return result
+	window := sess.ContextWindow()
+	if len(window) == 0 {
+		return nil
 	}
-	model := options.Model
-	if model == "" && options.Session.Model != nil {
-		model = *options.Session.Model
-	}
-	if model == "" {
-		result.Outcome = CompactNoModel
-		return result
-	}
-	if len(options.Session.Items) == 0 {
-		result.Outcome = CompactEmpty
-		return result
+	beforeTokens := EstimateTokens("", window)
+	if sink != nil {
+		sink.Emit(core.CompactStarted{Auto: auto})
 	}
 
-	working := *options.Session
-	working.Model = conversation.String(model)
-	working.Items = append([]conversation.Item(nil), options.Session.Items...)
-	working.Retired = nil
-	prompt := compactPrompt
-	if options.Focus != "" {
-		prompt += "\n\nAdditional focus for this summary:\n" + options.Focus
+	instruction := "Summarize the conversation so far concisely, preserving key decisions, file paths, symbol names, errors, and remaining work."
+	if strings.TrimSpace(focus) != "" {
+		instruction += " Focus especially on: " + strings.TrimSpace(focus)
 	}
-	working.Append(conversation.Item{Kind: conversation.KindUser, Text: conversation.String(prompt)})
-	baseCount := len(working.Items)
-
-	loopResult := RunLoop(options.Context, LoopOptions{
-		Session: &working, Provider: options.Provider, HTTPClient: options.HTTPClient,
-		Model: model, SessionID: options.SessionID, StreamOptions: options.StreamOptions,
-		MaxTurns: compactMaxAttempts, SuppressBoundaries: true, Tick: options.Tick, Observe: options.Observe,
-		Stream: options.Stream,
-		ToolCall: func(call conversation.Item, _ ToolAction, _ int) conversation.Item {
-			return conversation.Item{
-				Kind: conversation.KindToolResult, CallID: cloneString(call.CallID),
-				ToolName: cloneString(call.ToolName), Output: conversation.String(compactToolRejection),
-			}
-		},
-	})
-	result.Attempts = loopResult.Turns
-	result.ErrorMessage = loopResult.ErrorMessage
 
 	var summary string
-	if loopResult.Outcome == LoopComplete {
-		for index := loopResult.FinalItemsFrom; index < loopResult.FinalItemsTo && index < len(working.Items); index++ {
-			item := working.Items[index]
-			if item.Kind == conversation.KindAssistant && item.Text != nil && *item.Text != "" {
-				summary = *item.Text
+	var err error
+	candidates := [][]core.Item{window}
+	if len(window) > 4 {
+		candidates = append(candidates, window[len(window)/2:])
+	}
+	if len(window) > 8 {
+		candidates = append(candidates, window[len(window)*3/4:])
+	}
+
+	for _, slice := range candidates {
+		reqItems := append(append([]core.Item(nil), slice...), core.Item{
+			Kind: core.KindUser,
+			Text: instruction,
+		})
+		var b strings.Builder
+		var usage *core.Usage
+		err = prov.Stream(ctx, provider.StreamRequest{
+			Items:   reqItems,
+			Options: provider.StreamOptions{Model: model},
+		}, func(ev provider.StreamEvent) {
+			if ev.Kind == provider.EventText {
+				b.WriteString(ev.Text)
 			}
+			if ev.Kind == provider.EventUsage && ev.Usage != nil {
+				usage = ev.Usage
+			}
+		})
+		if err == nil {
+			summary = strings.TrimSpace(b.String())
+			if usage != nil {
+				sess.Append(core.Item{
+					Kind:     core.KindTurnUsage,
+					Origin:   core.OriginCompaction,
+					Provider: prov.ID(),
+					Model:    model,
+					Usage:    usage,
+				})
+			}
+			break
+		}
+		var ov *provider.OverflowError
+		if !errors.As(err, &ov) {
+			break
 		}
 	}
 
-	var usage []conversation.Item
-	for _, item := range working.Items[baseCount:] {
-		if item.Kind == conversation.KindTurnUsage {
-			item.Origin = conversation.OriginCompaction
-			usage = append(usage, item)
+	if err != nil {
+		if sink != nil {
+			sink.Emit(core.CompactFinished{BeforeTokens: beforeTokens, Err: err})
 		}
+		return err
 	}
 	if summary == "" {
-		options.Session.Items = append(options.Session.Items, usage...)
-		switch loopResult.Outcome {
-		case LoopInterrupted:
-			result.Outcome = CompactCancelled
-		case LoopProviderError:
-			result.Outcome = CompactProviderError
-		default:
-			result.Outcome = CompactNoSummary
-		}
-		return result
+		summary = "(empty compaction summary)"
 	}
-
-	if len(usage) > 1 {
-		options.Session.Items = append(options.Session.Items, usage[:len(usage)-1]...)
+	seed := core.Item{
+		Kind:   core.KindUser,
+		Origin: core.OriginCompactSeed,
+		Text:   "[Compacted conversation summary]\n" + summary,
 	}
-	options.Session.AddBoundary()
-	options.Session.Append(conversation.Item{
-		Kind: conversation.KindUser, Text: conversation.String(compactSeedPreamble + "\n\n" + summary),
-		Origin: conversation.OriginCompactSeed,
-	})
-	if len(usage) > 0 {
-		options.Session.Items = append(options.Session.Items, usage[len(usage)-1])
+	sess.Append(seed)
+	afterTokens := EstimateTokens("", []core.Item{seed})
+	if sink != nil {
+		sink.Emit(core.CompactFinished{BeforeTokens: beforeTokens, AfterTokens: afterTokens})
 	}
-	options.Session.CompactionDeferred = false
-	options.Session.ResumeReason = ResumeReasonNone
-	result.Outcome = CompactComplete
-	return result
+	return nil
 }

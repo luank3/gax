@@ -1,4 +1,4 @@
-// Package subagent contains the recursion boundary shared by nested gax runs and shell children.
+// Package subagent enforces the recursion depth limit for nested gax -p runs.
 package subagent
 
 import (
@@ -9,8 +9,7 @@ import (
 
 const MaxDepth = 3
 
-// CheckDepth rejects a nested gax invocation at the limit. A malformed or negative inherited
-// depth fails closed at MaxDepth, matching the command-line guard in gax.
+// CheckDepth rejects a nested gax invocation at MaxDepth (failing closed on malformed values).
 func CheckDepth(value string) error {
 	if value == "" {
 		return nil
@@ -25,8 +24,7 @@ func CheckDepth(value string) error {
 	return fmt.Errorf("subagent depth limit (%d) reached — run the task directly instead of spawning another gax", MaxDepth)
 }
 
-// NextChildDepth stamps a shell child with its ancestry depth. Malformed values fail closed at
-// MaxDepth so that a bad inherited marker cannot permit unbounded nested gax processes.
+// NextChildDepth returns the depth stamped onto child shell processes.
 func NextChildDepth(value string) int {
 	depth := 0
 	if value != "" {
@@ -44,7 +42,7 @@ func NextChildDepth(value string) int {
 }
 
 func parseDepth(value string) (int, bool) {
-	value = strings.TrimLeft(value, " \t\n\r\v\f")
+	value = strings.TrimSpace(value)
 	if value == "" {
 		return 0, false
 	}

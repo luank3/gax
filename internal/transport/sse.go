@@ -1,97 +1,73 @@
+// Package transport provides streaming HTTP/SSE requests, retry/backoff,
+// idle timeouts, and OS CA root fallback for provider and catalog clients.
 package transport
 
+import (
+	"bufio"
+	"io"
+	"strings"
+)
+
+// SSEEvent is a single parsed Server-Sent Event.
 type SSEEvent struct {
-	Name string
-	Data string
+	Event string
+	Data  string
+	ID    string
 }
 
-type SSEParser struct {
-	line     []byte
-	event    []byte
-	data     []byte
-	callback func(SSEEvent) bool
-	stopped  bool
-}
+const maxSSELineBytes = 4 << 20 // 4 MiB bounded line buffer
 
-func NewSSEParser(callback func(SSEEvent) bool) *SSEParser {
-	return &SSEParser{callback: callback}
-}
+// ParseSSE streams Server-Sent Events from r, calling fn for each complete event.
+// Returns nil on clean EOF, or the first non-EOF read/callback error.
+func ParseSSE(r io.Reader, fn func(SSEEvent) error) error {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 64*1024), maxSSELineBytes)
 
-func (parser *SSEParser) Feed(chunk []byte) {
-	lineStart := 0
-	for index, char := range chunk {
-		if char != '\n' {
+	var ev SSEEvent
+	var dataLines []string
+	hasData := false
+
+	flush := func() error {
+		if !hasData && ev.Event == "" && ev.ID == "" {
+			return nil
+		}
+		if hasData {
+			ev.Data = strings.Join(dataLines, "\n")
+		}
+		err := fn(ev)
+		ev = SSEEvent{}
+		dataLines = dataLines[:0]
+		hasData = false
+		return err
+	}
+
+	for scanner.Scan() {
+		line := strings.TrimSuffix(scanner.Text(), "\r")
+		if line == "" {
+			if err := flush(); err != nil {
+				return err
+			}
 			continue
 		}
-		parser.line = append(parser.line, chunk[lineStart:index]...)
-		parser.processLine(parser.line)
-		parser.line = parser.line[:0]
-		lineStart = index + 1
-	}
-	if lineStart < len(chunk) {
-		parser.line = append(parser.line, chunk[lineStart:]...)
-	}
-}
-
-func (parser *SSEParser) Finalize() {
-	if len(parser.line) > 0 {
-		parser.processLine(parser.line)
-		parser.line = parser.line[:0]
-	}
-	if len(parser.event) > 0 || len(parser.data) > 0 {
-		parser.emit()
-	}
-}
-
-func (parser *SSEParser) processLine(line []byte) {
-	if len(line) > 0 && line[len(line)-1] == '\r' {
-		line = line[:len(line)-1]
-	}
-	if len(line) == 0 {
-		parser.emit()
-		return
-	}
-	if line[0] == ':' {
-		return
-	}
-	colon := -1
-	for index, char := range line {
-		if char == ':' {
-			colon = index
-			break
+		if strings.HasPrefix(line, ":") {
+			continue
+		}
+		field, val, found := strings.Cut(line, ":")
+		if found && strings.HasPrefix(val, " ") {
+			val = val[1:]
+		}
+		switch field {
+		case "event":
+			ev.Event = val
+		case "data":
+			dataLines = append(dataLines, val)
+			hasData = true
+		case "id":
+			ev.ID = val
 		}
 	}
-	fieldLength := len(line)
-	value := []byte(nil)
-	if colon >= 0 {
-		fieldLength = colon
-		value = line[colon+1:]
-		if len(value) > 0 && value[0] == ' ' {
-			value = value[1:]
-		}
+	if err := scanner.Err(); err != nil {
+		return err
 	}
-	field := line[:fieldLength]
-	switch string(field) {
-	case "event":
-		parser.event = append(parser.event[:0], value...)
-	case "data":
-		if len(parser.data) > 0 {
-			parser.data = append(parser.data, '\n')
-		}
-		parser.data = append(parser.data, value...)
-	}
-}
-
-func (parser *SSEParser) emit() {
-	if len(parser.event) == 0 && len(parser.data) == 0 {
-		return
-	}
-	if !parser.stopped && parser.callback != nil {
-		event := SSEEvent{Name: string(parser.event), Data: string(parser.data)}
-		if !parser.callback(event) {
-			parser.stopped = true
-		}
-	}
-	parser.event = parser.event[:0]
-	parser.data = parser.data[:0]
+	return flush()
 }
