@@ -13,6 +13,7 @@ import (
 	"github.com/luank3/gax/internal/config"
 	"github.com/luank3/gax/internal/core"
 	"github.com/luank3/gax/internal/jsonstream"
+	"github.com/luank3/gax/internal/mcp"
 	"github.com/luank3/gax/internal/oneshot"
 	"github.com/luank3/gax/internal/platform"
 	"github.com/luank3/gax/internal/provider/registry"
@@ -159,10 +160,16 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 		fmt.Fprintf(stderr, "gax: %v\n", err)
 		return 1
 	}
+	mcpMgr := mcp.NewManager(store.MCPServers(), dirs.Cache)
+	if mcpMgr != nil {
+		defer mcpMgr.Close()
+	}
+
 	if !opts.printMode && !opts.jsonMode {
 		var toolReg *tools.Registry
 		if !opts.raw {
 			toolReg = tools.NewRegistry(cwd, store)
+			toolReg.SetMCP(mcpMgr)
 			defer toolReg.Close()
 		}
 		sess := agent.NewSession(core.SessionHeader{
@@ -270,6 +277,7 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 	var toolReg *tools.Registry
 	if !opts.raw {
 		toolReg = tools.NewRegistry(cwd, store)
+		toolReg.SetMCP(mcpMgr)
 		defer toolReg.Close()
 	}
 
@@ -282,6 +290,7 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 		Model:     modelID,
 		ShellName: shellName,
 		Store:     store,
+		MCPIndex:  mcpMgr.PromptIndex(),
 		Raw:       opts.raw,
 		Bare:      opts.bare,
 	})

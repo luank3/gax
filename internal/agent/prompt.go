@@ -25,6 +25,7 @@ type PromptOptions struct {
 	Model     string
 	ShellName string
 	Store     *config.Store
+	MCPIndex  string
 	Raw       bool
 	Bare      bool
 }
@@ -85,6 +86,9 @@ func BuildSystemPrompt(opts PromptOptions) string {
 				}
 			}
 			sections = append(sections, b.String())
+		}
+		if opts.MCPIndex != "" {
+			sections = append(sections, opts.MCPIndex)
 		}
 	}
 

@@ -64,6 +64,7 @@ func TestLayeringAndPlatformIsolation(t *testing.T) {
 			}
 			relDir := filepath.ToSlash(filepath.Dir(rel))
 			isPlatform := relDir == "internal/platform" || strings.HasPrefix(relDir, "internal/platform/")
+			isMCP := relDir == "internal/mcp" || strings.HasPrefix(relDir, "internal/mcp/")
 
 			file, err := parser.ParseFile(fset, path, nil, 0)
 			if err != nil {
@@ -74,6 +75,9 @@ func TestLayeringAndPlatformIsolation(t *testing.T) {
 				impPath := strings.Trim(imp.Path.Value, `"`)
 				if !isPlatform && (impPath == "syscall" || strings.HasPrefix(impPath, "golang.org/x/sys")) {
 					t.Errorf("%s imports %q outside internal/platform", rel, impPath)
+				}
+				if !isMCP && strings.HasPrefix(impPath, "github.com/modelcontextprotocol/go-sdk") {
+					t.Errorf("%s imports %q outside internal/mcp", rel, impPath)
 				}
 				if strings.HasPrefix(relDir, "internal/") && strings.HasPrefix(impPath, modulePrefix) {
 					fromPkg := strings.TrimPrefix(relDir, "internal/")
