@@ -31,4 +31,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: CGO_ENABLED=0 go test ./...
+      - name: Run tests
+        env:
+          CGO_ENABLED: "0"
+        run: go test ./...
