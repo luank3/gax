@@ -29,3 +29,8 @@ func WatchSignals(_, onAbort func()) func() {
 		close(done)
 	}
 }
+
+// WatchResize is a no-op on Windows console builds.
+func WatchResize(func()) func() {
+	return func() {}
+}

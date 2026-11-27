@@ -3,9 +3,12 @@ package transport
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -23,17 +26,84 @@ type Client struct {
 	Tracer Tracer
 }
 
-// NewClient constructs a provider-safe HTTP client that does not follow redirects.
+// NewClient constructs a provider-safe HTTP client that does not follow redirects
+// and honors GAX_CA_CERT / SSL_CERT_FILE when configured.
 func NewClient(retry RetryPolicy, tracer Tracer) *Client {
-	return &Client{
-		HTTP: &http.Client{
-			CheckRedirect: func(*http.Request, []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
+	hc := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
 		},
+	}
+	if tr := buildTransport(); tr != nil {
+		hc.Transport = tr
+	}
+	return &Client{
+		HTTP:   hc,
 		Retry:  retry,
 		Tracer: tracer,
 	}
+}
+
+func buildTransport() *http.Transport {
+	caPath := os.Getenv("GAX_CA_CERT")
+	if caPath == "" {
+		caPath = os.Getenv("SSL_CERT_FILE")
+	}
+	if caPath == "" {
+		return nil
+	}
+	pemData, err := os.ReadFile(caPath)
+	if err != nil {
+		return nil
+	}
+	pool, err := x509.SystemCertPool()
+	if err != nil || pool == nil {
+		pool = x509.NewCertPool()
+	}
+	if !pool.AppendCertsFromPEM(pemData) {
+		return nil
+	}
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}
+	return tr
+}
+
+// DoGet performs a traced HTTP GET request and returns body bytes (up to maxBytes).
+func (c *Client) DoGet(ctx context.Context, url string, headers http.Header, maxBytes int64) ([]byte, int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	for k, vs := range headers {
+		for _, v := range vs {
+			req.Header.Add(k, v)
+		}
+	}
+	if c != nil && c.Tracer != nil {
+		c.Tracer.TraceRequest(http.MethodGet, url, req.Header, nil)
+	}
+	t0 := time.Now()
+	httpClient := http.DefaultClient
+	if c != nil && c.HTTP != nil {
+		httpClient = c.HTTP
+	}
+	resp, err := httpClient.Do(req)
+	elapsed := time.Since(t0)
+	if err != nil {
+		if c != nil && c.Tracer != nil {
+			c.Tracer.TraceResponse(0, elapsed, err)
+		}
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+	if c != nil && c.Tracer != nil {
+		c.Tracer.TraceResponse(resp.StatusCode, elapsed, nil)
+	}
+	if maxBytes <= 0 {
+		maxBytes = 1 << 20
+	}
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes))
+	return raw, resp.StatusCode, err
 }
 
 // DoStream executes an HTTP request with retries on transient pre-stream failures

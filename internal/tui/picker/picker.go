@@ -62,26 +62,50 @@ func Run(title string, items []Item, in *os.File, out io.Writer) (*Item, error) 
 		}
 		render(matched)
 
-		b, err := reader.ReadByte()
+		rn, _, err := reader.ReadRune()
 		if err != nil {
 			_, _ = io.WriteString(out, "\r\n")
 			return nil, err
 		}
-		switch b {
-		case '\r':
+		switch rn {
+		case '\r', '\n':
+			if rn == '\n' && reader.Buffered() == 0 {
+				// Ctrl-J in raw mode arrives as '\n' (0x0a)
+				if len(matched) > 0 {
+					idx = (idx + 1) % len(matched)
+				}
+				continue
+			}
 			_, _ = io.WriteString(out, "\r\n")
 			if len(matched) == 0 {
 				return nil, nil
 			}
 			chosen := matched[idx]
 			return &chosen, nil
-		case 0x1b, 0x03, 0x04: // Esc, Ctrl-C, Ctrl-D
+		case 0x1b:
+			if reader.Buffered() > 0 {
+				b2, _ := reader.ReadByte()
+				if b2 == '[' {
+					b3, _ := reader.ReadByte()
+					switch b3 {
+					case 'A':
+						if len(matched) > 0 {
+							idx = (idx - 1 + len(matched)) % len(matched)
+						}
+						continue
+					case 'B':
+						if len(matched) > 0 {
+							idx = (idx + 1) % len(matched)
+						}
+						continue
+					}
+				}
+			}
 			_, _ = io.WriteString(out, "\r\n")
 			return nil, nil
-		case 0x0a: // Ctrl-J (next)
-			if len(matched) > 0 {
-				idx = (idx + 1) % len(matched)
-			}
+		case 0x03, 0x04: // Ctrl-C, Ctrl-D
+			_, _ = io.WriteString(out, "\r\n")
+			return nil, nil
 		case 0x0b: // Ctrl-K (prev)
 			if len(matched) > 0 {
 				idx = (idx - 1 + len(matched)) % len(matched)
@@ -89,12 +113,12 @@ func Run(title string, items []Item, in *os.File, out io.Writer) (*Item, error) 
 		case 0x17: // Ctrl-W
 			query = ""
 		case 0x7f, 0x08: // Backspace
-			if len(query) > 0 {
-				query = query[:len(query)-1]
+			if rs := []rune(query); len(rs) > 0 {
+				query = string(rs[:len(rs)-1])
 			}
 		default:
-			if b >= 32 && b < 127 {
-				query += string(b)
+			if rn >= 32 {
+				query += string(rn)
 			}
 		}
 	}

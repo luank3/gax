@@ -35,3 +35,27 @@ func WatchSignals(onPause, onAbort func()) func() {
 		close(done)
 	}
 }
+
+// WatchResize invokes onResize whenever SIGWINCH is delivered.
+func WatchResize(onResize func()) func() {
+	if onResize == nil {
+		return func() {}
+	}
+	ch := make(chan os.Signal, 2)
+	signal.Notify(ch, syscall.SIGWINCH)
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ch:
+				onResize()
+			}
+		}
+	}()
+	return func() {
+		signal.Stop(ch)
+		close(done)
+	}
+}

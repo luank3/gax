@@ -343,7 +343,11 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 		if loaded != nil && len(sess.Items) > 0 {
 			sess.Append(core.Item{Kind: core.KindTurnBoundary})
 		}
-		sess.Append(core.Item{Kind: core.KindUser, Text: prompt})
+		sess.Append(core.Item{
+			Kind:   core.KindUser,
+			Text:   prompt,
+			Images: agent.ExtractPromptImages(cwd, prompt),
+		})
 	}
 
 	var toolReg *tools.Registry

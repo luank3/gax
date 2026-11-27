@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -283,6 +284,7 @@ func RunLoop(ctx context.Context, opts LoopOptions) LoopResult {
 			emitEvent(opts.Sink, core.ToolCallFinished{
 				CallID:     tc.CallID,
 				Name:       tc.ToolName,
+				Summary:    summarizeToolResult(tc.ToolName, toolRes.Text),
 				DurationMS: time.Since(callT0).Milliseconds(),
 				IsError:    toolRes.IsError,
 			})
@@ -310,4 +312,27 @@ func emitEvent(sink core.EventSink, ev core.Event) {
 	if sink != nil {
 		sink.Emit(ev)
 	}
+}
+
+func summarizeToolResult(name, text string) string {
+	text = strings.TrimRight(text, "\r\n")
+	if text == "" {
+		return ""
+	}
+	if name == "edit" || name == "write" {
+		lines := strings.Split(text, "\n")
+		if len(lines) > 20 {
+			lines = append(lines[:20], fmt.Sprintf("... (%d more diff lines)", len(lines)-20))
+		}
+		out := strings.Join(lines, "\n")
+		if len(out) > 1536 {
+			return out[:1533] + "..."
+		}
+		return out
+	}
+	first, _, _ := strings.Cut(text, "\n")
+	if len(first) > 160 {
+		return first[:157] + "..."
+	}
+	return first
 }

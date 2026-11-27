@@ -67,7 +67,14 @@ func Run(ctx context.Context, opts Options) int {
 	}
 	isTTY := opts.StdoutFile != nil && platform.IsTerminal(opts.StdoutFile)
 	pal := theme.Resolve(opts.Store.String("theme"), opts.Store.String("tint"), isTTY)
-	cols := resolveCols(opts.Store, opts.StdoutFile)
+	var colsAtom atomic.Int64
+	colsAtom.Store(int64(resolveCols(opts.Store, opts.StdoutFile)))
+	if isTTY {
+		stopResize := platform.WatchResize(func() {
+			colsAtom.Store(int64(resolveCols(opts.Store, opts.StdoutFile)))
+		})
+		defer stopResize()
+	}
 	shellName := ""
 	if sp, err := platform.ResolveShell(opts.Store.String("bash.shell")); err == nil {
 		shellName = sp.Name
@@ -142,6 +149,7 @@ func Run(ctx context.Context, opts Options) int {
 		if paused {
 			promptLabel = fmt.Sprintf("%s[paused — Enter to continue]> %s", pal.Dim, pal.Reset)
 		}
+		cols := int(colsAtom.Load())
 		line, eof, action := readPromptLine(ctx, opts.CWD, opts.StateDir, inReader, opts.StdinFile, opts.Stdout, opts.StdoutFile, isTTY, cols, promptLabel, ed, opts.Store, pal, &focused, argChoices)
 		if eof {
 			if isTTY {
@@ -183,7 +191,11 @@ func Run(ctx context.Context, opts Options) int {
 			if len(opts.Session.Items) > 0 {
 				opts.Session.Append(core.Item{Kind: core.KindTurnBoundary})
 			}
-			opts.Session.Append(core.Item{Kind: core.KindUser, Text: line})
+			opts.Session.Append(core.Item{
+				Kind:   core.KindUser,
+				Text:   line,
+				Images: agent.ExtractPromptImages(opts.CWD, line),
+			})
 		}
 
 		sysPrompt := agent.BuildSystemPrompt(agent.PromptOptions{
@@ -196,7 +208,7 @@ func Run(ctx context.Context, opts Options) int {
 			keepAwake = platform.InhibitSleep("gax turn")
 		}
 
-		res := runInteractiveTurn(ctx, opts, sysPrompt, cols, pal, isTTY, &focused)
+		res := runInteractiveTurn(ctx, opts, sysPrompt, &colsAtom, pal, isTTY, &focused)
 		if keepAwake != nil {
 			keepAwake.Stop()
 		}
@@ -213,8 +225,9 @@ func Run(ctx context.Context, opts Options) int {
 	}
 }
 
-func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, cols int, pal theme.Palette, isTTY bool, focused *atomic.Bool) agent.LoopResult {
+func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, colsAtom *atomic.Int64, pal theme.Palette, isTTY bool, focused *atomic.Bool) agent.LoopResult {
 	region := live.NewRegion(opts.Stdout, isTTY)
+	cols := int(colsAtom.Load())
 	region.SetCols(cols)
 	var sig atomic.Int32
 	turnCtx, cancel := context.WithCancel(ctx)
@@ -293,6 +306,8 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 		CompactThreshold: opts.Store.Int("compact.threshold"),
 		StreamOptions:    opts.StreamOptions,
 		Sink: core.EventFunc(func(ev core.Event) {
+			cols = int(colsAtom.Load())
+			region.SetCols(cols)
 			switch e := ev.(type) {
 			case core.TextDelta:
 				textBuf.WriteString(e.Text)
@@ -339,7 +354,9 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 					mark = "✗"
 				}
 				fmt.Fprintf(opts.Stdout, "%s%s %s (%dms)%s\n", pal.Tool, mark, e.Name, e.DurationMS, pal.Reset)
-				if sum := truncateSingleLine(e.Summary, max(24, cols-4)); sum != "" {
+				if strings.HasPrefix(e.Summary, "--- ") {
+					printColoredDiff(opts.Stdout, e.Summary, pal)
+				} else if sum := truncateSingleLine(e.Summary, max(24, cols-4)); sum != "" {
 					fmt.Fprintf(opts.Stdout, "%s  %s%s\n", pal.Dim, sum, pal.Reset)
 				}
 			case core.CompactStarted:
@@ -582,6 +599,19 @@ func readCSISeq(r *bufio.Reader) string {
 	return b.String()
 }
 
+func printColoredDiff(w io.Writer, diff string, pal theme.Palette) {
+	for _, l := range strings.Split(strings.TrimRight(diff, "\n"), "\n") {
+		switch {
+		case strings.HasPrefix(l, "+") && !strings.HasPrefix(l, "+++"):
+			fmt.Fprintf(w, "  %s%s%s\n", pal.DiffAdd, l, pal.Reset)
+		case strings.HasPrefix(l, "-") && !strings.HasPrefix(l, "---"):
+			fmt.Fprintf(w, "  %s%s%s\n", pal.DiffDel, l, pal.Reset)
+		default:
+			fmt.Fprintf(w, "  %s%s%s\n", pal.Dim, l, pal.Reset)
+		}
+	}
+}
+
 func truncateSingleLine(s string, maxRunes int) string {
 	s = live.StripNewlines(s)
 	rs := []rune(s)
@@ -691,7 +721,7 @@ func handleSlashCommand(ctx context.Context, line string, opts *Options, paused 
 		fmt.Fprintf(opts.Stdout, "model: %s\n", opts.Model)
 		return true
 	case "/usage":
-		rep, err := registry.QueryAccountUsage(ctx, opts.Provider.ID())
+		rep, err := registry.QueryAccountUsage(ctx, opts.Provider.ID(), opts.HTTPClient)
 		if err != nil {
 			fmt.Fprintf(opts.Stdout, "%s%v%s\n", pal.Error, err, pal.Reset)
 		} else {

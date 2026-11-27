@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -52,7 +53,8 @@ func (t *bashTool) Run(ctx context.Context, arguments string, sink OutputSink) R
 		return Result{Text: fmt.Sprintf("error: %v", err), IsError: true}
 	}
 
-	cmdArgs := append(append([]string{}, shellSpec.Command[1:]...), args.Command)
+	execCmd := stripRedundantCD(args.Command, t.reg.cwd)
+	cmdArgs := append(append([]string{}, shellSpec.Command[1:]...), execCmd)
 	cmd := exec.Command(shellSpec.Command[0], cmdArgs...)
 	if t.reg.cwd != "" {
 		cmd.Dir = t.reg.cwd
@@ -165,7 +167,7 @@ func (t *bashTool) Run(ctx context.Context, arguments string, sink OutputSink) R
 	case <-done:
 		_ = pg.Close()
 		rawOut := ring.String()
-		out := formatBashOutput(args.Command, rawOut, waitErr, args.Raw, t.reg)
+		out := formatBashOutput(execCmd, rawOut, waitErr, args.Raw, t.reg)
 		if waitErr != nil {
 			return Result{Text: fmt.Sprintf("exit error: %v\n%s", waitErr, out), IsError: true}
 		}
@@ -217,6 +219,31 @@ func (t *bashTool) Run(ctx context.Context, arguments string, sink OutputSink) R
 				id, timeout, capOutput(ring.String(), t.reg.outputCap(), "gax-bash")),
 		}
 	}
+}
+
+func stripRedundantCD(command, cwd string) string {
+	trimmed := strings.TrimSpace(command)
+	if cwd == "" || !strings.HasPrefix(trimmed, "cd ") {
+		return command
+	}
+	rest := strings.TrimSpace(trimmed[3:])
+	var dir, after string
+	if idx := strings.Index(rest, "&&"); idx > 0 {
+		dir = strings.TrimSpace(rest[:idx])
+		after = strings.TrimSpace(rest[idx+2:])
+	} else if idx := strings.Index(rest, ";"); idx > 0 {
+		dir = strings.TrimSpace(rest[:idx])
+		after = strings.TrimSpace(rest[idx+1:])
+	} else {
+		return command
+	}
+	dir = strings.Trim(dir, `"'`)
+	if dir == "." || filepath.Clean(dir) == filepath.Clean(cwd) {
+		if after != "" {
+			return after
+		}
+	}
+	return command
 }
 
 func formatBashOutput(command, rawOut string, waitErr error, rawFlag bool, reg *Registry) string {
