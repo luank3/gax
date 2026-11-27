@@ -225,7 +225,7 @@ func Load(path string) (*Loaded, error) {
 				res.Selection = sel
 			}
 		case "undo":
-			res.LiveItems = applyUndo(res.LiveItems, probe.KeepUserTurns)
+			res.LiveItems = ApplyUndo(res.LiveItems, probe.KeepUserTurns)
 		default:
 			if probe.Kind != "" {
 				var it core.Item
@@ -245,7 +245,19 @@ func Load(path string) (*Loaded, error) {
 	return res, nil
 }
 
-func applyUndo(items []core.Item, keepUserTurns int) []core.Item {
+// CountUserTurns returns the number of typed user prompts in items.
+func CountUserTurns(items []core.Item) int {
+	n := 0
+	for _, it := range items {
+		if it.Kind == core.KindUser && it.Origin == core.OriginNone {
+			n++
+		}
+	}
+	return n
+}
+
+// ApplyUndo returns a copy of items keeping only the first keepUserTurns user prompts.
+func ApplyUndo(items []core.Item, keepUserTurns int) []core.Item {
 	if keepUserTurns <= 0 {
 		return nil
 	}
@@ -262,7 +274,7 @@ func applyUndo(items []core.Item, keepUserTurns int) []core.Item {
 			}
 		}
 	}
-	return items
+	return append([]core.Item(nil), items...)
 }
 
 // List returns session summaries for cwd, newest first.
@@ -352,7 +364,7 @@ func Fork(srcPath, stateDir, cwd, gaxVersion string, keepUserTurns int) (*Writer
 	}
 	items := loaded.LiveItems
 	if keepUserTurns > 0 {
-		items = applyUndo(items, keepUserTurns)
+		items = ApplyUndo(items, keepUserTurns)
 	}
 	hdr := loaded.Header
 	hdr.ID = NewUUID()

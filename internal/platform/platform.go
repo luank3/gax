@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"time"
 )
 
 // ShellSpec describes a resolved shell binary and how to pass a command string.
@@ -88,6 +89,11 @@ func TerminalSize(f *os.File) (int, int, bool) {
 // EnterRaw puts in (and optionally out) into raw/VT mode.
 func EnterRaw(in, out *os.File, processedSignals bool) (TerminalState, error) {
 	return enterRaw(in, out, processedSignals)
+}
+
+// ReadByteTimeout waits up to timeout for one byte from f.
+func ReadByteTimeout(f *os.File, timeout time.Duration) (byte, bool, error) {
+	return readByteTimeout(f, timeout)
 }
 
 // ReadClipboard reads an image (if available) or text from the system clipboard.

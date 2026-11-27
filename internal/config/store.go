@@ -311,3 +311,59 @@ func (s *Store) RawSection(name string) map[string]any {
 	}
 	return nil
 }
+
+// SaveState persists a top-level scalar selection (provider, model, effort, preset) to state.json.
+func (s *Store) SaveState(key, val string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if val == "" {
+		delete(s.state, key)
+	} else {
+		s.state[key] = val
+	}
+	if s.statePath == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(s.statePath), 0o700); err != nil {
+		return err
+	}
+	obj := make(map[string]any)
+	if b, err := os.ReadFile(s.statePath); err == nil {
+		_ = json.Unmarshal(b, &obj)
+	}
+	if val == "" {
+		delete(obj, key)
+	} else {
+		obj[key] = val
+	}
+	out, err := json.MarshalIndent(obj, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(s.statePath, append(out, '\n'), 0o600)
+}
+
+// SavePreset saves or updates a named preset in config.json.
+func (s *Store) SavePreset(name string, p Preset) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if existing, ok := s.presets[name]; ok && p.Description == "" {
+		p.Description = existing.Description
+	}
+	s.presets[name] = p
+	if s.cfgPath == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(s.cfgPath), 0o700); err != nil {
+		return err
+	}
+	if s.rawConfig == nil {
+		s.rawConfig = make(map[string]any)
+	}
+	s.rawConfig["presets"] = s.presets
+	out, err := json.MarshalIndent(s.rawConfig, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(s.cfgPath, append(out, '\n'), 0o600)
+}

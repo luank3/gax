@@ -23,7 +23,7 @@ func TestTUISlashCommandsAndMockTurn(t *testing.T) {
 	reg := tools.NewRegistry(dir, nil)
 	defer reg.Close()
 
-	in := strings.NewReader("/help\n/session\nhello tui\n/new\n")
+	in := strings.NewReader("/help\n/session\nhello tui\n/undo\n/tasks\n/preset-save fav teal\n/preset fav\n/new\n")
 	var out bytes.Buffer
 	code := tui.Run(context.Background(), tui.Options{
 		CWD:      dir,
@@ -41,7 +41,7 @@ func TestTUISlashCommandsAndMockTurn(t *testing.T) {
 		t.Fatalf("expected exit 0, got %d", code)
 	}
 	text := out.String()
-	for _, want := range []string{"gax v2-test · mock", "/provider", "session tui-1", "hello tui", "started a new conversation"} {
+	for _, want := range []string{"gax v2-test · mock", "/provider", "session tui-1", "hello tui", "rolled back to 0", "no background tasks", "saved preset \"fav\"", "started a new conversation"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("missing %q in TUI output:\n%s", want, text)
 		}

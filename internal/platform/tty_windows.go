@@ -4,6 +4,7 @@ package platform
 
 import (
 	"os"
+	"time"
 
 	"golang.org/x/sys/windows"
 )
@@ -93,4 +94,20 @@ func (s *windowsTerminalState) Restore() error {
 		}
 	}
 	return firstErr
+}
+
+func readByteTimeout(f *os.File, timeout time.Duration) (byte, bool, error) {
+	if f == nil {
+		return 0, false, nil
+	}
+	event, err := windows.WaitForSingleObject(windows.Handle(f.Fd()), uint32(timeout.Milliseconds()))
+	if err != nil || event != windows.WAIT_OBJECT_0 {
+		return 0, false, err
+	}
+	var buf [1]byte
+	nr, rerr := f.Read(buf[:])
+	if nr == 1 {
+		return buf[0], true, nil
+	}
+	return 0, false, rerr
 }

@@ -4,6 +4,7 @@ package platform
 
 import (
 	"os"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -60,4 +61,27 @@ func (s *unixTerminalState) Restore() error {
 		return nil
 	}
 	return unix.IoctlSetTermios(s.fd, ioctlSetTermios, &s.termios)
+}
+
+func readByteTimeout(f *os.File, timeout time.Duration) (byte, bool, error) {
+	if f == nil {
+		return 0, false, nil
+	}
+	fds := []unix.PollFd{{Fd: int32(f.Fd()), Events: unix.POLLIN}}
+	n, err := unix.Poll(fds, int(timeout.Milliseconds()))
+	if err != nil {
+		if err == unix.EINTR {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+	if n == 0 || fds[0].Revents&unix.POLLIN == 0 {
+		return 0, false, nil
+	}
+	var buf [1]byte
+	nr, rerr := f.Read(buf[:])
+	if nr == 1 {
+		return buf[0], true, nil
+	}
+	return 0, false, rerr
 }

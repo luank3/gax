@@ -130,6 +130,53 @@ func (m *taskManager) stopAll() {
 	}
 }
 
+// TaskInfo summarizes a background task for /tasks.
+type TaskInfo struct {
+	ID       string
+	Command  string
+	Finished bool
+}
+
+// ListTasks returns all background tasks registered in this session.
+func (r *Registry) ListTasks() []TaskInfo {
+	if r == nil || r.tasks == nil {
+		return nil
+	}
+	r.tasks.mu.Lock()
+	ids := append([]string(nil), r.tasks.order...)
+	r.tasks.mu.Unlock()
+	out := make([]TaskInfo, 0, len(ids))
+	for _, id := range ids {
+		t, ok := r.tasks.get(id)
+		if !ok {
+			continue
+		}
+		t.mu.Lock()
+		out = append(out, TaskInfo{ID: t.id, Command: t.command, Finished: t.finished})
+		t.mu.Unlock()
+	}
+	return out
+}
+
+// KillTask stops a running background task by id (or "all").
+func (r *Registry) KillTask(id string) int {
+	if r == nil || r.tasks == nil {
+		return 0
+	}
+	if id == "all" {
+		r.tasks.stopAll()
+		return len(r.ListTasks())
+	}
+	t, ok := r.tasks.get(id)
+	if !ok {
+		return 0
+	}
+	_ = t.pg.KillTree()
+	<-t.done
+	_ = t.pg.Close()
+	return 1
+}
+
 // CollectTaskNotes returns completion notifications for newly finished tasks.
 func (r *Registry) CollectTaskNotes() string {
 	if r == nil || r.tasks == nil {

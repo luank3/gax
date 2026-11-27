@@ -92,7 +92,7 @@ func Run(ctx context.Context, opts Options) int {
 		if paused {
 			promptLabel = fmt.Sprintf("%s[paused — Enter to continue]> %s", pal.Dim, pal.Reset)
 		}
-		line, eof, action := readPromptLine(inReader, opts.StdinFile, opts.Stdout, opts.StdoutFile, isTTY, promptLabel, ed, opts.Store, pal)
+		line, eof, action := readPromptLine(ctx, opts.CWD, opts.StateDir, inReader, opts.StdinFile, opts.Stdout, opts.StdoutFile, isTTY, promptLabel, ed, opts.Store, pal)
 		if eof {
 			if isTTY {
 				_, _ = io.WriteString(opts.Stdout, "\r\x1b[2K")
@@ -182,6 +182,32 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 	)
 	defer stopSig()
 
+	escDone := make(chan struct{})
+	if isTTY && opts.StdinFile != nil {
+		if rawSt, rerr := platform.EnterRaw(opts.StdinFile, nil, true); rerr == nil {
+			go func() {
+				defer rawSt.Restore()
+				for {
+					select {
+					case <-escDone:
+						return
+					default:
+					}
+					b, ok, _ := platform.ReadByteTimeout(opts.StdinFile, 50*time.Millisecond)
+					if ok && b == 0x1b {
+						if sig.Load() == int32(agent.SignalPause) {
+							sig.Store(int32(agent.SignalAbort))
+							cancel()
+						} else {
+							sig.Store(int32(agent.SignalPause))
+						}
+					}
+				}
+			}()
+		}
+	}
+	defer close(escDone)
+
 	var textBuf strings.Builder
 	var statusLbl live.StatusLabel
 	t0 := time.Now()
@@ -260,7 +286,7 @@ const (
 	actionPagerTranscript
 )
 
-func readPromptLine(r *bufio.Reader, inFile *os.File, out io.Writer, outFile *os.File, isTTY bool, prompt string, ed *editor.Buffer, store *config.Store, pal theme.Palette) (string, bool, inputAction) {
+func readPromptLine(ctx context.Context, cwd, stateDir string, r *bufio.Reader, inFile *os.File, out io.Writer, outFile *os.File, isTTY bool, prompt string, ed *editor.Buffer, store *config.Store, pal theme.Palette) (string, bool, inputAction) {
 	if !isTTY || inFile == nil {
 		_, _ = io.WriteString(out, prompt)
 		line, err := r.ReadString('\n')
@@ -313,6 +339,18 @@ func readPromptLine(r *bufio.Reader, inFile *os.File, out io.Writer, outFile *os
 			}
 		case 0x0c: // Ctrl-L
 			_, _ = io.WriteString(out, "\x1b[2J\x1b[H")
+		case 0x07: // Ctrl-G
+			_ = st.Restore()
+			if edited, ok := editInExternalEditor(ed.Text()); ok {
+				ed.Set(edited)
+			}
+			st, _ = platform.EnterRaw(inFile, outFile, false)
+		case 0x12: // Ctrl-R
+			_ = st.Restore()
+			searchHistoryPicker(stateDir, cwd, inFile, outFile, ed)
+			st, _ = platform.EnterRaw(inFile, outFile, false)
+		case 0x16: // Ctrl-V
+			pasteClipboardIntoEditor(ctx, ed)
 		case 0x0f: // Ctrl-O
 			_, _ = io.WriteString(out, "\r\n")
 			return "", false, actionPagerHistory
@@ -326,6 +364,9 @@ func readPromptLine(r *bufio.Reader, inFile *os.File, out io.Writer, outFile *os
 		case 0x0b: // Ctrl-K
 			ed.KillToEnd()
 		case 0x09: // Tab
+			if completeFileMention(cwd, ed) {
+				break
+			}
 			matches, lcp := slash.Complete(ed.Text(), nil)
 			if lcp != "" && lcp != ed.Text() {
 				ed.Set(lcp)
@@ -370,6 +411,8 @@ func handleSlashCommand(ctx context.Context, line string, opts *Options, paused 
 		arg = strings.Join(fields[1:], " ")
 	}
 	switch cmd {
+	case "/resume", "/undo", "/fork", "/preset", "/preset-save", "/tasks":
+		return handleSessionCommands(ctx, cmd, arg, opts, paused, pal)
 	case "/help":
 		for _, c := range slash.Commands {
 			fmt.Fprintf(opts.Stdout, "  %-16s %s\n", c.Name+" "+c.ArgHint, c.Description)
@@ -408,6 +451,7 @@ func handleSlashCommand(ctx context.Context, line string, opts *Options, paused 
 		}
 		opts.Provider = prov
 		opts.StreamOptions = registry.ResolveStreamOptions(prov.ID(), opts.Model, opts.Store, opts.Catalog)
+		_ = opts.Store.SaveState("provider", prov.ID())
 		fmt.Fprintf(opts.Stdout, "provider: %s\n", prov.ID())
 		return true
 	case "/model":
@@ -429,6 +473,7 @@ func handleSlashCommand(ctx context.Context, line string, opts *Options, paused 
 		}
 		opts.Model = arg
 		opts.StreamOptions = registry.ResolveStreamOptions(opts.Provider.ID(), opts.Model, opts.Store, opts.Catalog)
+		_ = opts.Store.SaveState("model", opts.Model)
 		fmt.Fprintf(opts.Stdout, "model: %s\n", opts.Model)
 		return true
 	case "/usage":
@@ -455,6 +500,7 @@ func handleSlashCommand(ctx context.Context, line string, opts *Options, paused 
 		return true
 	case "/effort":
 		opts.Effort = arg
+		_ = opts.Store.SaveState("effort", opts.Effort)
 		fmt.Fprintf(opts.Stdout, "effort: %s\n", opts.Effort)
 		return true
 	case "/config":
@@ -489,9 +535,6 @@ func handleSlashCommand(ctx context.Context, line string, opts *Options, paused 
 			}
 		}
 		fmt.Fprintln(opts.Stdout, "no assistant response to copy")
-		return true
-	case "/tasks":
-		fmt.Fprintln(opts.Stdout, "use task_wait or Ctrl-C to inspect/stop active tasks")
 		return true
 	default:
 		_ = isTTY
