@@ -21,4 +21,15 @@ func TestRegionWrappedClearCount(t *testing.T) {
 	if strings.Count(got, "\x1b[2K") != 2 || !strings.Contains(got, "\x1b[1A") {
 		t.Fatalf("unexpected wrapped clear sequence: %q", got)
 	}
+
+	buf.Reset()
+	r.SetMaxRows(2)
+	r.Paint("line1\nline2\nline3\nline4")
+	got = buf.String()
+	if !strings.HasPrefix(got, "\x1b[?2026h") || !strings.HasSuffix(got, "\x1b[?2026l") {
+		t.Fatalf("expected synchronized output markers, got %q", got)
+	}
+	if strings.Contains(got, "line1") || strings.Contains(got, "line2") || !strings.Contains(got, "line4") {
+		t.Fatalf("expected tail capped to maxRows=2, got %q", got)
+	}
 }

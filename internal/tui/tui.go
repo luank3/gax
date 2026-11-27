@@ -230,6 +230,9 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 	region := live.NewRegion(opts.Stdout, isTTY)
 	cols := int(colsAtom.Load())
 	region.SetCols(cols)
+	if _, rows, ok := platform.TerminalSize(opts.StdoutFile); ok && rows > 6 {
+		region.SetMaxRows(rows - 4)
+	}
 	var sig atomic.Int32
 	turnCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -295,6 +298,7 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 	var toolOutBuf strings.Builder
 	var statusLbl live.StatusLabel
 	t0 := time.Now()
+	var lastPaint time.Time
 	frame := 0
 
 	res := agent.RunLoop(turnCtx, agent.LoopOptions{
@@ -318,11 +322,23 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 			switch e := ev.(type) {
 			case core.TextDelta:
 				textBuf.WriteString(e.Text)
-				lbl := statusLbl.Update("streaming", false, time.Now())
+				now := time.Now()
+				if now.Sub(lastPaint) < 60*time.Millisecond {
+					return
+				}
+				lastPaint = now
+				lbl := statusLbl.Update("streaming", false, now)
 				frame++
+				previewSrc := textBuf.String()
+				if len(previewSrc) > 4096 {
+					previewSrc = previewSrc[len(previewSrc)-4096:]
+					if _, rest, ok := strings.Cut(previewSrc, "\n"); ok {
+						previewSrc = rest
+					}
+				}
 				region.Paint(
-					markdown.Render(textBuf.String(), cols, pal, opts.Store.Bool("markdown")),
-					live.FormatSpinner(frame, time.Since(t0), lbl, pal.Dim, pal.Reset),
+					markdown.Render(previewSrc, cols, pal, opts.Store.Bool("markdown")),
+					live.FormatSpinner(frame, now.Sub(t0), lbl, pal.Dim, pal.Reset),
 				)
 			case core.ToolCallStarted:
 				toolOutBuf.Reset()

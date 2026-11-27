@@ -20,12 +20,13 @@ type Region struct {
 	w        io.Writer
 	isTTY    bool
 	cols     int
+	maxRows  int
 	lastRows int
 }
 
 // NewRegion returns a live-region writer over w.
 func NewRegion(w io.Writer, isTTY bool) *Region {
-	return &Region{w: w, isTTY: isTTY, cols: 80}
+	return &Region{w: w, isTTY: isTTY, cols: 80, maxRows: 20}
 }
 
 // SetCols configures the terminal column width used to count wrapped rows.
@@ -38,26 +39,56 @@ func (r *Region) SetCols(cols int) {
 	r.mu.Unlock()
 }
 
-// Paint replaces the currently painted live region with lines, accounting for wrapping.
+// SetMaxRows configures the maximum number of terminal rows Paint may occupy.
+func (r *Region) SetMaxRows(maxRows int) {
+	if r == nil || maxRows <= 0 {
+		return
+	}
+	r.mu.Lock()
+	r.maxRows = maxRows
+	r.mu.Unlock()
+}
+
+// Paint replaces the currently painted live region with lines, accounting for wrapping,
+// capping height to maxRows, and using DEC synchronized output to prevent flicker.
 func (r *Region) Paint(lines ...string) {
 	if r == nil || r.w == nil || !r.isTTY {
 		return
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.clearLocked()
+
 	var flat []string
 	for _, l := range lines {
 		flat = append(flat, strings.Split(l, "\n")...)
 	}
+	if r.maxRows > 0 && len(flat) > 1 {
+		used := 0
+		start := len(flat)
+		for i := len(flat) - 1; i >= 0; i-- {
+			rw := wrappedRows(flat[i], r.cols)
+			if used+rw > r.maxRows && i < len(flat)-1 {
+				break
+			}
+			used += rw
+			start = i
+		}
+		flat = flat[start:]
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\x1b[?2026h")
+	r.appendClearLocked(&sb)
 	rows := 0
 	for i, l := range flat {
 		if i > 0 {
-			_, _ = io.WriteString(r.w, "\r\n")
+			sb.WriteString("\r\n")
 		}
-		_, _ = io.WriteString(r.w, l)
+		sb.WriteString(l)
 		rows += wrappedRows(l, r.cols)
 	}
+	sb.WriteString("\x1b[?2026l")
+	_, _ = io.WriteString(r.w, sb.String())
 	r.lastRows = rows
 }
 
@@ -97,14 +128,23 @@ func (r *Region) clearLocked() {
 	if r.lastRows <= 0 {
 		return
 	}
-	_, _ = io.WriteString(r.w, "\r")
+	var sb strings.Builder
+	r.appendClearLocked(&sb)
+	_, _ = io.WriteString(r.w, sb.String())
+}
+
+func (r *Region) appendClearLocked(sb *strings.Builder) {
+	if r.lastRows <= 0 {
+		return
+	}
+	sb.WriteByte('\r')
 	for i := 0; i < r.lastRows; i++ {
-		_, _ = io.WriteString(r.w, "\x1b[2K")
+		sb.WriteString("\x1b[2K")
 		if i+1 < r.lastRows {
-			_, _ = io.WriteString(r.w, "\x1b[1A")
+			sb.WriteString("\x1b[1A")
 		}
 	}
-	_, _ = io.WriteString(r.w, "\r")
+	sb.WriteByte('\r')
 	r.lastRows = 0
 }
 
