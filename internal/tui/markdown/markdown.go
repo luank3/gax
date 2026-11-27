@@ -18,7 +18,8 @@ func Render(src string, cols int, pal theme.Palette, enabled bool) string {
 	inCode := false
 	codeLang := ""
 
-	for _, line := range lines {
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "```") {
 			inCode = !inCode
@@ -45,15 +46,143 @@ func Render(src string, cols int, pal theme.Palette, enabled bool) string {
 			out = append(out, pal.Dim+"  "+line+pal.Reset)
 			continue
 		}
+		if strings.Contains(trimmed, "|") && i+1 < len(lines) && isTableSeparator(lines[i+1]) {
+			end := i + 2
+			for end < len(lines) && strings.Contains(lines[end], "|") && strings.TrimSpace(lines[end]) != "" {
+				end++
+			}
+			out = append(out, renderTable(lines[i:end], cols, pal)...)
+			i = end - 1
+			continue
+		}
 		if strings.HasPrefix(trimmed, "#") {
 			heading := strings.TrimSpace(strings.TrimLeft(trimmed, "#"))
 			out = append(out, pal.Bold+pal.Accent+heading+pal.Reset)
+			continue
+		}
+		if strings.HasPrefix(trimmed, "> ") {
+			quote := strings.TrimPrefix(trimmed, "> ")
+			out = append(out, pal.Dim+"│ "+pal.Reset+width.Wrap(styleInline(quote, pal), max(10, cols-2)))
+			continue
+		}
+		if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") {
+			item := trimmed[2:]
+			out = append(out, "  • "+width.Wrap(styleInline(item, pal), max(10, cols-4)))
 			continue
 		}
 		wrapped := width.Wrap(styleInline(line, pal), cols)
 		out = append(out, wrapped)
 	}
 	return strings.Join(out, "\n")
+}
+
+func isTableSeparator(line string) bool {
+	cells := splitTableRow(line)
+	if len(cells) == 0 {
+		return false
+	}
+	for _, c := range cells {
+		c = strings.TrimSpace(c)
+		c = strings.TrimPrefix(c, ":")
+		c = strings.TrimSuffix(c, ":")
+		if len(c) < 3 || strings.Trim(c, "-") != "" {
+			return false
+		}
+	}
+	return true
+}
+
+func splitTableRow(line string) []string {
+	t := strings.TrimSpace(line)
+	t = strings.TrimPrefix(t, "|")
+	t = strings.TrimSuffix(t, "|")
+	if t == "" {
+		return nil
+	}
+	parts := strings.Split(t, "|")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
+}
+
+func renderTable(rows []string, cols int, pal theme.Palette) []string {
+	if len(rows) < 2 {
+		return rows
+	}
+	header := splitTableRow(rows[0])
+	numCols := len(header)
+	var body [][]string
+	for _, r := range rows[2:] {
+		cells := splitTableRow(r)
+		if len(cells) > numCols {
+			numCols = len(cells)
+		}
+		body = append(body, cells)
+	}
+	widths := make([]int, numCols)
+	for c := 0; c < len(header); c++ {
+		widths[c] = max(widths[c], width.StringWidth(header[c]))
+	}
+	for _, r := range body {
+		for c := 0; c < len(r); c++ {
+			widths[c] = max(widths[c], width.StringWidth(r[c]))
+		}
+	}
+	// Shrink widest columns gently if total exceeds cols.
+	if cols > 10 && numCols > 0 {
+		sepW := (numCols - 1) * 3
+		for {
+			sum := sepW
+			maxIdx := 0
+			for i, w := range widths {
+				sum += w
+				if w > widths[maxIdx] {
+					maxIdx = i
+				}
+			}
+			if sum <= cols || widths[maxIdx] <= 6 {
+				break
+			}
+			widths[maxIdx]--
+		}
+	}
+	formatRow := func(cells []string, bold bool) string {
+		var b strings.Builder
+		for c := 0; c < numCols; c++ {
+			if c > 0 {
+				b.WriteString(pal.Dim + " │ " + pal.Reset)
+			}
+			val := ""
+			if c < len(cells) {
+				val = cells[c]
+			}
+			styled := styleInline(val, pal)
+			if bold {
+				styled = pal.Bold + val + pal.Reset
+			}
+			pad := widths[c] - width.StringWidth(val)
+			b.WriteString(styled)
+			if pad > 0 {
+				b.WriteString(strings.Repeat(" ", pad))
+			}
+		}
+		return b.String()
+	}
+	var out []string
+	out = append(out, formatRow(header, true))
+	var rule strings.Builder
+	for c := 0; c < numCols; c++ {
+		if c > 0 {
+			rule.WriteString("─┼─")
+		}
+		rule.WriteString(strings.Repeat("─", max(1, widths[c])))
+	}
+	out = append(out, pal.Dim+rule.String()+pal.Reset)
+	for _, r := range body {
+		out = append(out, formatRow(r, false))
+	}
+	return out
 }
 
 func styleInline(s string, pal theme.Palette) string {

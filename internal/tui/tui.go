@@ -84,16 +84,65 @@ func Run(ctx context.Context, opts Options) int {
 
 	hist := session.LoadHistory(opts.StateDir, opts.CWD)
 	ed := editor.NewBuffer(hist)
-	focused := true
+	var focused atomic.Bool
+	focused.Store(true)
+	if isTTY {
+		_, _ = io.WriteString(opts.Stdout, "\x1b[?1004h")
+		defer func() { _, _ = io.WriteString(opts.Stdout, "\x1b[?1004l") }()
+	}
 	paused := false
 	inReader := bufio.NewReader(opts.Stdin)
+
+	argChoices := func(cmd string) []string {
+		switch cmd {
+		case "/provider":
+			avail := registry.AvailableProviders(opts.Store)
+			out := make([]string, 0, len(avail))
+			for _, d := range avail {
+				out = append(out, d.ID)
+			}
+			return out
+		case "/model":
+			var out []string
+			if opts.Model != "" {
+				out = append(out, opts.Model)
+			}
+			if opts.Catalog != nil {
+				if cid := registry.CatalogIDFor(opts.Provider.ID(), opts.Store); cid != "" {
+					out = append(out, opts.Catalog.ListModels(cid)...)
+				}
+			}
+			return out
+		case "/effort":
+			return []string{"low", "medium", "high", "xhigh", "max"}
+		case "/preset", "/new", "/clear":
+			raw := opts.Store.RawSection("presets")
+			out := make([]string, 0, len(raw))
+			for k := range raw {
+				out = append(out, k)
+			}
+			return out
+		case "/config":
+			out := make([]string, 0, len(config.Registry))
+			for _, d := range config.Registry {
+				out = append(out, d.Key)
+			}
+			return out
+		case "/tasks":
+			return []string{"kill", "all"}
+		case "/login", "/logout":
+			return []string{"codex"}
+		default:
+			return nil
+		}
+	}
 
 	for {
 		promptLabel := fmt.Sprintf("%s> %s", pal.User, pal.Reset)
 		if paused {
 			promptLabel = fmt.Sprintf("%s[paused — Enter to continue]> %s", pal.Dim, pal.Reset)
 		}
-		line, eof, action := readPromptLine(ctx, opts.CWD, opts.StateDir, inReader, opts.StdinFile, opts.Stdout, opts.StdoutFile, isTTY, promptLabel, ed, opts.Store, pal)
+		line, eof, action := readPromptLine(ctx, opts.CWD, opts.StateDir, inReader, opts.StdinFile, opts.Stdout, opts.StdoutFile, isTTY, cols, promptLabel, ed, opts.Store, pal, &focused, argChoices)
 		if eof {
 			if isTTY {
 				_, _ = io.WriteString(opts.Stdout, "\r\x1b[2K")
@@ -160,12 +209,13 @@ func Run(ctx context.Context, opts Options) int {
 		} else {
 			notify.EmitProgramStatus(opts.Stdout, opts.Store.String("program_status"), notify.StateDone, isTTY)
 		}
-		notify.EmitAttention(opts.Stdout, opts.Store.String("notify"), focused, res.FinalText, isTTY)
+		notify.EmitAttention(opts.Stdout, opts.Store.String("notify"), focused.Load(), res.FinalText, isTTY)
 	}
 }
 
-func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, cols int, pal theme.Palette, isTTY bool, _ *bool) agent.LoopResult {
+func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, cols int, pal theme.Palette, isTTY bool, focused *atomic.Bool) agent.LoopResult {
 	region := live.NewRegion(opts.Stdout, isTTY)
+	region.SetCols(cols)
 	var sig atomic.Int32
 	turnCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -196,6 +246,18 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 					}
 					b, ok, _ := platform.ReadByteTimeout(opts.StdinFile, 50*time.Millisecond)
 					if ok && b == 0x1b {
+						if b2, ok2, _ := platform.ReadByteTimeout(opts.StdinFile, 10*time.Millisecond); ok2 && b2 == '[' {
+							if b3, ok3, _ := platform.ReadByteTimeout(opts.StdinFile, 10*time.Millisecond); ok3 {
+								if b3 == 'I' {
+									focused.Store(true)
+									continue
+								}
+								if b3 == 'O' {
+									focused.Store(false)
+									continue
+								}
+							}
+						}
 						if sig.Load() == int32(agent.SignalPause) {
 							sig.Store(int32(agent.SignalAbort))
 							cancel()
@@ -210,6 +272,7 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 	defer close(escDone)
 
 	var textBuf strings.Builder
+	var toolOutBuf strings.Builder
 	var statusLbl live.StatusLabel
 	t0 := time.Now()
 	frame := 0
@@ -240,10 +303,31 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 					live.FormatSpinner(frame, time.Since(t0), lbl, pal.Dim, pal.Reset),
 				)
 			case core.ToolCallStarted:
-				lbl := statusLbl.Update("running "+e.Name, true, time.Now())
+				toolOutBuf.Reset()
+				msg := "running " + e.Name
+				if e.ArgsSummary != "" {
+					msg += " " + truncateSingleLine(e.ArgsSummary, 48)
+				}
+				lbl := statusLbl.Update(msg, true, time.Now())
 				frame++
 				region.Paint(live.FormatSpinner(frame, time.Since(t0), lbl, pal.Dim, pal.Reset))
+			case core.ToolOutputDelta:
+				toolOutBuf.WriteString(e.Chunk)
+				if toolOutBuf.Len() > 4096 {
+					s := toolOutBuf.String()
+					toolOutBuf.Reset()
+					toolOutBuf.WriteString(s[len(s)-2048:])
+				}
+				preview := tailToolPreview(toolOutBuf.String(), 3, cols, pal)
+				frame++
+				spin := live.FormatSpinner(frame, time.Since(t0), statusLbl.Update("", false, time.Now()), pal.Dim, pal.Reset)
+				if preview != "" {
+					region.Paint(preview, spin)
+				} else {
+					region.Paint(spin)
+				}
 			case core.ToolCallFinished:
+				toolOutBuf.Reset()
 				if textBuf.Len() > 0 {
 					region.Commit(markdown.Render(textBuf.String(), cols, pal, opts.Store.Bool("markdown")) + "\n")
 					textBuf.Reset()
@@ -255,6 +339,9 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 					mark = "✗"
 				}
 				fmt.Fprintf(opts.Stdout, "%s%s %s (%dms)%s\n", pal.Tool, mark, e.Name, e.DurationMS, pal.Reset)
+				if sum := truncateSingleLine(e.Summary, max(24, cols-4)); sum != "" {
+					fmt.Fprintf(opts.Stdout, "%s  %s%s\n", pal.Dim, sum, pal.Reset)
+				}
 			case core.CompactStarted:
 				lbl := statusLbl.Update("compacting", true, time.Now())
 				region.Paint(live.FormatSpinner(frame, time.Since(t0), lbl, pal.Dim, pal.Reset))
@@ -288,7 +375,7 @@ const (
 	actionPagerTranscript
 )
 
-func readPromptLine(ctx context.Context, cwd, stateDir string, r *bufio.Reader, inFile *os.File, out io.Writer, outFile *os.File, isTTY bool, prompt string, ed *editor.Buffer, store *config.Store, pal theme.Palette) (string, bool, inputAction) {
+func readPromptLine(ctx context.Context, cwd, stateDir string, r *bufio.Reader, inFile *os.File, out io.Writer, outFile *os.File, isTTY bool, cols int, prompt string, ed *editor.Buffer, store *config.Store, pal theme.Palette, focused *atomic.Bool, argChoices func(string) []string) (string, bool, inputAction) {
 	if !isTTY || inFile == nil {
 		_, _ = io.WriteString(out, prompt)
 		line, err := r.ReadString('\n')
@@ -307,24 +394,63 @@ func readPromptLine(ctx context.Context, cwd, stateDir string, r *bufio.Reader, 
 		return strings.TrimSpace(line), false, actionNone
 	}
 	defer st.Restore()
+	_, _ = io.WriteString(out, "\x1b[?2004h")
+	defer func() { _, _ = io.WriteString(out, "\x1b[?2004l") }()
 
+	prevCursorRow := 0
 	repaint := func() {
-		_, _ = fmt.Fprintf(out, "\r\x1b[2K%s%s", prompt, ed.Text())
+		seq, cRow, _ := ed.RepaintSeq(prompt, cols, prevCursorRow)
+		prevCursorRow = cRow
+		_, _ = io.WriteString(out, seq)
 	}
 	repaint()
 	ctrlCCount := 0
+	pasting := false
 	for {
-		b, err := r.ReadByte()
+		rn, _, err := r.ReadRune()
 		if err != nil {
 			return "", true, actionNone
 		}
-		if b != 0x03 {
+		if pasting {
+			if rn == 0x1b && r.Buffered() > 0 {
+				next, _ := r.ReadByte()
+				if next == '[' {
+					csi := readCSISeq(r)
+					if csi == "201~" {
+						pasting = false
+						repaint()
+					}
+					continue
+				}
+			}
+			if rn == '\r' {
+				if r.Buffered() > 0 {
+					if b, err := r.Peek(1); err == nil && b[0] == '\n' {
+						_, _ = r.ReadByte()
+					}
+				}
+				ed.Insert("\n")
+			} else if rn == '\n' || rn == '\t' || rn >= 32 {
+				ed.Insert(string(rn))
+			}
+			if r.Buffered() == 0 {
+				repaint()
+			}
+			continue
+		}
+		if rn != 0x03 {
 			ctrlCCount = 0
 		}
-		switch b {
+		switch rn {
 		case '\r', '\n':
+			ed.MoveEnd()
+			repaint()
 			_, _ = io.WriteString(out, "\r\n")
 			return ed.Submit(), false, actionNone
+		case 0x01: // Ctrl-A
+			ed.MoveHome()
+		case 0x05: // Ctrl-E
+			ed.MoveEnd()
 		case 0x04: // Ctrl-D
 			if ed.Text() == "" {
 				return "", true, actionNone
@@ -341,16 +467,19 @@ func readPromptLine(ctx context.Context, cwd, stateDir string, r *bufio.Reader, 
 			}
 		case 0x0c: // Ctrl-L
 			_, _ = io.WriteString(out, "\x1b[2J\x1b[H")
+			prevCursorRow = 0
 		case 0x07: // Ctrl-G
 			_ = st.Restore()
 			if edited, ok := editInExternalEditor(ed.Text()); ok {
 				ed.Set(edited)
 			}
 			st, _ = platform.EnterRaw(inFile, outFile, false)
+			prevCursorRow = 0
 		case 0x12: // Ctrl-R
 			_ = st.Restore()
 			searchHistoryPicker(stateDir, cwd, inFile, outFile, ed)
 			st, _ = platform.EnterRaw(inFile, outFile, false)
+			prevCursorRow = 0
 		case 0x16: // Ctrl-V
 			pasteClipboardIntoEditor(ctx, ed)
 		case 0x0f: // Ctrl-O
@@ -369,40 +498,123 @@ func readPromptLine(ctx context.Context, cwd, stateDir string, r *bufio.Reader, 
 			if completeFileMention(cwd, ed) {
 				break
 			}
-			matches, lcp := slash.Complete(ed.Text(), nil)
+			matches, lcp := slash.Complete(ed.Text(), argChoices)
 			if lcp != "" && lcp != ed.Text() {
 				ed.Set(lcp)
 			} else if len(matches) > 1 {
+				ed.MoveEnd()
+				repaint()
 				_, _ = fmt.Fprintf(out, "\r\n%s%s%s\r\n", pal.Dim, strings.Join(matches, "  "), pal.Reset)
+				prevCursorRow = 0
 			}
 		case 0x7f, 0x08:
 			ed.Backspace()
 		case 0x1b:
-			// Handle common CSI arrow sequences
 			if r.Buffered() > 0 {
 				next, _ := r.ReadByte()
-				if next == '[' {
-					code, _ := r.ReadByte()
-					switch code {
-					case 'A':
+				switch next {
+				case '[':
+					switch readCSISeq(r) {
+					case "I":
+						focused.Store(true)
+						continue
+					case "O":
+						focused.Store(false)
+						continue
+					case "A":
 						ed.HistoryPrev()
-					case 'B':
+					case "B":
 						ed.HistoryNext()
-					case 'C':
+					case "C":
 						ed.MoveRight()
-					case 'D':
+					case "D":
 						ed.MoveLeft()
+					case "H", "1~":
+						ed.MoveHome()
+					case "F", "4~":
+						ed.MoveEnd()
+					case "3~":
+						ed.DeleteForward()
+					case "200~":
+						pasting = true
+						continue
+					case "13;2u", "27;2;13~":
+						ed.Insert("\n")
+					case "1;5C", "1;3C":
+						ed.MoveWordRight()
+					case "1;5D", "1;3D":
+						ed.MoveWordLeft()
 					}
+				case '\r', '\n':
+					ed.Insert("\n")
+				case 0x7f, 0x08:
+					ed.DeleteWordBackward()
+				case 'b':
+					ed.MoveWordLeft()
+				case 'f':
+					ed.MoveWordRight()
+				case 'd':
+					ed.DeleteWordForward()
 				}
 			}
 		default:
-			if b >= 32 {
-				ed.Insert(string(b))
+			if rn >= 32 {
+				ed.Insert(string(rn))
 			}
 		}
 		_ = store
 		repaint()
 	}
+}
+
+func readCSISeq(r *bufio.Reader) string {
+	var b strings.Builder
+	for i := 0; i < 32; i++ {
+		c, err := r.ReadByte()
+		if err != nil {
+			break
+		}
+		b.WriteByte(c)
+		if c >= 0x40 && c <= 0x7e {
+			break
+		}
+	}
+	return b.String()
+}
+
+func truncateSingleLine(s string, maxRunes int) string {
+	s = live.StripNewlines(s)
+	rs := []rune(s)
+	if len(rs) > maxRunes && maxRunes > 3 {
+		return string(rs[:maxRunes-3]) + "..."
+	}
+	return s
+}
+
+func tailToolPreview(s string, maxLines, cols int, pal theme.Palette) string {
+	lines := strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
+	var nonEmpty []string
+	for _, l := range lines {
+		l = strings.TrimRight(l, " \t\r")
+		if l != "" {
+			nonEmpty = append(nonEmpty, l)
+		}
+	}
+	if len(nonEmpty) == 0 {
+		return ""
+	}
+	if len(nonEmpty) > maxLines {
+		nonEmpty = nonEmpty[len(nonEmpty)-maxLines:]
+	}
+	maxW := max(20, cols-4)
+	for i, l := range nonEmpty {
+		rs := []rune(l)
+		if len(rs) > maxW {
+			l = string(rs[:maxW-3]) + "..."
+		}
+		nonEmpty[i] = pal.Dim + "  " + l + pal.Reset
+	}
+	return strings.Join(nonEmpty, "\n")
 }
 
 func handleSlashCommand(ctx context.Context, line string, opts *Options, paused *bool, pal theme.Palette, isTTY bool) bool {

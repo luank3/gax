@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/luank3/gax/internal/tui/width"
 )
 
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -17,15 +19,26 @@ type Region struct {
 	mu       sync.Mutex
 	w        io.Writer
 	isTTY    bool
+	cols     int
 	lastRows int
 }
 
 // NewRegion returns a live-region writer over w.
 func NewRegion(w io.Writer, isTTY bool) *Region {
-	return &Region{w: w, isTTY: isTTY}
+	return &Region{w: w, isTTY: isTTY, cols: 80}
 }
 
-// Paint replaces the currently painted live region with lines.
+// SetCols configures the terminal column width used to count wrapped rows.
+func (r *Region) SetCols(cols int) {
+	if r == nil || cols <= 0 {
+		return
+	}
+	r.mu.Lock()
+	r.cols = cols
+	r.mu.Unlock()
+}
+
+// Paint replaces the currently painted live region with lines, accounting for wrapping.
 func (r *Region) Paint(lines ...string) {
 	if r == nil || r.w == nil || !r.isTTY {
 		return
@@ -33,13 +46,30 @@ func (r *Region) Paint(lines ...string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.clearLocked()
-	for i, l := range lines {
+	var flat []string
+	for _, l := range lines {
+		flat = append(flat, strings.Split(l, "\n")...)
+	}
+	rows := 0
+	for i, l := range flat {
 		if i > 0 {
 			_, _ = io.WriteString(r.w, "\r\n")
 		}
 		_, _ = io.WriteString(r.w, l)
+		rows += wrappedRows(l, r.cols)
 	}
-	r.lastRows = len(lines)
+	r.lastRows = rows
+}
+
+func wrappedRows(line string, cols int) int {
+	if cols <= 0 {
+		return 1
+	}
+	w := width.StringWidth(line)
+	if w <= cols {
+		return 1
+	}
+	return (w + cols - 1) / cols
 }
 
 // Commit writes permanent lines into scrollback above the live region.

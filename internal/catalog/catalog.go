@@ -124,6 +124,22 @@ func (s *Store) Refresh(ctx context.Context, url string, fetch func(context.Cont
 	return nil
 }
 
+// ListModels returns sorted model IDs known for catalogID.
+func (s *Store) ListModels(catalogID string) []string {
+	if s == nil || catalogID == "" {
+		return nil
+	}
+	p, ok := s.data[catalogID]
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(p.Models))
+	for id := range p.Models {
+		out = append(out, id)
+	}
+	return out
+}
+
 // Lookup resolves metadata for (runtimeProvider, catalogID, modelID), applying
 // catalog.models overrides on top of cached models.dev entries.
 func (s *Store) Lookup(runtimeProvider, catalogID, modelID string) (ModelInfo, bool) {

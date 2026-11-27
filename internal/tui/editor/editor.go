@@ -3,8 +3,11 @@
 package editor
 
 import (
+	"fmt"
 	"strings"
 	"unicode"
+
+	"github.com/luank3/gax/internal/tui/width"
 )
 
 // Buffer holds the editable rune buffer, cursor index, and history recall state.
@@ -131,6 +134,85 @@ func (b *Buffer) MoveHome() { b.cursor = 0 }
 
 // MoveEnd moves cursor to end.
 func (b *Buffer) MoveEnd() { b.cursor = len(b.runes) }
+
+// MoveWordLeft moves cursor to the start of the previous word.
+func (b *Buffer) MoveWordLeft() {
+	i := b.cursor
+	for i > 0 && unicode.IsSpace(b.runes[i-1]) {
+		i--
+	}
+	for i > 0 && !unicode.IsSpace(b.runes[i-1]) {
+		i--
+	}
+	b.cursor = i
+}
+
+// MoveWordRight moves cursor past the next word.
+func (b *Buffer) MoveWordRight() {
+	i := b.cursor
+	for i < len(b.runes) && unicode.IsSpace(b.runes[i]) {
+		i++
+	}
+	for i < len(b.runes) && !unicode.IsSpace(b.runes[i]) {
+		i++
+	}
+	b.cursor = i
+}
+
+// Layout computes the 0-based (cursorRow, cursorCol) and total terminal rows
+// for promptWidth + the buffer contents wrapped to cols.
+func (b *Buffer) Layout(promptWidth, cols int) (cursorRow, cursorCol, totalRows int) {
+	row, col := 0, promptWidth
+	if cols > 0 && col >= cols {
+		row += col / cols
+		col = col % cols
+	}
+	cursorSet := false
+	for i, r := range b.runes {
+		if i == b.cursor {
+			cursorRow, cursorCol = row, col
+			cursorSet = true
+		}
+		if r == '\n' {
+			row++
+			col = 0
+			continue
+		}
+		rw := width.RuneWidth(r)
+		if cols > 0 && col+rw > cols {
+			row++
+			col = 0
+		}
+		col += rw
+	}
+	if !cursorSet {
+		cursorRow, cursorCol = row, col
+	}
+	return cursorRow, cursorCol, row + 1
+}
+
+// RepaintSeq builds the ANSI sequence to redraw the editor in place from prevCursorRow.
+func (b *Buffer) RepaintSeq(prompt string, cols, prevCursorRow int) (seq string, cursorRow, totalRows int) {
+	var sb strings.Builder
+	if prevCursorRow > 0 {
+		fmt.Fprintf(&sb, "\x1b[%dA", prevCursorRow)
+	}
+	sb.WriteString("\r\x1b[J")
+	sb.WriteString(prompt)
+	sb.WriteString(strings.ReplaceAll(string(b.runes), "\n", "\r\n"))
+
+	pw := width.StringWidth(prompt)
+	cRow, cCol, tRows := b.Layout(pw, cols)
+	endRow := tRows - 1
+	if endRow > cRow {
+		fmt.Fprintf(&sb, "\x1b[%dA", endRow-cRow)
+	}
+	sb.WriteByte('\r')
+	if cCol > 0 {
+		fmt.Fprintf(&sb, "\x1b[%dC", cCol)
+	}
+	return sb.String(), cRow, tRows
+}
 
 // HistoryPrev recalls the previous history entry.
 func (b *Buffer) HistoryPrev() {

@@ -39,3 +39,30 @@ func TestEditorEditingAndHistory(t *testing.T) {
 		t.Fatalf("expected trimmed submit, got %q", got)
 	}
 }
+
+func TestEditorUTF8MultilineAndLayout(t *testing.T) {
+	b := editor.NewBuffer(nil)
+	b.Insert("xin chào\n世界")
+	b.MoveLeft()
+	b.Insert("！")
+	if got := b.Text(); got != "xin chào\n世！界" {
+		t.Fatalf("unexpected UTF-8 multiline text: %q", got)
+	}
+	// Cursor is right before '界' (width of '世' + '！' = 2 + 2 = 4 on row 1)
+	cRow, cCol, total := b.Layout(2, 40)
+	if cRow != 1 || cCol != 4 || total != 2 {
+		t.Fatalf("Layout = (%d,%d,%d), want (1,4,2)", cRow, cCol, total)
+	}
+	b.MoveWordLeft()
+	if b.Cursor() != 9 { // start of line 2 ("世界"...)
+		t.Fatalf("MoveWordLeft cursor = %d, want 9", b.Cursor())
+	}
+	b.MoveWordRight()
+	if b.Cursor() != len([]rune(b.Text())) {
+		t.Fatalf("MoveWordRight cursor = %d, want end", b.Cursor())
+	}
+	seq, r, tot := b.RepaintSeq("> ", 40, 1)
+	if r != 1 || tot != 2 || seq == "" {
+		t.Fatalf("RepaintSeq = (%d,%d), len=%d", r, tot, len(seq))
+	}
+}
