@@ -20,6 +20,7 @@ import (
 	"github.com/luank3/gax/internal/subagent"
 	"github.com/luank3/gax/internal/tools"
 	"github.com/luank3/gax/internal/transport"
+	"github.com/luank3/gax/internal/tui"
 	"github.com/luank3/gax/internal/wiretrace"
 )
 
@@ -159,8 +160,45 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 		return 1
 	}
 	if !opts.printMode && !opts.jsonMode {
-		fmt.Fprintln(stderr, "gax: interactive TUI arrives in Slice 7; use -p or --json")
-		return 1
+		var toolReg *tools.Registry
+		if !opts.raw {
+			toolReg = tools.NewRegistry(cwd, store)
+			defer toolReg.Close()
+		}
+		sess := agent.NewSession(core.SessionHeader{
+			Version:    1,
+			GaxVersion: version,
+			ID:         session.NewUUID(),
+			CWD:        cwd,
+			Provider:   provID,
+			Model:      modelID,
+			Effort:     effort,
+			Preset:     opts.preset,
+		})
+		if loaded != nil {
+			sess.Header = loaded.Header
+			sess.Items = append(sess.Items, loaded.LiveItems...)
+		}
+		return tui.Run(context.Background(), tui.Options{
+			CWD:        cwd,
+			StateDir:   dirs.State,
+			Version:    version,
+			Store:      store,
+			HTTPClient: httpClient,
+			Session:    sess,
+			Provider:   prov,
+			Tools:      toolReg,
+			Model:      modelID,
+			Effort:     effort,
+			Preset:     opts.preset,
+			Bare:       opts.bare,
+			Raw:        opts.raw,
+			Stdin:      stdin,
+			StdinFile:  os.Stdin,
+			Stdout:     stdout,
+			StdoutFile: os.Stdout,
+			Stderr:     stderr,
+		})
 	}
 	if prompt == "" && loaded == nil {
 		fmt.Fprintln(stderr, "gax: -p requires a prompt or --resume")
