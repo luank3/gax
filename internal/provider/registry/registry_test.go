@@ -1,121 +1,71 @@
 package registry_test
 
 import (
-	"reflect"
 	"testing"
 
-	baseconfig "github.com/luank3/gax/internal/config"
-	providerregistry "github.com/luank3/gax/internal/provider/registry"
+	"github.com/luank3/gax/internal/config"
+	"github.com/luank3/gax/internal/provider/registry"
+	"github.com/luank3/gax/internal/transport"
 )
 
-func TestShippedProviderOrderDefaultAndAlias(t *testing.T) {
-	registry := providerregistry.New(baseconfig.New(baseconfig.DefaultSettings()))
-	all := registry.All()
-	want := []string{
-		"codex", "openai", "anthropic", "openrouter", "opencode-go", "deepseek",
-		"llamacpp", "ollama", "openai-compatible", "anthropic-compatible",
+func TestAvailableProvidersHidesUnconfiguredCompatible(t *testing.T) {
+	store := config.NewStore()
+	avail := registry.AvailableProviders(store)
+	hasZen := false
+	for _, d := range avail {
+		if d.ID == "openai-compatible" || d.ID == "anthropic-compatible" || d.ID == "mock" {
+			t.Fatalf("did not expect %q in AvailableProviders", d.ID)
+		}
+		if d.ID == "opencode-zen" {
+			hasZen = true
+		}
 	}
-	got := make([]string, len(all))
-	for index, definition := range all {
-		got[index] = definition.ID
+	if !hasZen {
+		t.Fatal("expected opencode-zen in AvailableProviders")
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("shipped provider order changed: got=%v want=%v", got, want)
+
+	t.Setenv("GAX_OPENAI_BASE_URL", "http://127.0.0.1:8000/v1")
+	avail = registry.AvailableProviders(store)
+	found := false
+	for _, d := range avail {
+		if d.ID == "openai-compatible" {
+			found = true
+		}
 	}
-	if registry.Default() == nil || registry.Default().ID != "codex" {
-		t.Fatalf("default provider should be highest-priority visible def: %+v", registry.Default())
-	}
-	deepseek, ok := registry.Find("deepseek")
-	if !ok || deepseek.API != "" || deepseek.BaseURL != "https://api.deepseek.com" || !deepseek.Pinned ||
-		deepseek.APIKeyEnv != "DEEPSEEK_API_KEY" || deepseek.CatalogID != "deepseek" ||
-		deepseek.ReasoningRoundtrip != "reasoning_content" || !deepseek.ReasoningRequired ||
-		deepseek.Hooks&(providerregistry.HookParseModel|providerregistry.HookQueryUsage) != providerregistry.HookParseModel|providerregistry.HookQueryUsage {
-		t.Fatalf("DeepSeek shipped definition or hooks missing: %+v found=%t", deepseek, ok)
-	}
-	if _, ok := registry.Find("openference"); ok {
-		t.Fatal("Openference should not be a shipped provider")
-	}
-	if _, ok := registry.Find("opencode-zen"); ok {
-		t.Fatal("the retired OpenCode Zen def should not be a shipped provider")
-	}
-	if _, ok := registry.Find("agnes"); ok {
-		t.Fatal("the retired Agnes AI def should not be a shipped provider")
-	}
-	ollama, ok := registry.Find("ollama")
-	wantOllamaHint := "ollama's context window may be too small for the prompt — restart `ollama serve` with a larger OLLAMA_CONTEXT_LENGTH (e.g. 16384), or raise num_ctx on the model"
-	if !ok || ollama.ReasoningRoundtrip != "" || ollama.LengthHint != wantOllamaHint {
-		t.Fatalf("Ollama reasoning replay or context guidance changed: %+v found=%t", ollama, ok)
-	}
-	llama, ok := registry.Find("llama.cpp")
-	if !ok || llama.ID != "llamacpp" || registry.DisplayName(llama) != "llama.cpp" {
-		t.Fatalf("llama.cpp alias did not resolve to canonical definition: %+v found=%t", llama, ok)
-	}
-	mock, ok := registry.Find("mock")
-	if !ok || !mock.Internal || !mock.NoEfforts {
-		t.Fatalf("internal mock provider definition = %+v found=%t, want directly addressable without effort levels", mock, ok)
+	if !found {
+		t.Fatal("expected openai-compatible once base_url is set")
 	}
 }
 
-func TestConfigOnlyProvidersAppendAndShippedBlocksOverlay(t *testing.T) {
-	store := baseconfig.New(baseconfig.DefaultSettings())
-	if err := store.LoadConfig([]byte(`{"providers":{"zeta":{"display_name":"Zeta Gateway","catalog_id":"groq"},"openai":{"display_name":"Ignored override"},"bad.name":{"base_url":"https://bad.example"}}}`)); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.LoadState([]byte(`{"providers":{"alpha":{},"llamacpp":{"display_name":"Local server"}}}`)); err != nil {
-		t.Fatal(err)
-	}
-	registry := providerregistry.New(store)
-	all := registry.All()
-	if all[len(all)-2].ID != "zeta" || all[len(all)-1].ID != "alpha" {
-		t.Fatalf("config-only defs should append in file then state key order: %v", definitionIDs(all))
-	}
-	if _, ok := registry.Find("bad.name"); ok {
-		t.Fatal("provider name containing a dot should not be registered")
-	}
-	if registry.Warnings() == nil {
-		t.Fatal("invalid dotted provider should produce a warning")
-	}
-	zeta, ok := registry.Find("zeta")
-	if !ok || zeta.BaseURL != "" || registry.DisplayName(zeta) != "Zeta Gateway" {
-		t.Fatalf("custom provider definition or configured display name is wrong: %+v", zeta)
-	}
-	if got := registry.CatalogID(zeta); got == nil || *got != "groq" {
-		t.Fatalf("custom catalog identity did not resolve: %v", got)
-	}
-	openAI, _ := registry.Find("openai")
-	if registry.DisplayName(openAI) != "Ignored override" || openAI.BaseURL != "https://api.openai.com/v1" {
-		t.Fatalf("shipped definition should retain defaults while allowing display overrides: %+v name=%q", openAI, registry.DisplayName(openAI))
-	}
-	llama, _ := registry.Find("llamacpp")
-	if registry.DisplayName(llama) != "Local server" {
-		t.Fatalf("config should overlay shipped definitions by matching id: %q", registry.DisplayName(llama))
-	}
-	if got := registry.CatalogID(alphaDefinition(registry)); got != nil {
-		t.Fatalf("config-only provider should not inherit a catalog identity: %v", got)
-	}
-}
+func TestResolveMockAndLlamaCpp(t *testing.T) {
+	store := config.NewStore()
+	httpClient := transport.NewClient(transport.RetryPolicy{}, nil)
 
-func TestEmptyCatalogIdentityOptsOutOfShippedDefault(t *testing.T) {
-	store := baseconfig.New(baseconfig.DefaultSettings())
-	if err := store.LoadConfig([]byte(`{"providers":{"openai":{"catalog_id":""}}}`)); err != nil {
-		t.Fatal(err)
+	m, err := registry.Resolve("mock", "", "", store, httpClient)
+	if err != nil || m.ID() != "mock" {
+		t.Fatalf("Resolve(mock): %v", err)
 	}
-	registry := providerregistry.New(store)
-	openAI, _ := registry.Find("openai")
-	if got := registry.CatalogID(openAI); got != nil {
-		t.Fatalf("empty catalog id should opt out of shipped identity: %v", got)
+	l, err := registry.Resolve("llamacpp", "qwen", "", store, httpClient)
+	if err != nil || l.ID() != "llamacpp" {
+		t.Fatalf("Resolve(llamacpp): %v", err)
 	}
-}
 
-func definitionIDs(definitions []*providerregistry.Definition) []string {
-	ids := make([]string, len(definitions))
-	for index, definition := range definitions {
-		ids[index] = definition.ID
+	t.Setenv("OPENAI_API_KEY", "sk-test")
+	if got := registry.AutoSelect(store); got == "" {
+		t.Fatal("expected AutoSelect to pick an available provider")
 	}
-	return ids
-}
 
-func alphaDefinition(registry *providerregistry.Registry) *providerregistry.Definition {
-	definition, _ := registry.Find("alpha")
-	return definition
+	so := registry.ResolveStreamOptions("deepseek", "deepseek-chat", store, nil)
+	if !so.ReasoningRequired {
+		t.Fatal("expected deepseek to set ReasoningRequired=true")
+	}
+	soOR := registry.ResolveStreamOptions("openrouter", "openai/gpt-4o", store, nil)
+	if !soOR.RequestCost {
+		t.Fatal("expected openrouter to set RequestCost=true")
+	}
+	t.Setenv("OPENCODE_API_KEY", "test-key")
+	oc, err := registry.Resolve("opencode-zen", "claude-sonnet-4", "", store, httpClient)
+	if err != nil || oc.ID() != "opencode-zen" {
+		t.Fatalf("Resolve(opencode-zen): %v", err)
+	}
 }

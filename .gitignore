@@ -1,13 +1,6 @@
-# Build output
-/bin/
-/dist/
-
-# Coverage and test artifacts
-/coverage.out
-*.test
-
-# Editor and OS noise
-.DS_Store
-.idea/
-.vscode/
-*.swp
+bin/
+dist/
+internal/serve/ui/dist/
+web/node_modules/
+*.exe
+*.out

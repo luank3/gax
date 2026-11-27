@@ -5,72 +5,33 @@ on:
     branches: [main]
   pull_request:
 
-permissions:
-  contents: read
-
 jobs:
-  test:
-    name: test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Check Go module policy
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sh scripts/check-go-mod-test.sh
-          sh scripts/check-go-mod.sh
-      - run: make fmt-check
-      - run: make vet
-      - run: make test-race
-      # gax is cgo-free; a build that quietly needs cgo would not cross-compile.
-      - run: make build
-      - run: ./bin/gax --version
-
-  windows:
-    name: test (windows-latest)
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
-      - run: choco install make --no-progress -y
-      - run: make SHELL=bash lint test build TEST_FLAGS=-timeout=3m
-      - run: ./bin/gax.exe --version
-
-  build:
-    name: build (${{ matrix.goos }}/${{ matrix.goarch }})
+  lint-test-budget:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { goos: linux, goarch: amd64 }
-          - { goos: linux, goarch: arm64 }
-          - { goos: darwin, goarch: amd64 }
-          - { goos: darwin, goarch: arm64 }
-          - { goos: windows, goarch: amd64 }
-          - { goos: windows, goarch: arm64 }
-    env:
-      CGO_ENABLED: "0"
-      GOOS: ${{ matrix.goos }}
-      GOARCH: ${{ matrix.goarch }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
-      - run: go build -trimpath -o /dev/null ./cmd/gax
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: make lint
+      - run: make test-race
+      - run: make cross
+      - run: make budget
+
+  cross-os-test:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run tests
+        env:
+          CGO_ENABLED: "0"
+        run: go test ./...

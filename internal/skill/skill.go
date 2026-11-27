@@ -1,125 +1,133 @@
-// Package skill carries the skills gax ships inside the binary. A built-in skill is listed with the
-// discovered ones, but its SKILL.md lives in the executable, so the read tool serves it from here
-// under the gax: path scheme instead of the filesystem.
+// Package skill discovers SKILL.md files and provides built-in skills.
 package skill
 
 import (
-	"embed"
-	"fmt"
-	"io/fs"
-	"slices"
-	"sort"
+	"os"
+	"path/filepath"
 	"strings"
-	"unicode"
-
-	"github.com/luank3/gax/internal/config"
 )
 
-// Scheme prefixes the path of a built-in skill: gax:skills/<name>/SKILL.md.
-const Scheme = "gax:"
-
-// settingsMarker is replaced by the generated table of registered settings, so the shipped document
-// cannot drift from the registry it documents.
-const settingsMarker = "<!-- settings-table -->"
-
-//go:embed skills
-var documents embed.FS
-
-// Skill is one built-in SKILL.md.
-type Skill struct {
-	Name string
-	Path string
-	Body string
+// Entry describes one discovered or built-in skill.
+type Entry struct {
+	Name        string
+	Description string
+	Path        string
+	DisplayPath string
+	BuiltinBody string
 }
 
-var builtin = load()
-
-// Builtin returns the built-in skills in name order.
-func Builtin() []Skill { return append([]Skill(nil), builtin...) }
-
-// Read returns the body of the built-in skill at path and whether path named one.
-func Read(path string) (string, bool) {
-	for _, entry := range builtin {
-		if entry.Path == path {
-			return entry.Body, true
-		}
+// Load returns the full SKILL.md text for entry.
+func (e Entry) Load() (string, error) {
+	if e.BuiltinBody != "" {
+		return e.BuiltinBody, nil
 	}
-	return "", false
-}
-
-func load() []Skill {
-	entries, err := fs.ReadDir(documents, "skills")
+	raw, err := os.ReadFile(e.Path)
 	if err != nil {
-		return nil
+		return "", err
 	}
-	skills := make([]Skill, 0, len(entries))
-	for _, entry := range entries {
-		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
-		data, err := documents.ReadFile("skills/" + entry.Name() + "/SKILL.md")
+	return string(raw), nil
+}
+
+// Options configures skill discovery roots.
+type Options struct {
+	Home string
+	CWD  string
+}
+
+// Discover searches project .agents/skills up to the git root, ~/.config/gax/skills,
+// ~/.agents/skills, and built-in skills. Nearest match wins per skill name.
+func Discover(opts Options) []Entry {
+	seen := make(map[string]bool)
+	var out []Entry
+
+	addDir := func(dir, displayPrefix string) {
+		entries, err := os.ReadDir(dir)
 		if err != nil {
+			return
+		}
+		for _, de := range entries {
+			if !de.IsDir() {
+				continue
+			}
+			name := de.Name()
+			if seen[name] {
+				continue
+			}
+			skillFile := filepath.Join(dir, name, "SKILL.md")
+			raw, err := os.ReadFile(skillFile)
+			if err != nil {
+				continue
+			}
+			seen[name] = true
+			out = append(out, Entry{
+				Name:        name,
+				Description: parseDescription(string(raw)),
+				Path:        skillFile,
+				DisplayPath: filepath.Join(displayPrefix, name, "SKILL.md"),
+			})
+		}
+	}
+
+	if opts.CWD != "" {
+		cur := opts.CWD
+		for {
+			addDir(filepath.Join(cur, ".agents", "skills"), ".agents/skills")
+			if _, err := os.Stat(filepath.Join(cur, ".git")); err == nil {
+				break
+			}
+			parent := filepath.Dir(cur)
+			if parent == cur {
+				break
+			}
+			cur = parent
+		}
+	}
+	if opts.Home != "" {
+		addDir(filepath.Join(opts.Home, ".config", "gax", "skills"), "~/.config/gax/skills")
+		addDir(filepath.Join(opts.Home, ".agents", "skills"), "~/.agents/skills")
+	}
+
+	for _, b := range builtinSkills {
+		if seen[b.Name] {
 			continue
 		}
-		skills = append(skills, Skill{
-			Name: entry.Name(),
-			Path: Scheme + "skills/" + entry.Name() + "/SKILL.md",
-			Body: render(string(data)),
-		})
+		seen[b.Name] = true
+		out = append(out, b)
 	}
-	sort.Slice(skills, func(i, j int) bool { return skills[i].Name < skills[j].Name })
-	return skills
+	return out
 }
 
-func render(body string) string {
-	if !strings.Contains(body, settingsMarker) {
-		return body
+// parseDescription extracts `description` from YAML frontmatter, supporting
+// single-line values and `>` / `|` block scalars.
+func parseDescription(doc string) string {
+	lines := strings.Split(strings.ReplaceAll(doc, "\r\n", "\n"), "\n")
+	if len(lines) < 3 || strings.TrimSpace(lines[0]) != "---" {
+		return ""
 	}
-	return strings.Replace(body, settingsMarker, settingsTable(), 1)
-}
-
-func settingsTable() string {
-	var out strings.Builder
-	out.WriteString("| Setting | Environment variable | Default | Changeable | Notes |\n")
-	out.WriteString("| --- | --- | --- | --- | --- |\n")
-	for _, setting := range config.DefaultSettings() {
-		changeable := "restart"
-		if setting.Editable {
-			changeable = "live"
+	for i := 1; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed == "---" {
+			break
 		}
-		fmt.Fprintf(&out, "| `%s` | `%s` | %s | %s | %s |\n",
-			setting.Key, setting.EnvVar, defaultCell(setting), changeable, notesCell(setting))
-	}
-	return out.String()
-}
-
-func defaultCell(setting config.Setting) string {
-	if setting.Default == "" {
-		return "—"
-	}
-	return "`" + setting.Default + "`"
-}
-
-func notesCell(setting config.Setting) string {
-	notes := setting.Description
-	if setting.Choices != "" && !mentionsEveryChoice(notes, setting.Choices) {
-		notes += " (values: " + strings.ReplaceAll(setting.Choices, "|", ", ") + ")"
-	}
-	if setting.Secret {
-		notes += " (secret: never print the value)"
-	}
-	return strings.ReplaceAll(notes, "|", "\\|")
-}
-
-// mentionsEveryChoice keeps the table from repeating enumerations a description already carries.
-func mentionsEveryChoice(description, choices string) bool {
-	words := strings.FieldsFunc(strings.ToLower(description), func(character rune) bool {
-		return !unicode.IsLetter(character) && !unicode.IsDigit(character)
-	})
-	for _, choice := range strings.Split(choices, "|") {
-		if !slices.Contains(words, strings.ToLower(choice)) {
-			return false
+		if !strings.HasPrefix(trimmed, "description:") {
+			continue
 		}
+		rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "description:"))
+		if rest != ">" && rest != "|" && rest != ">-" && rest != "|-" {
+			return strings.Trim(rest, `"'`)
+		}
+		var parts []string
+		for j := i + 1; j < len(lines); j++ {
+			l := lines[j]
+			if strings.TrimSpace(l) == "---" {
+				break
+			}
+			if len(l) > 0 && l[0] != ' ' && l[0] != '\t' {
+				break
+			}
+			parts = append(parts, strings.TrimSpace(l))
+		}
+		return strings.TrimSpace(strings.Join(parts, " "))
 	}
-	return true
+	return ""
 }
