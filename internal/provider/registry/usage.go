@@ -27,7 +27,7 @@ func QueryAccountUsage(ctx context.Context, providerID string, clients ...*trans
 		if err != nil {
 			return provider.UsageReport{}, err
 		}
-		return codex.QueryUsage(ctx, creds.AccessToken)
+		return codex.QueryUsage(ctx, creds.AccessToken, creds.AccountID)
 	case "openrouter":
 		return queryJSONUsage(ctx, hc, "https://openrouter.ai/api/v1/credits", "Bearer", os.Getenv("OPENROUTER_API_KEY"), func(raw []byte) (string, error) {
 			var r struct {

@@ -47,10 +47,15 @@ func LoadCredentials(stateDir, homeDir string) (Credentials, bool, error) {
 				if c, ok := root["codex"]; ok && c.AccessToken != "" {
 					if c.ExpiresAt > 0 && c.RefreshToken != "" && time.Now().Unix() >= c.ExpiresAt-60 {
 						if refreshed, rerr := refreshTokens(c.RefreshToken); rerr == nil {
-							refreshed.AccountID = c.AccountID
+							if refreshed.AccountID == "" {
+								refreshed.AccountID = c.AccountID
+							}
 							_ = SaveCredentials(stateDir, refreshed)
 							return refreshed, true, nil
 						}
+					}
+					if c.AccountID == "" {
+						c.AccountID = extractAccountIDFromJWT(c.AccessToken)
 					}
 					return c, true, nil
 				}
@@ -208,7 +213,7 @@ func BrowserLogin(ctx context.Context, stateDir string, out io.Writer) error {
 	go func() { _ = srv.Serve(ln) }()
 	defer srv.Shutdown(context.Background())
 
-	authURL := fmt.Sprintf("%s/oauth/authorize?response_type=code&client_id=%s&redirect_uri=%s&scope=%s&code_challenge=%s&code_challenge_method=S256&state=%s",
+	authURL := fmt.Sprintf("%s/oauth/authorize?response_type=code&client_id=%s&redirect_uri=%s&scope=%s&code_challenge=%s&code_challenge_method=S256&id_token_add_organizations=true&codex_cli_simplified_flow=true&originator=codex_cli_rs&state=%s",
 		defaultAuthBaseURL, url.QueryEscape(defaultClientID), url.QueryEscape(redirectURI),
 		url.QueryEscape("openid profile email offline_access"), url.QueryEscape(challenge), url.QueryEscape(state))
 
@@ -245,16 +250,70 @@ func BrowserLogin(ctx context.Context, stateDir string, out io.Writer) error {
 	var tok struct {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
+		IDToken      string `json:"id_token"`
 		ExpiresIn    int64  `json:"expires_in"`
 	}
 	if err := json.Unmarshal(raw, &tok); err != nil {
 		return err
 	}
+	accID := extractAccountIDFromJWT(tok.IDToken)
+	if accID == "" {
+		accID = extractAccountIDFromJWT(tok.AccessToken)
+	}
 	return SaveCredentials(stateDir, Credentials{
 		AccessToken:  tok.AccessToken,
 		RefreshToken: tok.RefreshToken,
+		AccountID:    accID,
 		ExpiresAt:    time.Now().Unix() + tok.ExpiresIn,
 	})
+}
+
+// RefreshCredentials forces a refresh of gax-managed codex OAuth tokens in stateDir.
+func RefreshCredentials(stateDir string) (Credentials, error) {
+	if stateDir == "" {
+		return Credentials{}, fmt.Errorf("state directory unavailable")
+	}
+	b, err := os.ReadFile(filepath.Join(stateDir, "auth.json"))
+	if err != nil {
+		return Credentials{}, err
+	}
+	var root map[string]Credentials
+	if err := json.Unmarshal(b, &root); err != nil {
+		return Credentials{}, err
+	}
+	c, ok := root["codex"]
+	if !ok || c.RefreshToken == "" {
+		return Credentials{}, fmt.Errorf("no refresh token for codex")
+	}
+	refreshed, err := refreshTokens(c.RefreshToken)
+	if err != nil {
+		return Credentials{}, err
+	}
+	if refreshed.AccountID == "" {
+		refreshed.AccountID = c.AccountID
+	}
+	_ = SaveCredentials(stateDir, refreshed)
+	return refreshed, nil
+}
+
+func extractAccountIDFromJWT(jwt string) string {
+	parts := strings.Split(jwt, ".")
+	if len(parts) != 3 {
+		return ""
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return ""
+	}
+	var claims struct {
+		Auth struct {
+			ChatGPTAccountID string `json:"chatgpt_account_id"`
+		} `json:"https://api.openai.com/auth"`
+	}
+	if json.Unmarshal(payload, &claims) == nil {
+		return claims.Auth.ChatGPTAccountID
+	}
+	return ""
 }
 
 func refreshTokens(refreshToken string) (Credentials, error) {
@@ -275,6 +334,7 @@ func refreshTokens(refreshToken string) (Credentials, error) {
 	var tok struct {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
+		IDToken      string `json:"id_token"`
 		ExpiresIn    int64  `json:"expires_in"`
 	}
 	if err := json.Unmarshal(raw, &tok); err != nil {
@@ -283,9 +343,14 @@ func refreshTokens(refreshToken string) (Credentials, error) {
 	if tok.RefreshToken == "" {
 		tok.RefreshToken = refreshToken
 	}
+	accID := extractAccountIDFromJWT(tok.IDToken)
+	if accID == "" {
+		accID = extractAccountIDFromJWT(tok.AccessToken)
+	}
 	return Credentials{
 		AccessToken:  tok.AccessToken,
 		RefreshToken: tok.RefreshToken,
+		AccountID:    accID,
 		ExpiresAt:    time.Now().Unix() + tok.ExpiresIn,
 	}, nil
 }
@@ -339,14 +404,20 @@ func DeviceLogin(ctx context.Context, stateDir string, out io.Writer) error {
 			var tok struct {
 				AccessToken  string `json:"access_token"`
 				RefreshToken string `json:"refresh_token"`
+				IDToken      string `json:"id_token"`
 				ExpiresIn    int64  `json:"expires_in"`
 			}
 			if err := json.Unmarshal(pRaw, &tok); err != nil {
 				return err
 			}
+			accID := extractAccountIDFromJWT(tok.IDToken)
+			if accID == "" {
+				accID = extractAccountIDFromJWT(tok.AccessToken)
+			}
 			return SaveCredentials(stateDir, Credentials{
 				AccessToken:  tok.AccessToken,
 				RefreshToken: tok.RefreshToken,
+				AccountID:    accID,
 				ExpiresAt:    time.Now().Unix() + tok.ExpiresIn,
 			})
 		}
@@ -355,12 +426,17 @@ func DeviceLogin(ctx context.Context, stateDir string, out io.Writer) error {
 }
 
 // QueryUsage fetches ChatGPT subscription usage windows for Codex.
-func QueryUsage(ctx context.Context, accessToken string) (provider.UsageReport, error) {
+func QueryUsage(ctx context.Context, accessToken string, accountID ...string) (provider.UsageReport, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, defaultCodexAPI+"/wham/usage", nil)
 	if err != nil {
 		return provider.UsageReport{}, err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("originator", "codex_cli_rs")
+	if len(accountID) > 0 && accountID[0] != "" {
+		req.Header.Set("chatgpt-account-id", accountID[0])
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return provider.UsageReport{}, err

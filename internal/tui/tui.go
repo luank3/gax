@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -247,9 +248,12 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 	defer stopSig()
 
 	escDone := make(chan struct{})
+	var escWG sync.WaitGroup
 	if isTTY && opts.StdinFile != nil {
 		if rawSt, rerr := platform.EnterRaw(opts.StdinFile, nil, true); rerr == nil {
+			escWG.Add(1)
 			go func() {
+				defer escWG.Done()
 				defer rawSt.Restore()
 				for {
 					select {
@@ -282,7 +286,10 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 			}()
 		}
 	}
-	defer close(escDone)
+	defer func() {
+		close(escDone)
+		escWG.Wait()
+	}()
 
 	var textBuf strings.Builder
 	var toolOutBuf strings.Builder
@@ -732,6 +739,11 @@ func handleSlashCommand(ctx context.Context, line string, opts *Options, paused 
 		if err := codex.BrowserLogin(ctx, opts.StateDir, opts.Stdout); err != nil {
 			fmt.Fprintf(opts.Stdout, "%slogin failed: %v%s\n", pal.Error, err, pal.Reset)
 		} else {
+			if opts.Provider != nil && opts.Provider.ID() == "codex" {
+				if prov, rerr := registry.Resolve("codex", opts.Model, opts.CWD, opts.Store, opts.HTTPClient); rerr == nil {
+					opts.Provider = prov
+				}
+			}
 			fmt.Fprintln(opts.Stdout, "codex login saved")
 		}
 		return true

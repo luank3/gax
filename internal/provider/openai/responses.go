@@ -23,6 +23,7 @@ type Config struct {
 	HTTP        *transport.Client
 	IdleTimeout time.Duration
 	Headers     map[string]string
+	RefreshAuth func(ctx context.Context) (apiKey string, headers map[string]string, err error)
 }
 
 // ResponsesClient implements provider.Client over the OpenAI Responses API.
@@ -38,27 +39,48 @@ func NewResponsesClient(cfg Config) *ResponsesClient {
 func (c *ResponsesClient) ID() string { return c.cfg.ProviderID }
 
 func (c *ResponsesClient) Stream(ctx context.Context, req provider.StreamRequest, emit func(provider.StreamEvent)) error {
-	bodyBytes, err := buildResponsesBody(req)
+	bodyBytes, err := buildResponsesBody(c.cfg.ProviderID, req)
 	if err != nil {
 		return err
 	}
-	hdr := make(http.Header)
-	hdr.Set("Content-Type", "application/json")
-	hdr.Set("Accept", "text/event-stream")
-	if c.cfg.APIKey != "" {
-		hdr.Set("Authorization", "Bearer "+c.cfg.APIKey)
+	buildHeaders := func(apiKey string, extra map[string]string) http.Header {
+		hdr := make(http.Header)
+		hdr.Set("Content-Type", "application/json")
+		hdr.Set("Accept", "text/event-stream")
+		if apiKey != "" {
+			hdr.Set("Authorization", "Bearer "+apiKey)
+		}
+		for k, v := range extra {
+			hdr.Set(k, v)
+		}
+		provider.ApplyExtraHeaders(hdr, req.Options.ExtraHeaders, req.Options.SessionID)
+		return hdr
 	}
-	for k, v := range c.cfg.Headers {
-		hdr.Set(k, v)
-	}
-	provider.ApplyExtraHeaders(hdr, req.Options.ExtraHeaders, req.Options.SessionID)
 
 	url := strings.TrimRight(c.cfg.BaseURL, "/") + "/responses"
+	hdr := buildHeaders(c.cfg.APIKey, c.cfg.Headers)
 	resp, err := c.cfg.HTTP.DoStream(ctx, http.MethodPost, url, hdr, bodyBytes, c.cfg.IdleTimeout, func(attempt int, delay time.Duration, reason string) {
 		emit(provider.StreamEvent{Kind: provider.EventRetry, RetryAttempt: attempt, RetryDelay: delay, RetryReason: reason})
 	})
 	if err != nil {
 		return err
+	}
+	if resp.StatusCode == http.StatusUnauthorized && c.cfg.RefreshAuth != nil {
+		if newKey, newHdrs, rerr := c.cfg.RefreshAuth(ctx); rerr == nil && newKey != "" {
+			_ = resp.Body.Close()
+			c.cfg.APIKey = newKey
+			for k, v := range newHdrs {
+				if c.cfg.Headers == nil {
+					c.cfg.Headers = map[string]string{}
+				}
+				c.cfg.Headers[k] = v
+			}
+			hdr = buildHeaders(c.cfg.APIKey, c.cfg.Headers)
+			resp, err = c.cfg.HTTP.DoStream(ctx, http.MethodPost, url, hdr, bodyBytes, c.cfg.IdleTimeout, nil)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	defer resp.Body.Close()
 
@@ -74,7 +96,7 @@ func (c *ResponsesClient) Stream(ctx context.Context, req provider.StreamRequest
 	return parseResponsesSSE(resp.Body, emit, req.Options.OverflowPhrases)
 }
 
-func buildResponsesBody(req provider.StreamRequest) ([]byte, error) {
+func buildResponsesBody(providerID string, req provider.StreamRequest) ([]byte, error) {
 	input := make([]any, 0, len(req.Items))
 	for _, it := range req.Items {
 		switch it.Kind {
@@ -123,7 +145,11 @@ func buildResponsesBody(req provider.StreamRequest) ([]byte, error) {
 		"input":  input,
 		"stream": true,
 	}
-	if req.SystemPrompt != "" {
+	if providerID == "codex" {
+		body["store"] = false
+		body["instructions"] = req.SystemPrompt
+		body["text"] = map[string]any{"verbosity": "low"}
+	} else if req.SystemPrompt != "" {
 		body["instructions"] = req.SystemPrompt
 	}
 	if req.Options.Effort != "" {

@@ -42,6 +42,10 @@ var Shipped = []Def{
 	{
 		ID: "codex", DisplayName: "Codex (ChatGPT)", API: "openai-responses",
 		BaseURL: "https://chatgpt.com/backend-api/codex", CatalogID: "openai", Pinned: true, SendCacheKey: true,
+		ExtraHeaders: map[string]string{
+			"originator": "codex_cli_rs",
+			"User-Agent": "codex_cli_rs/0.144.1 gax",
+		},
 	},
 	{
 		ID: "openai", DisplayName: "OpenAI", API: "openai-responses",
@@ -185,12 +189,31 @@ func Resolve(providerID, modelID, cwd string, store *config.Store, httpClient *t
 		}
 	}
 
+	extraHeaders := make(map[string]string, len(def.ExtraHeaders)+1)
+	for k, v := range def.ExtraHeaders {
+		extraHeaders[k] = v
+	}
+	var refreshAuth func(context.Context) (string, map[string]string, error)
 	if providerID == "codex" {
 		dirs := platform.ResolveDirs()
 		if creds, _, cerr := codex.LoadCredentials(dirs.State, dirs.Home); cerr == nil {
 			apiKey = creds.AccessToken
+			if creds.AccountID != "" {
+				extraHeaders["chatgpt-account-id"] = creds.AccountID
+			}
 		} else {
 			return nil, cerr
+		}
+		refreshAuth = func(context.Context) (string, map[string]string, error) {
+			refreshed, rerr := codex.RefreshCredentials(dirs.State)
+			if rerr != nil {
+				return "", nil, rerr
+			}
+			hdrs := map[string]string{}
+			if refreshed.AccountID != "" {
+				hdrs["chatgpt-account-id"] = refreshed.AccountID
+			}
+			return refreshed.AccessToken, hdrs, nil
 		}
 	}
 	if providerID == "llamacpp" {
@@ -242,7 +265,7 @@ func Resolve(providerID, modelID, cwd string, store *config.Store, httpClient *t
 			Version:     store.String("providers.anthropic-compatible.version"),
 			HTTP:        httpClient,
 			IdleTimeout: idleTimeout,
-			Headers:     def.ExtraHeaders,
+			Headers:     extraHeaders,
 		}), nil
 	case "openai-responses":
 		return openai.NewResponsesClient(openai.Config{
@@ -251,7 +274,8 @@ func Resolve(providerID, modelID, cwd string, store *config.Store, httpClient *t
 			APIKey:      apiKey,
 			HTTP:        httpClient,
 			IdleTimeout: idleTimeout,
-			Headers:     def.ExtraHeaders,
+			Headers:     extraHeaders,
+			RefreshAuth: refreshAuth,
 		}), nil
 	default:
 		return openai.NewChatClient(openai.Config{
@@ -260,7 +284,7 @@ func Resolve(providerID, modelID, cwd string, store *config.Store, httpClient *t
 			APIKey:      apiKey,
 			HTTP:        httpClient,
 			IdleTimeout: idleTimeout,
-			Headers:     def.ExtraHeaders,
+			Headers:     extraHeaders,
 		}), nil
 	}
 }

@@ -67,14 +67,17 @@ func TestTmuxInteractiveTUIE2E(t *testing.T) {
 	_ = exec.Command("tmux", "send-keys", "-t", sessName, "hello from tmux", "Enter").Run()
 	waitForPane("turns · in")
 
-	// Quit cleanly with Ctrl-D.
+	// Wait for prompt to be ready, then quit cleanly with Ctrl-D.
+	time.Sleep(100 * time.Millisecond)
 	_ = exec.Command("tmux", "send-keys", "-t", sessName, "C-d").Run()
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		if err := exec.Command("tmux", "has-session", "-t", sessName).Run(); err != nil {
 			return
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
+		_ = exec.Command("tmux", "send-keys", "-t", sessName, "C-d").Run()
 	}
-	t.Fatal("tmux session did not exit after Ctrl-D")
+	out, _ := exec.Command("tmux", "capture-pane", "-p", "-t", sessName).CombinedOutput()
+	t.Fatalf("tmux session did not exit after Ctrl-D; pane:\n%s", out)
 }
