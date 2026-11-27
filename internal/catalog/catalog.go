@@ -12,6 +12,7 @@ import (
 
 // ModelInfo holds resolved metadata for one model.
 type ModelInfo struct {
+	API            string
 	ContextLimit   int64
 	OutputLimit    int64
 	CostInput      float64
@@ -27,8 +28,11 @@ type rawCatalog map[string]struct {
 }
 
 type rawModel struct {
-	Reasoning  bool `json:"reasoning"`
-	ToolCall   bool `json:"tool_call"`
+	Reasoning bool `json:"reasoning"`
+	ToolCall  bool `json:"tool_call"`
+	Provider  struct {
+		NPM string `json:"npm"`
+	} `json:"provider"`
 	Modalities struct {
 		Input []string `json:"input"`
 	} `json:"modalities"`
@@ -151,6 +155,14 @@ func (s *Store) Lookup(runtimeProvider, catalogID, modelID string) (ModelInfo, b
 		}
 		if m.Interleaved.Field != "" {
 			out.ReasoningField = m.Interleaved.Field
+		}
+		switch m.Provider.NPM {
+		case "@ai-sdk/anthropic":
+			out.API = "anthropic-messages"
+		case "@ai-sdk/openai":
+			out.API = "openai-responses"
+		case "@ai-sdk/openai-compatible":
+			out.API = "openai-completions"
 		}
 		for _, mod := range m.Modalities.Input {
 			if mod == "image" {

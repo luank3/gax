@@ -45,6 +45,13 @@ func LoadCredentials(stateDir, homeDir string) (Credentials, bool, error) {
 			var root map[string]Credentials
 			if json.Unmarshal(b, &root) == nil {
 				if c, ok := root["codex"]; ok && c.AccessToken != "" {
+					if c.ExpiresAt > 0 && c.RefreshToken != "" && time.Now().Unix() >= c.ExpiresAt-60 {
+						if refreshed, rerr := refreshTokens(c.RefreshToken); rerr == nil {
+							refreshed.AccountID = c.AccountID
+							_ = SaveCredentials(stateDir, refreshed)
+							return refreshed, true, nil
+						}
+					}
 					return c, true, nil
 				}
 			}
@@ -248,6 +255,103 @@ func BrowserLogin(ctx context.Context, stateDir string, out io.Writer) error {
 		RefreshToken: tok.RefreshToken,
 		ExpiresAt:    time.Now().Unix() + tok.ExpiresIn,
 	})
+}
+
+func refreshTokens(refreshToken string) (Credentials, error) {
+	form := url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {defaultClientID},
+		"refresh_token": {refreshToken},
+	}
+	resp, err := http.PostForm(defaultAuthBaseURL+"/oauth/token", form)
+	if err != nil {
+		return Credentials{}, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return Credentials{}, fmt.Errorf("refresh HTTP %d", resp.StatusCode)
+	}
+	var tok struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int64  `json:"expires_in"`
+	}
+	if err := json.Unmarshal(raw, &tok); err != nil {
+		return Credentials{}, err
+	}
+	if tok.RefreshToken == "" {
+		tok.RefreshToken = refreshToken
+	}
+	return Credentials{
+		AccessToken:  tok.AccessToken,
+		RefreshToken: tok.RefreshToken,
+		ExpiresAt:    time.Now().Unix() + tok.ExpiresIn,
+	}, nil
+}
+
+// DeviceLogin runs the headless OAuth device-code flow for SSH sessions.
+func DeviceLogin(ctx context.Context, stateDir string, out io.Writer) error {
+	form := url.Values{
+		"client_id": {defaultClientID},
+		"scope":     {"openid profile email offline_access"},
+	}
+	resp, err := http.PostForm(defaultAuthBaseURL+"/oauth/device/code", form)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("device code HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+	}
+	var dc struct {
+		DeviceCode      string `json:"device_code"`
+		UserCode        string `json:"user_code"`
+		VerificationURI string `json:"verification_uri"`
+		Interval        int    `json:"interval"`
+		ExpiresIn       int    `json:"expires_in"`
+	}
+	if err := json.Unmarshal(raw, &dc); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Open %s and enter code: %s\n", dc.VerificationURI, dc.UserCode)
+
+	interval := max(2, dc.Interval)
+	deadline := time.Now().Add(time.Duration(max(60, dc.ExpiresIn)) * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Duration(interval) * time.Second):
+		}
+		pollResp, err := http.PostForm(defaultAuthBaseURL+"/oauth/token", url.Values{
+			"grant_type":  {"urn:ietf:params:oauth:grant-type:device_code"},
+			"client_id":   {defaultClientID},
+			"device_code": {dc.DeviceCode},
+		})
+		if err != nil {
+			continue
+		}
+		pRaw, _ := io.ReadAll(io.LimitReader(pollResp.Body, 64*1024))
+		_ = pollResp.Body.Close()
+		if pollResp.StatusCode >= 200 && pollResp.StatusCode < 300 {
+			var tok struct {
+				AccessToken  string `json:"access_token"`
+				RefreshToken string `json:"refresh_token"`
+				ExpiresIn    int64  `json:"expires_in"`
+			}
+			if err := json.Unmarshal(pRaw, &tok); err != nil {
+				return err
+			}
+			return SaveCredentials(stateDir, Credentials{
+				AccessToken:  tok.AccessToken,
+				RefreshToken: tok.RefreshToken,
+				ExpiresAt:    time.Now().Unix() + tok.ExpiresIn,
+			})
+		}
+	}
+	return fmt.Errorf("device login timed out")
 }
 
 // QueryUsage fetches ChatGPT subscription usage windows for Codex.

@@ -49,6 +49,7 @@ type Options struct {
 	Model         string
 	Effort        string
 	Preset        string
+	ContextLimit  int64
 	StreamOptions provider.StreamOptions
 	Bare          bool
 	Raw           bool
@@ -224,6 +225,7 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 		Catalog:          opts.Catalog,
 		CatalogID:        registry.CatalogIDFor(opts.Provider.ID(), opts.Store),
 		MaxTurns:         int(opts.Store.Int("max_turns")),
+		ContextLimit:     opts.ContextLimit,
 		CompactAuto:      opts.Store.Bool("compact.auto"),
 		CompactThreshold: opts.Store.Int("compact.threshold"),
 		StreamOptions:    opts.StreamOptions,

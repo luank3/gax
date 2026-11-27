@@ -91,6 +91,13 @@ func buildResponsesBody(req provider.StreamRequest) ([]byte, error) {
 			} else {
 				input = append(input, map[string]any{"role": "user", "content": it.Text})
 			}
+		case core.KindReasoning:
+			if it.ReasoningJSON != "" {
+				var rawItem any
+				if json.Unmarshal([]byte(it.ReasoningJSON), &rawItem) == nil {
+					input = append(input, rawItem)
+				}
+			}
 		case core.KindAssistant:
 			if it.Text != "" {
 				input = append(input, map[string]any{"role": "assistant", "content": it.Text})

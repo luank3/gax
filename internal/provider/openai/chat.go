@@ -99,7 +99,18 @@ func buildChatBody(req provider.StreamRequest) ([]byte, error) {
 		switch it.Kind {
 		case core.KindUser:
 			flushAssistant()
-			msgs = append(msgs, map[string]any{"role": "user", "content": it.Text})
+			if len(it.Images) > 0 {
+				parts := []any{map[string]any{"type": "text", "text": it.Text}}
+				for _, img := range it.Images {
+					parts = append(parts, map[string]any{
+						"type":      "image_url",
+						"image_url": map[string]any{"url": "data:" + img.MediaType + ";base64," + img.Data},
+					})
+				}
+				msgs = append(msgs, map[string]any{"role": "user", "content": parts})
+			} else {
+				msgs = append(msgs, map[string]any{"role": "user", "content": it.Text})
+			}
 		case core.KindReasoning:
 			if req.Options.ReasoningRoundtrip == "off" {
 				continue
@@ -153,6 +164,9 @@ func buildChatBody(req provider.StreamRequest) ([]byte, error) {
 		"messages":       msgs,
 		"stream":         true,
 		"stream_options": map[string]any{"include_usage": true},
+	}
+	if req.Options.RequestCost {
+		body["usage"] = map[string]any{"include": true}
 	}
 	if req.Options.Effort != "" {
 		if req.Options.ReasoningFormat == "nested" {

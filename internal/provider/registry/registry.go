@@ -218,6 +218,15 @@ func Resolve(providerID, modelID, cwd string, store *config.Store, httpClient *t
 		baseURL = store.String("providers.anthropic-compatible.base_url")
 		apiKey = store.String("providers.anthropic-compatible.api_key")
 	}
+	if api == "catalog" && modelID != "" {
+		cat := catalog.Load(platform.ResolveDirs().Cache)
+		cat.SetOverrides(store.RawSection("catalog"))
+		if info, ok := cat.Lookup(providerID, def.CatalogID, modelID); ok && info.API != "" {
+			api = info.API
+		} else {
+			api = "openai-completions"
+		}
+	}
 
 	if baseURL == "" {
 		return nil, fmt.Errorf("provider %q has no base_url configured", providerID)
@@ -306,6 +315,12 @@ func ResolveStreamOptions(providerID, modelID string, store *config.Store, cat *
 	}
 	if providerID == "deepseek" {
 		opts.ReasoningRequired = true
+	}
+	if providerID == "openrouter" {
+		opts.RequestCost = true
+	}
+	if providerID == "opencode-zen" || providerID == "opencode-go" {
+		opts.ExtraHeaders = map[string]string{"x-opencode-session": "{session_id}"}
 	}
 	if providerID == "openai-compatible" {
 		opts.ReasoningFormat = store.String("providers.openai-compatible.reasoning_format")
@@ -462,6 +477,30 @@ func llamacppBaseURL(store *config.Store) string {
 		port = 9931
 	}
 	return fmt.Sprintf("http://127.0.0.1:%d/v1", port)
+}
+
+// DiscoverLlamaCpp probes llama-server /models and /props to auto-adopt an unambiguous
+// model and discover its active context window.
+func DiscoverLlamaCpp(ctx context.Context, store *config.Store) (model string, contextLimit int64) {
+	baseURL := llamacppBaseURL(store)
+	apiKey := store.String("providers.llamacpp.api_key")
+	if models, err := openai.ListModels(ctx, baseURL, apiKey, nil); err == nil {
+		if len(models) == 1 {
+			model = models[0].ID
+		} else {
+			var loaded []string
+			for _, m := range models {
+				if m.Loaded {
+					loaded = append(loaded, m.ID)
+				}
+			}
+			if len(loaded) == 1 {
+				model = loaded[0]
+			}
+		}
+	}
+	ctxLim, _ := openai.ProbeLlamaCppProps(ctx, baseURL, apiKey)
+	return model, ctxLim
 }
 
 func probeLocal(url string) bool {

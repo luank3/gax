@@ -18,6 +18,7 @@ import (
 	"github.com/luank3/gax/internal/mcp"
 	"github.com/luank3/gax/internal/oneshot"
 	"github.com/luank3/gax/internal/platform"
+	"github.com/luank3/gax/internal/provider/codex"
 	"github.com/luank3/gax/internal/provider/registry"
 	"github.com/luank3/gax/internal/serve"
 	"github.com/luank3/gax/internal/session"
@@ -150,6 +151,27 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 	}
 	modelID := store.String("model")
 	effort := store.String("effort")
+	if provID == "codex" && (modelID == "" || effort == "") {
+		dm, de := codex.ReadCodexDefaults(dirs.Home)
+		if modelID == "" {
+			modelID = dm
+		}
+		if effort == "" {
+			effort = de
+		}
+	}
+	var discoveredCtx int64
+	if provID == "llamacpp" {
+		dm, dc := registry.DiscoverLlamaCpp(context.Background(), store)
+		if modelID == "" {
+			modelID = dm
+		}
+		discoveredCtx = dc
+	}
+	ctxLimit := store.Int("context_limit")
+	if ctxLimit <= 0 && discoveredCtx > 0 {
+		ctxLimit = discoveredCtx
+	}
 
 	cat := catalog.Load(dirs.Cache)
 	cat.SetOverrides(store.RawSection("catalog"))
@@ -246,6 +268,7 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 			Model:         modelID,
 			Effort:        effort,
 			Preset:        opts.preset,
+			ContextLimit:  ctxLimit,
 			StreamOptions: streamOpts,
 			Bare:          opts.bare,
 			Raw:           opts.raw,
@@ -355,6 +378,7 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 			Model:            modelID,
 			Effort:           effort,
 			MaxTurns:         int(store.Int("max_turns")),
+			ContextLimit:     ctxLimit,
 			CompactAuto:      store.Bool("compact.auto"),
 			CompactThreshold: store.Int("compact.threshold"),
 			StreamOptions:    streamOpts,
@@ -371,6 +395,7 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 		Model:            modelID,
 		Effort:           effort,
 		MaxTurns:         int(store.Int("max_turns")),
+		ContextLimit:     ctxLimit,
 		CompactAuto:      store.Bool("compact.auto"),
 		CompactThreshold: store.Int("compact.threshold"),
 		StreamOptions:    streamOpts,

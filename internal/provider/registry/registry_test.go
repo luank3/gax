@@ -59,4 +59,13 @@ func TestResolveMockAndLlamaCpp(t *testing.T) {
 	if !so.ReasoningRequired {
 		t.Fatal("expected deepseek to set ReasoningRequired=true")
 	}
+	soOR := registry.ResolveStreamOptions("openrouter", "openai/gpt-4o", store, nil)
+	if !soOR.RequestCost {
+		t.Fatal("expected openrouter to set RequestCost=true")
+	}
+	t.Setenv("OPENCODE_API_KEY", "test-key")
+	oc, err := registry.Resolve("opencode-zen", "claude-sonnet-4", "", store, httpClient)
+	if err != nil || oc.ID() != "opencode-zen" {
+		t.Fatalf("Resolve(opencode-zen): %v", err)
+	}
 }

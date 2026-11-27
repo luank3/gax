@@ -56,6 +56,7 @@ type StreamOptions struct {
 	ReasoningFormat    string
 	ReasoningRoundtrip string
 	ReasoningRequired  bool
+	RequestCost        bool
 	SendCacheKey       bool
 	Cache              string
 	CacheTTL           string

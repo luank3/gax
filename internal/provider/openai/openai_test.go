@@ -87,3 +87,31 @@ func TestChatReasoningRequiredAndOverflow(t *testing.T) {
 		t.Fatalf("expected reasoning_content on assistant message when reasoning_required=true: %+v", asst)
 	}
 }
+
+func TestChatImageAndRequestCost(t *testing.T) {
+	var seen map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &seen)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: [DONE]\n\n")
+	}))
+	defer srv.Close()
+
+	c := openai.NewChatClient(openai.Config{
+		ProviderID: "openrouter", BaseURL: srv.URL, APIKey: "k",
+		HTTP: transport.NewClient(transport.RetryPolicy{}, nil),
+	})
+	_ = c.Stream(context.Background(), provider.StreamRequest{
+		Items:   []core.Item{{Kind: core.KindUser, Text: "see", Images: []core.ImageAttachment{{MediaType: "image/png", Data: "AAAA"}}}},
+		Options: provider.StreamOptions{Model: "gpt-5", RequestCost: true},
+	}, func(provider.StreamEvent) {})
+
+	if _, ok := seen["usage"]; !ok {
+		t.Fatal("expected usage.include when RequestCost=true")
+	}
+	msgs := seen["messages"].([]any)
+	if _, ok := msgs[0].(map[string]any)["content"].([]any); !ok {
+		t.Fatalf("expected multipart content array for image, got %T", msgs[0].(map[string]any)["content"])
+	}
+}

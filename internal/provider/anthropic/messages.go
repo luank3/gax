@@ -83,35 +83,80 @@ func buildBody(req provider.StreamRequest) ([]byte, error) {
 	if maxTokens <= 0 {
 		maxTokens = 32000
 	}
+
 	msgs := make([]map[string]any, 0, len(req.Items))
+	appendRoleBlock := func(role string, block any) {
+		if len(msgs) > 0 && msgs[len(msgs)-1]["role"] == role {
+			blocks := msgs[len(msgs)-1]["content"].([]any)
+			msgs[len(msgs)-1]["content"] = append(blocks, block)
+			return
+		}
+		msgs = append(msgs, map[string]any{
+			"role":    role,
+			"content": []any{block},
+		})
+	}
+
 	for _, it := range req.Items {
 		switch it.Kind {
 		case core.KindUser:
-			msgs = append(msgs, map[string]any{"role": "user", "content": it.Text})
+			if it.Text != "" {
+				appendRoleBlock("user", map[string]any{"type": "text", "text": it.Text})
+			}
+			for _, img := range it.Images {
+				appendRoleBlock("user", map[string]any{
+					"type": "image",
+					"source": map[string]any{
+						"type":       "base64",
+						"media_type": img.MediaType,
+						"data":       img.Data,
+					},
+				})
+			}
+		case core.KindReasoning:
+			if it.ReasoningText != "" && it.ReasoningJSON != "" {
+				appendRoleBlock("assistant", map[string]any{
+					"type":      "thinking",
+					"thinking":  it.ReasoningText,
+					"signature": it.ReasoningJSON,
+				})
+			}
 		case core.KindAssistant:
-			msgs = append(msgs, map[string]any{"role": "assistant", "content": it.Text})
+			if it.Text != "" {
+				appendRoleBlock("assistant", map[string]any{"type": "text", "text": it.Text})
+			}
 		case core.KindToolCall:
 			var inputObj any = map[string]any{}
 			if it.Arguments != "" {
 				_ = json.Unmarshal([]byte(it.Arguments), &inputObj)
 			}
-			msgs = append(msgs, map[string]any{
-				"role": "assistant",
-				"content": []any{map[string]any{
-					"type":  "tool_use",
-					"id":    it.CallID,
-					"name":  it.ToolName,
-					"input": inputObj,
-				}},
+			appendRoleBlock("assistant", map[string]any{
+				"type":  "tool_use",
+				"id":    it.CallID,
+				"name":  it.ToolName,
+				"input": inputObj,
 			})
 		case core.KindToolResult:
-			msgs = append(msgs, map[string]any{
-				"role": "user",
-				"content": []any{map[string]any{
-					"type":        "tool_result",
-					"tool_use_id": it.CallID,
-					"content":     it.Output,
-				}},
+			var content any = it.Output
+			if len(it.Images) > 0 {
+				parts := []any{map[string]any{"type": "text", "text": it.Output}}
+				for _, img := range it.Images {
+					parts = append(parts, map[string]any{
+						"type": "image",
+						"source": map[string]any{
+							"type":       "base64",
+							"media_type": img.MediaType,
+							"data":       img.Data,
+						},
+					})
+				}
+				content = parts
+			}
+			appendRoleBlock("user", map[string]any{
+				"type":        "tool_result",
+				"tool_use_id": it.CallID,
+				"content":     content,
+				"is_error":    it.IsError,
 			})
 		}
 	}
@@ -122,6 +167,29 @@ func buildBody(req provider.StreamRequest) ([]byte, error) {
 		"messages":   msgs,
 		"stream":     true,
 	}
+
+	mode := req.Options.ThinkingMode
+	if mode == "" || mode == "auto" {
+		if req.Options.Effort != "" {
+			mode = "adaptive"
+		}
+	} else if mode == "prefer-adaptive" && req.Options.Effort != "" {
+		mode = "adaptive"
+	}
+	switch mode {
+	case "adaptive":
+		body["thinking"] = map[string]any{"type": "adaptive"}
+		if req.Options.Effort != "" {
+			body["output_config"] = map[string]any{"effort": req.Options.Effort}
+		}
+	case "budget":
+		budget := req.Options.ThinkingBudget
+		if budget <= 0 || budget >= maxTokens {
+			budget = max(1024, maxTokens-1)
+		}
+		body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": budget}
+	}
+
 	if req.SystemPrompt != "" {
 		sysBlock := map[string]any{"type": "text", "text": req.SystemPrompt}
 		if req.Options.Cache != "off" {
@@ -156,6 +224,7 @@ func parseSSE(r io.Reader, emit func(provider.StreamEvent), overflowPhrases []st
 		id   string
 		name string
 		args strings.Builder
+		sig  strings.Builder
 	}
 	blocks := make(map[int]*blockAccum)
 	var incompleteLength bool
@@ -177,6 +246,7 @@ func parseSSE(r io.Reader, emit func(provider.StreamEvent), overflowPhrases []st
 				Type        string `json:"type"`
 				Text        string `json:"text"`
 				Thinking    string `json:"thinking"`
+				Signature   string `json:"signature"`
 				PartialJSON string `json:"partial_json"`
 				StopReason  string `json:"stop_reason"`
 			} `json:"delta"`
@@ -219,6 +289,10 @@ func parseSSE(r io.Reader, emit func(provider.StreamEvent), overflowPhrases []st
 				emit(provider.StreamEvent{Kind: provider.EventText, Text: msg.Delta.Text})
 			case "thinking_delta":
 				emit(provider.StreamEvent{Kind: provider.EventReasoning, Text: msg.Delta.Thinking})
+			case "signature_delta":
+				if b, ok := blocks[msg.Index]; ok {
+					b.sig.WriteString(msg.Delta.Signature)
+				}
 			case "input_json_delta":
 				if b, ok := blocks[msg.Index]; ok {
 					b.args.WriteString(msg.Delta.PartialJSON)
@@ -226,12 +300,16 @@ func parseSSE(r io.Reader, emit func(provider.StreamEvent), overflowPhrases []st
 				}
 			}
 		case "content_block_stop":
-			if b, ok := blocks[msg.Index]; ok && b.kind == "tool_use" {
-				args := b.args.String()
-				if args == "" {
-					args = "{}"
+			if b, ok := blocks[msg.Index]; ok {
+				if b.kind == "tool_use" {
+					args := b.args.String()
+					if args == "" {
+						args = "{}"
+					}
+					emit(provider.StreamEvent{Kind: provider.EventToolCallDone, CallID: b.id, ToolName: b.name, Arguments: args})
+				} else if b.kind == "thinking" && b.sig.Len() > 0 {
+					emit(provider.StreamEvent{Kind: provider.EventReasoning, ReasoningJSON: b.sig.String()})
 				}
-				emit(provider.StreamEvent{Kind: provider.EventToolCallDone, CallID: b.id, ToolName: b.name, Arguments: args})
 			}
 		case "message_delta":
 			usage.Output = msg.Usage.OutputTokens

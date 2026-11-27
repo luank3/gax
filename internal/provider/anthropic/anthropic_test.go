@@ -2,6 +2,7 @@ package anthropic_test
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -50,5 +51,44 @@ func TestAnthropicStreamTextAndToolUse(t *testing.T) {
 	}
 	if gotCall != "read" || gotArgs != `{"path":"a.go"}` || gotInput != 30 {
 		t.Fatalf("call=%q args=%q input=%d", gotCall, gotArgs, gotInput)
+	}
+}
+
+func TestAnthropicGroupsToolCallsAndThinking(t *testing.T) {
+	var seen map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &seen)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer srv.Close()
+
+	c := anthropic.NewClient(anthropic.Config{
+		ProviderID: "anthropic", BaseURL: srv.URL, APIKey: "k",
+		HTTP: transport.NewClient(transport.RetryPolicy{}, nil),
+	})
+	_ = c.Stream(context.Background(), provider.StreamRequest{
+		Items: []core.Item{
+			{Kind: core.KindUser, Text: "go", Images: []core.ImageAttachment{{MediaType: "image/png", Data: "AAAA"}}},
+			{Kind: core.KindReasoning, ReasoningText: "plan", ReasoningJSON: "sig123"},
+			{Kind: core.KindToolCall, CallID: "c1", ToolName: "read", Arguments: `{}`},
+			{Kind: core.KindToolCall, CallID: "c2", ToolName: "bash", Arguments: `{}`},
+			{Kind: core.KindToolResult, CallID: "c1", Output: "r1"},
+			{Kind: core.KindToolResult, CallID: "c2", Output: "r2"},
+		},
+		Options: provider.StreamOptions{Model: "claude-sonnet-4-6", Effort: "high"},
+	}, func(provider.StreamEvent) {})
+
+	msgs := seen["messages"].([]any)
+	if len(msgs) != 3 {
+		t.Fatalf("expected 3 grouped messages (user, assistant, user), got %d", len(msgs))
+	}
+	asst := msgs[1].(map[string]any)["content"].([]any)
+	if len(asst) != 3 {
+		t.Fatalf("expected thinking + 2 tool_use blocks grouped in assistant, got %d", len(asst))
+	}
+	if _, ok := seen["thinking"]; !ok {
+		t.Fatal("expected thinking config when effort is set")
 	}
 }
