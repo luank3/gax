@@ -12,7 +12,11 @@ import (
 
 func buildTestBinary(t *testing.T) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "gax")
+	exeOut, err := exec.Command("go", "env", "GOEXE").Output()
+	if err != nil {
+		t.Fatalf("go env GOEXE: %v", err)
+	}
+	bin := filepath.Join(t.TempDir(), "gax"+strings.TrimSpace(string(exeOut)))
 	cmd := exec.Command("go", "build", "-o", bin, ".")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go build: %v\n%s", err, out)
