@@ -427,7 +427,7 @@ func DeviceLogin(ctx context.Context, stateDir string, out io.Writer) error {
 
 // QueryUsage fetches ChatGPT subscription usage windows for Codex.
 func QueryUsage(ctx context.Context, accessToken string, accountID ...string) (provider.UsageReport, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, defaultCodexAPI+"/wham/usage", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://chatgpt.com/backend-api/wham/usage", nil)
 	if err != nil {
 		return provider.UsageReport{}, err
 	}

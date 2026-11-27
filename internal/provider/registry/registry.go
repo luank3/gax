@@ -219,6 +219,14 @@ func Resolve(providerID, modelID, cwd string, store *config.Store, httpClient *t
 			return refreshed.AccessToken, hdrs, nil
 		}
 	}
+	if providerID == "codex" {
+		dirs := platform.ResolveDirs()
+		creds, _, cerr := codex.LoadCredentials(dirs.State, dirs.Home)
+		if cerr != nil {
+			return nil, cerr
+		}
+		apiKey = creds.AccessToken
+	}
 	if providerID == "llamacpp" {
 		if u := store.String("providers.llamacpp.base_url"); u != "" {
 			baseURL = u
@@ -459,6 +467,14 @@ func ListProviderModels(ctx context.Context, providerID string, store *config.St
 			apiKey = os.Getenv(def.APIKeyEnv)
 		}
 	}
+	if providerID == "codex" {
+		dirs := platform.ResolveDirs()
+		creds, _, cerr := codex.LoadCredentials(dirs.State, dirs.Home)
+		if cerr != nil {
+			return nil, cerr
+		}
+		apiKey = creds.AccessToken
+	}
 	if providerID == "llamacpp" {
 		baseURL = llamacppBaseURL(store)
 		apiKey = store.String("providers.llamacpp.api_key")
@@ -480,9 +496,19 @@ func ListProviderModels(ctx context.Context, providerID string, store *config.St
 	if api == "anthropic-messages" {
 		list, err = anthropic.ListModels(ctx, baseURL, apiKey, store.String("providers.anthropic-compatible.version"))
 	} else {
-		var hdr map[string]string
+		hdr := map[string]string{}
 		if def != nil {
-			hdr = def.ExtraHeaders
+			for k, v := range def.ExtraHeaders {
+				hdr[k] = v
+			}
+		}
+		if providerID == "codex" {
+			dirs := platform.ResolveDirs()
+			if creds, _, cerr := codex.LoadCredentials(dirs.State, dirs.Home); cerr == nil && creds.AccountID != "" {
+				hdr["chatgpt-account-id"] = creds.AccountID
+			}
+			hdr["Accept"] = "application/json"
+			delete(hdr, "OpenAI-Beta")
 		}
 		list, err = openai.ListModels(ctx, baseURL, apiKey, hdr)
 	}

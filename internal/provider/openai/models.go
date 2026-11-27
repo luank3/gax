@@ -14,6 +14,9 @@ import (
 // ListModels queries an OpenAI-style /models endpoint (and /props for llamacpp).
 func ListModels(ctx context.Context, baseURL, apiKey string, extraHeaders map[string]string) ([]provider.ModelEntry, error) {
 	url := strings.TrimRight(baseURL, "/") + "/models"
+	if strings.Contains(baseURL, "chatgpt.com/backend-api/codex") {
+		url += "?client_version=999.0.0"
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -22,6 +25,9 @@ func ListModels(ctx context.Context, baseURL, apiKey string, extraHeaders map[st
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 	}
 	for k, v := range extraHeaders {
+		if v == "" || strings.Contains(v, "{session_id}") {
+			continue
+		}
 		req.Header.Set(k, v)
 	}
 	resp, err := http.DefaultClient.Do(req)
@@ -42,11 +48,17 @@ func ListModels(ctx context.Context, baseURL, apiKey string, extraHeaders map[st
 				Value string `json:"value"`
 			} `json:"status"`
 		} `json:"data"`
+		Models []struct {
+			Slug          string `json:"slug"`
+			DisplayName   string `json:"display_name"`
+			ContextWindow int64  `json:"context_window"`
+			Visibility    string `json:"visibility"`
+		} `json:"models"`
 	}
 	if err := json.Unmarshal(raw, &body); err != nil {
 		return nil, err
 	}
-	out := make([]provider.ModelEntry, 0, len(body.Data))
+	out := make([]provider.ModelEntry, 0, len(body.Data)+len(body.Models))
 	for _, m := range body.Data {
 		name := m.Name
 		if name == "" {
@@ -57,6 +69,20 @@ func ListModels(ctx context.Context, baseURL, apiKey string, extraHeaders map[st
 			DisplayName:  name,
 			ContextLimit: m.ContextLength,
 			Loaded:       m.Status.Value == "loaded",
+		})
+	}
+	for _, m := range body.Models {
+		if m.Slug == "" || m.Visibility == "hide" {
+			continue
+		}
+		name := m.DisplayName
+		if name == "" {
+			name = m.Slug
+		}
+		out = append(out, provider.ModelEntry{
+			ID:           m.Slug,
+			DisplayName:  name,
+			ContextLimit: m.ContextWindow,
 		})
 	}
 	return out, nil
