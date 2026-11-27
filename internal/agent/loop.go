@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -47,6 +48,7 @@ type LoopResult struct {
 	Outcome           core.Outcome
 	Turns             int
 	LastContextTokens int64
+	ContextLimit      int64
 	FinalText         string
 	ErrorMessage      string
 }
@@ -75,6 +77,7 @@ func RunLoop(ctx context.Context, opts LoopOptions) LoopResult {
 			opts.ContextLimit = info.ContextLimit
 		}
 	}
+	res.ContextLimit = opts.ContextLimit
 
 	for turn := 0; opts.MaxTurns <= 0 || turn < opts.MaxTurns; turn++ {
 		if opts.Tools != nil {
@@ -263,7 +266,8 @@ func RunLoop(ctx context.Context, opts LoopOptions) LoopResult {
 				})
 				continue
 			}
-			emitEvent(opts.Sink, core.ToolCallStarted{CallID: tc.CallID, Name: tc.ToolName})
+			argsSummary := formatToolArgsSummary(tc.ToolName, tc.Arguments)
+			emitEvent(opts.Sink, core.ToolCallStarted{CallID: tc.CallID, Name: tc.ToolName, ArgsSummary: argsSummary})
 			callT0 := time.Now()
 			var toolRes tools.Result
 			if opts.Tools != nil {
@@ -282,11 +286,12 @@ func RunLoop(ctx context.Context, opts LoopOptions) LoopResult {
 				IsError:  toolRes.IsError,
 			})
 			emitEvent(opts.Sink, core.ToolCallFinished{
-				CallID:     tc.CallID,
-				Name:       tc.ToolName,
-				Summary:    summarizeToolResult(tc.ToolName, toolRes.Text),
-				DurationMS: time.Since(callT0).Milliseconds(),
-				IsError:    toolRes.IsError,
+				CallID:      tc.CallID,
+				Name:        tc.ToolName,
+				ArgsSummary: argsSummary,
+				Summary:     summarizeToolResult(tc.ToolName, toolRes.Text),
+				DurationMS:  time.Since(callT0).Milliseconds(),
+				IsError:     toolRes.IsError,
 			})
 		}
 
@@ -312,6 +317,75 @@ func emitEvent(sink core.EventSink, ev core.Event) {
 	if sink != nil {
 		sink.Emit(ev)
 	}
+}
+
+func formatToolArgsSummary(name, rawArgs string) string {
+	rawArgs = strings.TrimSpace(rawArgs)
+	if rawArgs == "" || rawArgs == "{}" {
+		return ""
+	}
+	var m map[string]any
+	if json.Unmarshal([]byte(rawArgs), &m) != nil {
+		return collapsePreview(rawArgs, 80)
+	}
+	str := func(k string) string {
+		if v, ok := m[k].(string); ok {
+			return v
+		}
+		return ""
+	}
+	switch name {
+	case "bash":
+		if c := str("command"); c != "" {
+			return "$ " + collapsePreview(c, 80)
+		}
+	case "read":
+		p := str("path")
+		if p != "" {
+			if off, ok := m["offset"].(float64); ok && off > 0 {
+				if lim, ok := m["limit"].(float64); ok && lim > 0 {
+					return fmt.Sprintf("%s:%d+%d", p, int(off), int(lim))
+				}
+				return fmt.Sprintf("%s:%d", p, int(off))
+			}
+			return p
+		}
+	case "write", "edit":
+		if p := str("path"); p != "" {
+			return p
+		}
+	case "web_fetch":
+		if u := str("url"); u != "" {
+			return collapsePreview(u, 80)
+		}
+	case "web_search":
+		if q := str("query"); q != "" {
+			return collapsePreview(q, 80)
+		}
+	case "skill":
+		if s := str("name"); s != "" {
+			return s
+		}
+	case "task_wait", "task_stop", "task_output":
+		if id := str("id"); id != "" {
+			return id
+		}
+	}
+	for _, k := range []string{"path", "command", "query", "url", "name", "id"} {
+		if v := str(k); v != "" {
+			return collapsePreview(v, 80)
+		}
+	}
+	return collapsePreview(rawArgs, 80)
+}
+
+func collapsePreview(s string, maxRunes int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	rs := []rune(s)
+	if len(rs) > maxRunes && maxRunes > 3 {
+		return string(rs[:maxRunes-3]) + "..."
+	}
+	return s
 }
 
 func summarizeToolResult(name, text string) string {

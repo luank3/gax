@@ -68,11 +68,12 @@ type ToolOutputDelta struct {
 func (ToolOutputDelta) isAgentEvent() {}
 
 type ToolCallFinished struct {
-	CallID     string
-	Name       string
-	Summary    string
-	DurationMS int64
-	IsError    bool
+	CallID      string
+	Name        string
+	ArgsSummary string
+	Summary     string
+	DurationMS  int64
+	IsError     bool
 }
 
 func (ToolCallFinished) isAgentEvent() {}

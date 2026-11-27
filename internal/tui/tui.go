@@ -357,10 +357,16 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 					region.Clear()
 				}
 				mark := "✓"
+				color := pal.Tool
 				if e.IsError {
 					mark = "✗"
+					color = pal.Error
 				}
-				fmt.Fprintf(opts.Stdout, "%s%s %s (%dms)%s\n", pal.Tool, mark, e.Name, e.DurationMS, pal.Reset)
+				if e.ArgsSummary != "" {
+					fmt.Fprintf(opts.Stdout, "%s%s %s%s %s %s(%dms)%s\n", color, mark, e.Name, pal.Reset, e.ArgsSummary, pal.Dim, e.DurationMS, pal.Reset)
+				} else {
+					fmt.Fprintf(opts.Stdout, "%s%s %s %s(%dms)%s\n", color, mark, e.Name, pal.Dim, e.DurationMS, pal.Reset)
+				}
 				if strings.HasPrefix(e.Summary, "--- ") {
 					printColoredDiff(opts.Stdout, e.Summary, pal)
 				} else if sum := truncateSingleLine(e.Summary, max(24, cols-4)); sum != "" {
@@ -386,9 +392,35 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 		fmt.Fprintf(opts.Stdout, "%serror: %s%s\n", pal.Error, res.ErrorMessage, pal.Reset)
 	}
 	totals := opts.Session.Totals()
-	fmt.Fprintf(opts.Stdout, "%s%s · %d turns · in %d · out %d · $%.4f%s\n\n",
-		pal.Dim, time.Since(t0).Round(time.Millisecond), res.Turns, totals.InputTokens, totals.OutputTokens, totals.CostTotal, pal.Reset)
+	ctxPart := formatContextUsage(res.LastContextTokens, res.ContextLimit)
+	if ctxPart != "" {
+		ctxPart = " · " + ctxPart
+	}
+	fmt.Fprintf(opts.Stdout, "%s%s · %d turns · in %d · out %d%s · $%.4f%s\n\n",
+		pal.Dim, time.Since(t0).Round(time.Millisecond), res.Turns, totals.InputTokens, totals.OutputTokens, ctxPart, totals.CostTotal, pal.Reset)
 	return res
+}
+
+func formatContextUsage(used, limit int64) string {
+	if used <= 0 {
+		return ""
+	}
+	if limit > 0 {
+		pct := (used * 100) / limit
+		return fmt.Sprintf("ctx %s/%s (%d%%)", formatTokenCount(used), formatTokenCount(limit), pct)
+	}
+	return "ctx " + formatTokenCount(used)
+}
+
+func formatTokenCount(n int64) string {
+	switch {
+	case n >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+	case n >= 1_000:
+		return fmt.Sprintf("%.1fk", float64(n)/1_000)
+	default:
+		return fmt.Sprintf("%d", n)
+	}
 }
 
 type inputAction uint8
@@ -671,8 +703,29 @@ func handleSlashCommand(ctx context.Context, line string, opts *Options, paused 
 		return true
 	case "/session":
 		st := opts.Session.Totals()
-		fmt.Fprintf(opts.Stdout, "session %s · %s · %s · turns=%d · in=%d · out=%d · cost=$%.4f\n",
-			opts.Session.Header.ID, opts.Provider.ID(), opts.Model, st.Turns, st.InputTokens, st.OutputTokens, st.CostTotal)
+		ctxLim := opts.ContextLimit
+		if ctxLim <= 0 && opts.Catalog != nil && opts.Model != "" {
+			if info, ok := opts.Catalog.Lookup(opts.Provider.ID(), registry.CatalogIDFor(opts.Provider.ID(), opts.Store), opts.Model); ok {
+				ctxLim = info.ContextLimit
+			}
+		}
+		var lastCtx int64
+		for i := len(opts.Session.Items) - 1; i >= 0; i-- {
+			it := opts.Session.Items[i]
+			if it.Kind == core.KindTurnUsage && it.Usage != nil && !it.Inherited {
+				lastCtx = it.Usage.Input + it.Usage.Output
+				break
+			}
+		}
+		ctxStr := formatContextUsage(lastCtx, ctxLim)
+		if ctxStr == "" && ctxLim > 0 {
+			ctxStr = "ctx 0/" + formatTokenCount(ctxLim)
+		}
+		if ctxStr != "" {
+			ctxStr = " · " + ctxStr
+		}
+		fmt.Fprintf(opts.Stdout, "session %s · %s · %s · turns=%d · in=%d · out=%d%s · cost=$%.4f\n",
+			opts.Session.Header.ID, opts.Provider.ID(), opts.Model, st.Turns, st.InputTokens, st.OutputTokens, ctxStr, st.CostTotal)
 		return true
 	case "/new", "/clear":
 		opts.Session = agent.NewSession(core.SessionHeader{
@@ -706,6 +759,7 @@ func handleSlashCommand(ctx context.Context, line string, opts *Options, paused 
 		fmt.Fprintf(opts.Stdout, "provider: %s\n", prov.ID())
 		return true
 	case "/model":
+		var pickedLimit int64
 		if arg == "" {
 			models, err := registry.ListProviderModels(ctx, opts.Provider.ID(), opts.Store)
 			if err != nil {
@@ -713,16 +767,24 @@ func handleSlashCommand(ctx context.Context, line string, opts *Options, paused 
 				return true
 			}
 			items := make([]picker.Item, 0, len(models))
+			limits := make(map[string]int64, len(models))
 			for _, m := range models {
 				items = append(items, picker.Item{ID: m.ID, Label: m.DisplayName})
+				limits[m.ID] = m.ContextLimit
 			}
 			chosen, _ := picker.Run("model", items, opts.StdinFile, opts.Stdout)
 			if chosen == nil {
 				return true
 			}
 			arg = chosen.ID
+			pickedLimit = limits[arg]
 		}
 		opts.Model = arg
+		if pickedLimit > 0 {
+			opts.ContextLimit = pickedLimit
+		} else if opts.Store.Int("context_limit") <= 0 {
+			opts.ContextLimit = 0
+		}
 		opts.StreamOptions = registry.ResolveStreamOptions(opts.Provider.ID(), opts.Model, opts.Store, opts.Catalog)
 		_ = opts.Store.SaveState("model", opts.Model)
 		fmt.Fprintf(opts.Stdout, "model: %s\n", opts.Model)

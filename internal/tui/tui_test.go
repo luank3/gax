@@ -41,7 +41,7 @@ func TestTUISlashCommandsAndMockTurn(t *testing.T) {
 		t.Fatalf("expected exit 0, got %d", code)
 	}
 	text := out.String()
-	for _, want := range []string{"gax v2-test · mock", "/provider", "session tui-1", "hello tui", "rolled back to 0", "no background tasks", "saved preset \"fav\"", "started a new conversation"} {
+	for _, want := range []string{"gax v2-test · mock", "/provider", "session tui-1", "hello tui", "ctx 15", "rolled back to 0", "no background tasks", "saved preset \"fav\"", "started a new conversation"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("missing %q in TUI output:\n%s", want, text)
 		}
