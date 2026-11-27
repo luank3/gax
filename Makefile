@@ -1,4 +1,4 @@
-.PHONY: web build test test-race vet fmt fmt-check lint cross clean
+.PHONY: web build test test-race vet fmt fmt-check lint cross budget clean
 
 VERSION ?= dev
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -35,6 +35,9 @@ cross: web
 		ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
 		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -tags webui -trimpath -ldflags="$(LDFLAGS)" -o bin/cross/gax-$$os-$$arch$$ext ./cmd/gax || exit 1; \
 	done
+
+budget: cross
+	./scripts/check-budgets.sh
 
 clean:
 	rm -rf bin dist
