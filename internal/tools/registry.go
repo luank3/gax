@@ -11,6 +11,7 @@ import (
 
 	"github.com/luank3/gax/internal/config"
 	"github.com/luank3/gax/internal/core"
+	"github.com/luank3/gax/internal/web"
 )
 
 // OutputSink receives live streamed tool output chunks (e.g., bash stdout/stderr).
@@ -60,6 +61,11 @@ func NewRegistry(cwd string, store *config.Store) *Registry {
 	}
 	if !store.Bool("no_skills") {
 		r.Register(&skillTool{reg: r})
+	}
+	if !store.Bool("no_web") {
+		wc := web.NewClient()
+		r.Register(&webFetchTool{reg: r, client: wc})
+		r.Register(&webSearchTool{reg: r, client: wc})
 	}
 	return r
 }

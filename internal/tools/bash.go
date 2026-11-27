@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/luank3/gax/internal/bashcompress"
 	"github.com/luank3/gax/internal/core"
 	"github.com/luank3/gax/internal/platform"
 	"github.com/luank3/gax/internal/subagent"
@@ -137,7 +138,8 @@ func (t *bashTool) Run(ctx context.Context, arguments string, sink OutputSink) R
 	select {
 	case <-done:
 		_ = pg.Close()
-		out := capOutput(ring.String(), t.reg.outputCap(), "gax-bash")
+		rawOut := ring.String()
+		out := formatBashOutput(args.Command, rawOut, waitErr, args.Raw, t.reg)
 		if waitErr != nil {
 			return Result{Text: fmt.Sprintf("exit error: %v\n%s", waitErr, out), IsError: true}
 		}
@@ -189,4 +191,25 @@ func (t *bashTool) Run(ctx context.Context, arguments string, sink OutputSink) R
 				id, timeout, capOutput(ring.String(), t.reg.outputCap(), "gax-bash")),
 		}
 	}
+}
+
+func formatBashOutput(command, rawOut string, waitErr error, rawFlag bool, reg *Registry) string {
+	if !rawFlag && reg.store.Bool("bash.compress") {
+		exitCode := 0
+		if waitErr != nil {
+			exitCode = 1
+		}
+		if res, ok := bashcompress.Compress(command, rawOut, exitCode); ok {
+			if res.Omitted {
+				if f, err := os.CreateTemp("", "gax-bash-full-*.log"); err == nil {
+					_, _ = f.WriteString(rawOut)
+					fullPath := f.Name()
+					_ = f.Close()
+					return res.Text + fmt.Sprintf("\n[full output saved to %s; pass raw: true to bypass compression]", fullPath)
+				}
+			}
+			return res.Text
+		}
+	}
+	return capOutput(rawOut, reg.outputCap(), "gax-bash")
 }
