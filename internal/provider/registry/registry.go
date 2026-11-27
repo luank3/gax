@@ -3,15 +3,22 @@
 package registry
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"path"
 	"strings"
+	"time"
 
+	"github.com/luank3/gax/internal/catalog"
 	"github.com/luank3/gax/internal/config"
+	"github.com/luank3/gax/internal/platform"
 	"github.com/luank3/gax/internal/provider"
 	"github.com/luank3/gax/internal/provider/anthropic"
+	"github.com/luank3/gax/internal/provider/codex"
 	"github.com/luank3/gax/internal/provider/mock"
+	"github.com/luank3/gax/internal/provider/modelsort"
 	"github.com/luank3/gax/internal/provider/openai"
 	"github.com/luank3/gax/internal/transport"
 )
@@ -178,6 +185,14 @@ func Resolve(providerID, modelID, cwd string, store *config.Store, httpClient *t
 		}
 	}
 
+	if providerID == "codex" {
+		dirs := platform.ResolveDirs()
+		if creds, _, cerr := codex.LoadCredentials(dirs.State, dirs.Home); cerr == nil {
+			apiKey = creds.AccessToken
+		} else {
+			return nil, cerr
+		}
+	}
 	if providerID == "llamacpp" {
 		if u := store.String("providers.llamacpp.base_url"); u != "" {
 			baseURL = u
@@ -239,4 +254,222 @@ func Resolve(providerID, modelID, cwd string, store *config.Store, httpClient *t
 			Headers:     def.ExtraHeaders,
 		}), nil
 	}
+}
+
+// AutoSelect picks the first available provider in hax priority order, returning ""
+// if none is configured or reachable.
+func AutoSelect(store *config.Store) string {
+	dirs := platform.ResolveDirs()
+	if _, _, err := codex.LoadCredentials(dirs.State, dirs.Home); err == nil {
+		return "codex"
+	}
+	for _, d := range Shipped {
+		if d.Internal || d.APIKeyEnv == "" {
+			continue
+		}
+		if os.Getenv(d.APIKeyEnv) != "" {
+			return d.ID
+		}
+	}
+	if probeLocal(llamacppBaseURL(store) + "/models") {
+		return "llamacpp"
+	}
+	if probeLocal("http://127.0.0.1:11434/v1/models") {
+		return "ollama"
+	}
+	if store.String("providers.openai-compatible.base_url") != "" {
+		return "openai-compatible"
+	}
+	if store.String("providers.anthropic-compatible.base_url") != "" {
+		return "anthropic-compatible"
+	}
+	for _, d := range AvailableProviders(store) {
+		if !isShipped(d.ID) {
+			return d.ID
+		}
+	}
+	return ""
+}
+
+// ResolveStreamOptions populates StreamOptions from providers.<id> config and catalog metadata.
+func ResolveStreamOptions(providerID, modelID string, store *config.Store, cat *catalog.Store) provider.StreamOptions {
+	var opts provider.StreamOptions
+	var def *Def
+	for i := range Shipped {
+		if Shipped[i].ID == providerID {
+			def = &Shipped[i]
+			break
+		}
+	}
+	if def != nil {
+		opts.SendCacheKey = def.SendCacheKey
+	}
+	if providerID == "deepseek" {
+		opts.ReasoningRequired = true
+	}
+	if providerID == "openai-compatible" {
+		opts.ReasoningFormat = store.String("providers.openai-compatible.reasoning_format")
+		opts.ReasoningRoundtrip = store.String("providers.openai-compatible.reasoning_roundtrip")
+		if req := store.String("providers.openai-compatible.reasoning_required"); req != "" && req != "auto" {
+			if b, ok := config.ParseBool(req); ok {
+				opts.ReasoningRequired = b
+			}
+		}
+		opts.Cache = store.String("providers.openai-compatible.cache")
+		opts.CacheTTL = store.String("providers.openai-compatible.cache_ttl")
+	}
+	if providerID == "anthropic-compatible" {
+		opts.MaxTokens = store.Int("providers.anthropic-compatible.max_tokens")
+		opts.ThinkingMode = store.String("providers.anthropic-compatible.thinking_mode")
+		opts.ThinkingBudget = store.Int("providers.anthropic-compatible.thinking_budget")
+		opts.Cache = store.String("providers.anthropic-compatible.cache")
+		opts.CacheTTL = store.String("providers.anthropic-compatible.cache_ttl")
+	}
+
+	catalogID := ""
+	if def != nil {
+		catalogID = def.CatalogID
+	}
+	if rawProviders := store.RawSection("providers"); rawProviders != nil {
+		if block, ok := rawProviders[providerID].(map[string]any); ok {
+			if cid, ok := block["catalog_id"].(string); ok && cid != "" {
+				catalogID = cid
+			}
+			if eb, ok := block["extra_body"].(map[string]any); ok {
+				opts.ExtraBody = eb
+			}
+			if eh, ok := block["extra_headers"].(map[string]any); ok {
+				opts.ExtraHeaders = make(map[string]string, len(eh))
+				for k, v := range eh {
+					if s, ok := v.(string); ok {
+						opts.ExtraHeaders[k] = s
+					}
+				}
+			}
+			if rf, ok := block["reasoning_format"].(string); ok && rf != "" {
+				opts.ReasoningFormat = rf
+			}
+			if rr, ok := block["reasoning_roundtrip"].(string); ok && rr != "" {
+				opts.ReasoningRoundtrip = rr
+			}
+			if req, ok := block["reasoning_required"].(bool); ok {
+				opts.ReasoningRequired = req
+			}
+			if op, ok := block["overflow_phrases"].([]any); ok {
+				for _, p := range op {
+					if s, ok := p.(string); ok && s != "" {
+						opts.OverflowPhrases = append(opts.OverflowPhrases, s)
+					}
+				}
+			}
+		}
+	}
+
+	if cat != nil && modelID != "" {
+		if info, ok := cat.Lookup(providerID, catalogID, modelID); ok {
+			if info.ReasoningField != "" {
+				if opts.ReasoningRoundtrip == "" || opts.ReasoningRoundtrip == "auto" {
+					opts.ReasoningRoundtrip = info.ReasoningField
+				}
+				opts.ReasoningRequired = true
+			}
+			if opts.MaxTokens == 0 && info.OutputLimit > 0 {
+				opts.MaxTokens = info.OutputLimit
+			}
+		}
+	}
+	return opts
+}
+
+// CatalogIDFor returns the models.dev catalog id for providerID.
+func CatalogIDFor(providerID string, store *config.Store) string {
+	for _, d := range Shipped {
+		if d.ID == providerID {
+			return d.CatalogID
+		}
+	}
+	if rawProviders := store.RawSection("providers"); rawProviders != nil {
+		if block, ok := rawProviders[providerID].(map[string]any); ok {
+			if cid, ok := block["catalog_id"].(string); ok {
+				return cid
+			}
+		}
+	}
+	return ""
+}
+
+// ListProviderModels queries /models for providerID and sorts newest-first unless disabled.
+func ListProviderModels(ctx context.Context, providerID string, store *config.Store) ([]provider.ModelEntry, error) {
+	var def *Def
+	for i := range Shipped {
+		if Shipped[i].ID == providerID {
+			def = &Shipped[i]
+			break
+		}
+	}
+	baseURL := ""
+	apiKey := ""
+	api := "openai-completions"
+	if def != nil {
+		baseURL = def.BaseURL
+		api = def.API
+		if def.APIKeyEnv != "" {
+			apiKey = os.Getenv(def.APIKeyEnv)
+		}
+	}
+	if providerID == "llamacpp" {
+		baseURL = llamacppBaseURL(store)
+		apiKey = store.String("providers.llamacpp.api_key")
+	}
+	if providerID == "openai-compatible" {
+		baseURL = store.String("providers.openai-compatible.base_url")
+		apiKey = store.String("providers.openai-compatible.api_key")
+	}
+	if providerID == "anthropic-compatible" {
+		baseURL = store.String("providers.anthropic-compatible.base_url")
+		apiKey = store.String("providers.anthropic-compatible.api_key")
+		api = "anthropic-messages"
+	}
+	if baseURL == "" {
+		return nil, fmt.Errorf("provider %q has no base_url", providerID)
+	}
+	var list []provider.ModelEntry
+	var err error
+	if api == "anthropic-messages" {
+		list, err = anthropic.ListModels(ctx, baseURL, apiKey, store.String("providers.anthropic-compatible.version"))
+	} else {
+		var hdr map[string]string
+		if def != nil {
+			hdr = def.ExtraHeaders
+		}
+		list, err = openai.ListModels(ctx, baseURL, apiKey, hdr)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if store.String("sort_models") != "off" {
+		modelsort.Sort(list)
+	}
+	return list, nil
+}
+
+func llamacppBaseURL(store *config.Store) string {
+	if u := store.String("providers.llamacpp.base_url"); u != "" {
+		return u
+	}
+	port := store.Int("providers.llamacpp.port")
+	if port <= 0 {
+		port = 9931
+	}
+	return fmt.Sprintf("http://127.0.0.1:%d/v1", port)
+}
+
+func probeLocal(url string) bool {
+	c := &http.Client{Timeout: 250 * time.Millisecond}
+	resp, err := c.Get(url)
+	if err != nil {
+		return false
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode >= 200 && resp.StatusCode < 500
 }

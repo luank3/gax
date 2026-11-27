@@ -49,4 +49,14 @@ func TestResolveMockAndLlamaCpp(t *testing.T) {
 	if err != nil || l.ID() != "llamacpp" {
 		t.Fatalf("Resolve(llamacpp): %v", err)
 	}
+
+	t.Setenv("OPENAI_API_KEY", "sk-test")
+	if got := registry.AutoSelect(store); got == "" {
+		t.Fatal("expected AutoSelect to pick an available provider")
+	}
+
+	so := registry.ResolveStreamOptions("deepseek", "deepseek-chat", store, nil)
+	if !so.ReasoningRequired {
+		t.Fatal("expected deepseek to set ReasoningRequired=true")
+	}
 }

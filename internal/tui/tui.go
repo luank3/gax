@@ -13,10 +13,12 @@ import (
 	"time"
 
 	"github.com/luank3/gax/internal/agent"
+	"github.com/luank3/gax/internal/catalog"
 	"github.com/luank3/gax/internal/config"
 	"github.com/luank3/gax/internal/core"
 	"github.com/luank3/gax/internal/platform"
 	"github.com/luank3/gax/internal/provider"
+	"github.com/luank3/gax/internal/provider/codex"
 	"github.com/luank3/gax/internal/provider/registry"
 	"github.com/luank3/gax/internal/session"
 	"github.com/luank3/gax/internal/tools"
@@ -34,25 +36,27 @@ import (
 
 // Options configures an interactive TUI session.
 type Options struct {
-	CWD        string
-	StateDir   string
-	Version    string
-	Store      *config.Store
-	HTTPClient *transport.Client
-	Session    *agent.Session
-	Writer     *session.Writer
-	Provider   provider.Client
-	Tools      *tools.Registry
-	Model      string
-	Effort     string
-	Preset     string
-	Bare       bool
-	Raw        bool
-	Stdin      io.Reader
-	StdinFile  *os.File
-	Stdout     io.Writer
-	StdoutFile *os.File
-	Stderr     io.Writer
+	CWD           string
+	StateDir      string
+	Version       string
+	Store         *config.Store
+	Catalog       *catalog.Store
+	HTTPClient    *transport.Client
+	Session       *agent.Session
+	Writer        *session.Writer
+	Provider      provider.Client
+	Tools         *tools.Registry
+	Model         string
+	Effort        string
+	Preset        string
+	StreamOptions provider.StreamOptions
+	Bare          bool
+	Raw           bool
+	Stdin         io.Reader
+	StdinFile     *os.File
+	Stdout        io.Writer
+	StdoutFile    *os.File
+	Stderr        io.Writer
 }
 
 // Run runs the interactive terminal REPL until EOF, Ctrl-C twice, or Ctrl-D.
@@ -191,9 +195,12 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 		Model:            opts.Model,
 		Effort:           opts.Effort,
 		SessionID:        opts.Session.Header.ID,
+		Catalog:          opts.Catalog,
+		CatalogID:        registry.CatalogIDFor(opts.Provider.ID(), opts.Store),
 		MaxTurns:         int(opts.Store.Int("max_turns")),
 		CompactAuto:      opts.Store.Bool("compact.auto"),
 		CompactThreshold: opts.Store.Int("compact.threshold"),
+		StreamOptions:    opts.StreamOptions,
 		Sink: core.EventFunc(func(ev core.Event) {
 			switch e := ev.(type) {
 			case core.TextDelta:
@@ -400,15 +407,51 @@ func handleSlashCommand(ctx context.Context, line string, opts *Options, paused 
 			return true
 		}
 		opts.Provider = prov
+		opts.StreamOptions = registry.ResolveStreamOptions(prov.ID(), opts.Model, opts.Store, opts.Catalog)
 		fmt.Fprintf(opts.Stdout, "provider: %s\n", prov.ID())
 		return true
 	case "/model":
 		if arg == "" {
-			fmt.Fprintf(opts.Stdout, "current model: %s\n", opts.Model)
-			return true
+			models, err := registry.ListProviderModels(ctx, opts.Provider.ID(), opts.Store)
+			if err != nil {
+				fmt.Fprintf(opts.Stdout, "current model: %s (%v)\n", opts.Model, err)
+				return true
+			}
+			items := make([]picker.Item, 0, len(models))
+			for _, m := range models {
+				items = append(items, picker.Item{ID: m.ID, Label: m.DisplayName})
+			}
+			chosen, _ := picker.Run("model", items, opts.StdinFile, opts.Stdout)
+			if chosen == nil {
+				return true
+			}
+			arg = chosen.ID
 		}
 		opts.Model = arg
+		opts.StreamOptions = registry.ResolveStreamOptions(opts.Provider.ID(), opts.Model, opts.Store, opts.Catalog)
 		fmt.Fprintf(opts.Stdout, "model: %s\n", opts.Model)
+		return true
+	case "/usage":
+		rep, err := registry.QueryAccountUsage(ctx, opts.Provider.ID())
+		if err != nil {
+			fmt.Fprintf(opts.Stdout, "%s%v%s\n", pal.Error, err, pal.Reset)
+		} else {
+			fmt.Fprintln(opts.Stdout, rep.Summary)
+		}
+		return true
+	case "/login":
+		if err := codex.BrowserLogin(ctx, opts.StateDir, opts.Stdout); err != nil {
+			fmt.Fprintf(opts.Stdout, "%slogin failed: %v%s\n", pal.Error, err, pal.Reset)
+		} else {
+			fmt.Fprintln(opts.Stdout, "codex login saved")
+		}
+		return true
+	case "/logout":
+		if err := codex.RemoveCredentials(opts.StateDir); err != nil {
+			fmt.Fprintf(opts.Stdout, "%slogout failed: %v%s\n", pal.Error, err, pal.Reset)
+		} else {
+			fmt.Fprintln(opts.Stdout, "codex login removed")
+		}
 		return true
 	case "/effort":
 		opts.Effort = arg

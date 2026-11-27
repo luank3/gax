@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/luank3/gax/internal/catalog"
 	"github.com/luank3/gax/internal/core"
 	"github.com/luank3/gax/internal/provider"
 	"github.com/luank3/gax/internal/tools"
@@ -29,6 +30,8 @@ type LoopOptions struct {
 	Model            string
 	Effort           string
 	SessionID        string
+	Catalog          *catalog.Store
+	CatalogID        string
 	MaxTurns         int
 	ContextLimit     int64
 	CompactAuto      bool
@@ -66,6 +69,11 @@ func RunLoop(ctx context.Context, opts LoopOptions) LoopResult {
 
 	compactFailures := 0
 	autoCompact := opts.CompactAuto
+	if opts.ContextLimit <= 0 && opts.Catalog != nil && opts.Model != "" {
+		if info, ok := opts.Catalog.Lookup(opts.Provider.ID(), opts.CatalogID, opts.Model); ok && info.ContextLimit > 0 {
+			opts.ContextLimit = info.ContextLimit
+		}
+	}
 
 	for turn := 0; opts.MaxTurns <= 0 || turn < opts.MaxTurns; turn++ {
 		if opts.Tools != nil {
@@ -214,6 +222,17 @@ func RunLoop(ctx context.Context, opts LoopOptions) LoopResult {
 		}
 		if turnUsage != nil {
 			turnUsage.ElapsedMS = time.Since(t0).Milliseconds()
+			if turnUsage.CostTotal == 0 && opts.Catalog != nil && opts.Model != "" {
+				if info, ok := opts.Catalog.Lookup(opts.Provider.ID(), opts.CatalogID, opts.Model); ok {
+					turnUsage.CostInput = float64(turnUsage.InTokens) * info.CostInput / 1e6
+					turnUsage.CostOutput = float64(turnUsage.Output) * info.CostOutput / 1e6
+					turnUsage.CostCached = float64(turnUsage.Cached) * info.CostCacheRead / 1e6
+					turnUsage.CostTotal = turnUsage.CostInput + turnUsage.CostOutput + turnUsage.CostCached
+					if turnUsage.CostTotal > 0 {
+						turnUsage.CostEstimated = true
+					}
+				}
+			}
 			res.LastContextTokens = turnUsage.Input + turnUsage.Output
 			opts.Session.Append(core.Item{
 				Kind:     core.KindTurnUsage,

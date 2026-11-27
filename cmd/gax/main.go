@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/luank3/gax/internal/agent"
+	"github.com/luank3/gax/internal/catalog"
 	"github.com/luank3/gax/internal/config"
 	"github.com/luank3/gax/internal/core"
 	"github.com/luank3/gax/internal/jsonstream"
@@ -141,10 +142,36 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 
 	provID := store.String("provider")
 	if provID == "" || provID == "auto" {
-		provID = "mock"
+		provID = registry.AutoSelect(store)
+		if provID == "" {
+			fmt.Fprintln(stderr, "gax: no provider available (set an API key, run /login, or pass --provider)")
+			return 1
+		}
 	}
 	modelID := store.String("model")
 	effort := store.String("effort")
+
+	cat := catalog.Load(dirs.Cache)
+	cat.SetOverrides(store.RawSection("catalog"))
+	if cid := registry.CatalogIDFor(provID, store); cid != "" && cat.NeedsRefresh(store.Duration("catalog.refresh")) {
+		if u := store.String("catalog.url"); u != "" {
+			go func() {
+				_ = cat.Refresh(context.Background(), u, func(c context.Context, target string) ([]byte, error) {
+					req, err := http.NewRequestWithContext(c, http.MethodGet, target, nil)
+					if err != nil {
+						return nil, err
+					}
+					resp, err := http.DefaultClient.Do(req)
+					if err != nil {
+						return nil, err
+					}
+					defer resp.Body.Close()
+					return io.ReadAll(io.LimitReader(resp.Body, 16<<20))
+				})
+			}()
+		}
+	}
+	streamOpts := registry.ResolveStreamOptions(provID, modelID, store, cat)
 
 	tracer, _ := wiretrace.Open(store.String("trace"))
 	if tracer != nil {
@@ -192,25 +219,41 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 			sess.Header = loaded.Header
 			sess.Items = append(sess.Items, loaded.LiveItems...)
 		}
+		recordTUI := !store.Bool("no_session") && !(store.String("no_session") == "auto" && provID == "mock")
+		var tuiWriter *session.Writer
+		if recordTUI {
+			if loaded != nil {
+				tuiWriter, _ = session.OpenAppend(loaded.Path)
+			} else {
+				tuiWriter, _ = session.Create(dirs.State, cwd, sess.Header)
+			}
+			if tuiWriter != nil {
+				defer tuiWriter.Close()
+				sess.SetOnAppend(func(it core.Item) { _ = tuiWriter.AppendItem(it) })
+			}
+		}
 		return tui.Run(context.Background(), tui.Options{
-			CWD:        cwd,
-			StateDir:   dirs.State,
-			Version:    version,
-			Store:      store,
-			HTTPClient: httpClient,
-			Session:    sess,
-			Provider:   prov,
-			Tools:      toolReg,
-			Model:      modelID,
-			Effort:     effort,
-			Preset:     opts.preset,
-			Bare:       opts.bare,
-			Raw:        opts.raw,
-			Stdin:      stdin,
-			StdinFile:  os.Stdin,
-			Stdout:     stdout,
-			StdoutFile: os.Stdout,
-			Stderr:     stderr,
+			CWD:           cwd,
+			StateDir:      dirs.State,
+			Version:       version,
+			Store:         store,
+			Catalog:       cat,
+			HTTPClient:    httpClient,
+			Session:       sess,
+			Writer:        tuiWriter,
+			Provider:      prov,
+			Tools:         toolReg,
+			Model:         modelID,
+			Effort:        effort,
+			Preset:        opts.preset,
+			StreamOptions: streamOpts,
+			Bare:          opts.bare,
+			Raw:           opts.raw,
+			Stdin:         stdin,
+			StdinFile:     os.Stdin,
+			Stdout:        stdout,
+			StdoutFile:    os.Stdout,
+			Stderr:        stderr,
 		})
 	}
 	if prompt == "" && loaded == nil {
@@ -314,6 +357,7 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 			MaxTurns:         int(store.Int("max_turns")),
 			CompactAuto:      store.Bool("compact.auto"),
 			CompactThreshold: store.Int("compact.threshold"),
+			StreamOptions:    streamOpts,
 			Stdout:           stdout,
 			Stderr:           stderr,
 		})
@@ -329,6 +373,7 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 		MaxTurns:         int(store.Int("max_turns")),
 		CompactAuto:      store.Bool("compact.auto"),
 		CompactThreshold: store.Int("compact.threshold"),
+		StreamOptions:    streamOpts,
 		Stdout:           stdout,
 		Stderr:           stderr,
 	})
