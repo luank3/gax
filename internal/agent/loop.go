@@ -393,8 +393,8 @@ func summarizeToolResult(name, text string) string {
 	if text == "" {
 		return ""
 	}
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
 	if name == "edit" || name == "write" {
-		lines := strings.Split(text, "\n")
 		if len(lines) > 20 {
 			lines = append(lines[:20], fmt.Sprintf("... (%d more diff lines)", len(lines)-20))
 		}
@@ -404,9 +404,27 @@ func summarizeToolResult(name, text string) string {
 		}
 		return out
 	}
-	first, _, _ := strings.Cut(text, "\n")
-	if len(first) > 160 {
-		return first[:157] + "..."
+	var nonEmpty []string
+	for _, l := range lines {
+		l = strings.TrimRight(l, " \t\r")
+		if l != "" {
+			nonEmpty = append(nonEmpty, l)
+		}
 	}
-	return first
+	if len(nonEmpty) == 0 {
+		return ""
+	}
+	if len(nonEmpty) > 6 {
+		omitted := len(nonEmpty) - 6
+		preview := make([]string, 0, 7)
+		preview = append(preview, nonEmpty[:3]...)
+		preview = append(preview, fmt.Sprintf("... (%d more lines)", omitted))
+		preview = append(preview, nonEmpty[len(nonEmpty)-3:]...)
+		nonEmpty = preview
+	}
+	out := strings.Join(nonEmpty, "\n")
+	if len(out) > 1024 {
+		return out[:1021] + "..."
+	}
+	return out
 }

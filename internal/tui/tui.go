@@ -369,8 +369,8 @@ func runInteractiveTurn(ctx context.Context, opts Options, sysPrompt string, col
 				}
 				if strings.HasPrefix(e.Summary, "--- ") {
 					printColoredDiff(opts.Stdout, e.Summary, pal)
-				} else if sum := truncateSingleLine(e.Summary, max(24, cols-4)); sum != "" {
-					fmt.Fprintf(opts.Stdout, "%s  %s%s\n", pal.Dim, sum, pal.Reset)
+				} else if e.Summary != "" {
+					printToolPreview(opts.Stdout, e.Summary, cols, pal)
 				}
 			case core.CompactStarted:
 				lbl := statusLbl.Update("compacting", true, time.Now())
@@ -638,6 +638,17 @@ func readCSISeq(r *bufio.Reader) string {
 	return b.String()
 }
 
+func printToolPreview(w io.Writer, summary string, cols int, pal theme.Palette) {
+	maxW := max(24, cols-4)
+	for _, l := range strings.Split(strings.TrimRight(summary, "\n"), "\n") {
+		rs := []rune(l)
+		if len(rs) > maxW {
+			l = string(rs[:maxW-3]) + "..."
+		}
+		fmt.Fprintf(w, "%s  │ %s%s\n", pal.Dim, l, pal.Reset)
+	}
+}
+
 func printColoredDiff(w io.Writer, diff string, pal theme.Palette) {
 	for _, l := range strings.Split(strings.TrimRight(diff, "\n"), "\n") {
 		switch {
@@ -681,7 +692,7 @@ func tailToolPreview(s string, maxLines, cols int, pal theme.Palette) string {
 		if len(rs) > maxW {
 			l = string(rs[:maxW-3]) + "..."
 		}
-		nonEmpty[i] = pal.Dim + "  " + l + pal.Reset
+		nonEmpty[i] = pal.Dim + "  │ " + l + pal.Reset
 	}
 	return strings.Join(nonEmpty, "\n")
 }
