@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/luank3/gax/internal/oneshot"
 	"github.com/luank3/gax/internal/platform"
 	"github.com/luank3/gax/internal/provider/registry"
+	"github.com/luank3/gax/internal/serve"
 	"github.com/luank3/gax/internal/session"
 	"github.com/luank3/gax/internal/subagent"
 	"github.com/luank3/gax/internal/tools"
@@ -55,6 +57,10 @@ func run(args []string, stdin io.Reader, stdinTTY bool, stdout, stderr io.Writer
 	if err != nil {
 		fmt.Fprintf(stderr, "gax: %v\n", err)
 		return 1
+	}
+
+	if len(args) > 0 && args[0] == "serve" {
+		return runServe(args[1:], store, dirs.State, dirs.Cache, stderr)
 	}
 
 	opts, err := parseArgs(args, store)
@@ -396,6 +402,58 @@ func parseArgs(args []string, store *config.Store) (cliOptions, error) {
 		}
 	}
 	return opts, nil
+}
+
+func runServe(args []string, store *config.Store, stateDir, cacheDir string, stderr io.Writer) int {
+	listen := serve.DefaultListen
+	allowRemote := false
+	token := os.Getenv("GAX_SERVE_TOKEN")
+	for _, a := range args {
+		switch {
+		case strings.HasPrefix(a, "--listen="):
+			listen = strings.TrimPrefix(a, "--listen=")
+		case a == "--allow-remote":
+			allowRemote = true
+		case a == "-h" || a == "--help":
+			fmt.Fprintln(stderr, "Usage: gax serve [--listen=127.0.0.1:8484] [--allow-remote]")
+			return 0
+		}
+	}
+	if allowRemote {
+		fmt.Fprintln(stderr, "WARNING: --allow-remote exposes remote code execution; keep the bearer token secret.")
+	}
+	httpClient := transport.NewClient(transport.RetryPolicy{
+		MaxRetries: int(store.Int("http.max_retries")),
+		BaseDelay:  store.Duration("http.retry_base"),
+	}, nil)
+	mcpMgr := mcp.NewManager(store.MCPServers(), cacheDir)
+	if mcpMgr != nil {
+		defer mcpMgr.Close()
+	}
+	srv, err := serve.NewServer(serve.Options{
+		Listen:      listen,
+		AllowRemote: allowRemote,
+		Token:       token,
+		StateDir:    stateDir,
+		Version:     version,
+		Store:       store,
+		HTTPClient:  httpClient,
+		MCP:         mcpMgr,
+	})
+	if err != nil {
+		fmt.Fprintf(stderr, "gax serve: %v\n", err)
+		return 1
+	}
+	defer srv.Close()
+	fmt.Fprintf(stderr, "gax serve listening on http://%s\n", listen)
+	if token == "" {
+		fmt.Fprintf(stderr, "bearer token: %s\n", srv.Token())
+	}
+	if err := http.ListenAndServe(listen, srv.Handler()); err != nil {
+		fmt.Fprintf(stderr, "gax serve: %v\n", err)
+		return 1
+	}
+	return 0
 }
 
 func printHelp(w io.Writer) {

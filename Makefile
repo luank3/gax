@@ -1,11 +1,15 @@
-.PHONY: build test test-race vet fmt fmt-check lint cross clean
+.PHONY: web build test test-race vet fmt fmt-check lint cross clean
 
 VERSION ?= dev
 LDFLAGS := -s -w -X main.version=$(VERSION)
 TARGETS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
 
-build:
-	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/gax ./cmd/gax
+web:
+	npm install --prefix web --no-audit --no-fund
+	npm run build --prefix web
+
+build: web
+	CGO_ENABLED=0 go build -tags webui -trimpath -ldflags="$(LDFLAGS)" -o bin/gax ./cmd/gax
 
 test:
 	CGO_ENABLED=0 go test ./...
@@ -24,12 +28,12 @@ fmt-check:
 
 lint: fmt-check vet
 
-cross:
+cross: web
 	@mkdir -p bin/cross
 	@for t in $(TARGETS); do \
 		os=$${t%/*}; arch=$${t#*/}; \
 		ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
-		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags="$(LDFLAGS)" -o bin/cross/gax-$$os-$$arch$$ext ./cmd/gax || exit 1; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -tags webui -trimpath -ldflags="$(LDFLAGS)" -o bin/cross/gax-$$os-$$arch$$ext ./cmd/gax || exit 1; \
 	done
 
 clean:
